@@ -50,4 +50,36 @@ app_server <- function(input, output, session) {
     data_import_rv = data_import_rv,
     data_clean_rv = data_clean_rv
   )
+
+  remove_noise_server(
+    id = "remove_noise_features_id",
+    volumes = volumes,
+    prj_init = prj_init,
+    data_import_rv = data_import_rv,
+    data_clean_rv = data_clean_rv
+  )
+
+  remove_outlier_server(
+    id = "remove_outlier_id",
+    volumes = volumes,
+    prj_init = prj_init,
+    data_import_rv = data_import_rv,
+    data_clean_rv = data_clean_rv
+  )
+
+  mv_impute_server(
+    id = "mv_impute_id",
+    volumes = volumes,
+    prj_init = prj_init,
+    data_import_rv = data_import_rv,
+    data_clean_rv = data_clean_rv
+  )
+
+  data_normalize_server(
+    id = "data_normalize_id",
+    volumes = volumes,
+    prj_init = prj_init,
+    data_import_rv = data_import_rv,
+    data_clean_rv = data_clean_rv
+  )
 }

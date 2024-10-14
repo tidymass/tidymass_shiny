@@ -21,9 +21,13 @@ app_ui <- function(request) {
         data_import_tbl_ui("data_import_tbl_id"),
         data_import_massdataset_ui("data_import_massdataset_id")
       ),
+      data_overview_ui("data_overview_id"),
       nav_menu(
         title = 'Data Cleaning',icon = bs_icon("filter"),
-        data_overview_ui("data_overview_id"),
+        remove_noise_ui("remove_noise_features_id"),
+        remove_outlier_ui("remove_outlier_id"),
+        mv_impute_ui("mv_impute_id"),
+        data_normalize_ui("data_normalize_id"),
       )
 
     )
