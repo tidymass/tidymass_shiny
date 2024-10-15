@@ -93,7 +93,7 @@ homepage_ui <- function(id) {
       # )
     ),
 
-    # 添加Footer
+    # add Footer
     hr_head(),
     tags$footer(style="text-align:center; margin-top: 20px;",
                 "")

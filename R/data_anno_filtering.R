@@ -25,19 +25,19 @@ annotation_filter_ui <- function(id) {
           radioButtons(
             inputId = ns("af_multi_anno"),
             label = "Multiple annotations",
-            choices = c("keep all","keep top total score","keep the first one"),
+            choices = c("keep all", "keep top total score", "keep the first one"),
             selected = "keep the first one"
           ),
           radioButtons(
             inputId = ns("af_redundancy"),
             label = "Remove redundancy",
-            choices = c("keep all","keep the first one"),
+            choices = c("keep all", "keep the first one"),
             selected = "keep all"
           ),
           radioButtons(
             inputId = ns("annotation_levels"),
             label = "Annotation levels",
-            choices = c("keep all","keep level 1 and 2"),
+            choices = c("keep all", "keep level 1 and 2"),
             selected = "keep all"
           )
         ),
@@ -47,7 +47,7 @@ annotation_filter_ui <- function(id) {
           selectInput_div(
             inputId = ns('af_column'),
             label = "column type",
-            choices = c("rp","hilic"),
+            choices = c("rp", "hilic"),
             selected = "rp",
             multiple = F,
             title = "column type"
@@ -71,79 +71,62 @@ annotation_filter_ui <- function(id) {
         )
       ),
       page_fluid(
-        nav_panel(title = "Annotation filtering",
-                  navset_card_tab(
-                    title = "Annotation table",
-                    height = 400,
-                    full_screen = TRUE,
-                    nav_panel(
-                      "Positive",
-                      DT::dataTableOutput(outputId = ns("Annotation_filtering_pos"))
-                    ),
-                    nav_panel(
-                      "Negative",
-                      DT::dataTableOutput(outputId = ns("Annotation_filtering_neg"))
-                    ),
-                    nav_panel(
-                      shiny::icon("circle-info"),
-                      markdown("description of noise remove method.")
-                    )
-                  ),
-                  navset_card_tab(
-                    title = "Check compound annotation in other online database",
-                    height = 400,
-                    full_screen = TRUE,
-                    nav_panel(
-                      "links"
-                    ),
-                    nav_panel(
-                      shiny::icon("circle-info"),
-                      markdown("description of noise remove method.")
-                    )
-                  ),
-                  layout_column_wrap(
-                    width = 1/2,
-                    height = 350,
-                    navset_card_tab(
-                      title = "Chromatogram (Only available at start with MS file.)",
-                      height = 350,
-                      full_screen = TRUE,
-                      nav_panel(
-                        "Positive",
-                        plotOutput(ns("Chromatogram_pos"))
-                      ),
-                      nav_panel(
-                        "Negative",
-                        plotOutput(ns("Chromatogram_neg"))
-                      )
-                    ),
-                    navset_card_tab(
-                      title = "MS/MS",
-                      height = 350,
-                      full_screen = TRUE,
-                      nav_panel(
-                        "Positive",
-                        plotOutput(ns("MS2_pos"))
-                      ),
-                      nav_panel(
-                        "Negative",
-                        plotOutput(ns("MS2_neg"))
-                      )
-                    ),
-                  ),
-                  navset_card_tab(
-                    title = "Status",
-                    height = 400,
-                    full_screen = TRUE,
-                    nav_panel(
-                      "Positive",
-                      verbatimTextOutput(ns("obj_af.pos"))
-                    ),
-                    nav_panel(
-                      "Negative",
-                      verbatimTextOutput(ns("obj_af.neg"))
-                    )
-                  )
+        nav_panel(
+          title = "Annotation filtering",
+          navset_card_tab(
+            title = "Annotation table",
+            height = 400,
+            full_screen = TRUE,
+            nav_panel("Positive", DT::dataTableOutput(
+              outputId = ns("Annotation_filtering_pos")
+            )),
+            nav_panel("Negative", DT::dataTableOutput(
+              outputId = ns("Annotation_filtering_neg")
+            )),
+            nav_panel(
+              shiny::icon("circle-info"),
+              markdown("description of noise remove method.")
+            )
+          ),
+          navset_card_tab(
+            title = "Check compound annotation in other online database",
+            height = 400,
+            full_screen = TRUE,
+            nav_panel("links"),
+            nav_panel(
+              shiny::icon("circle-info"),
+              markdown("description of noise remove method.")
+            )
+          ),
+          layout_column_wrap(
+            width = 1 / 2,
+            height = 350,
+            navset_card_tab(
+              title = "Chromatogram (Only available at start with MS file.)",
+              height = 350,
+              full_screen = TRUE,
+              nav_panel("Positive", plotOutput(ns(
+                "Chromatogram_pos"
+              ))),
+              nav_panel("Negative", plotOutput(ns(
+                "Chromatogram_neg"
+              )))
+            ),
+            navset_card_tab(
+              title = "MS/MS",
+              height = 350,
+              full_screen = TRUE,
+              nav_panel("Positive", plotOutput(ns("MS2_pos"))),
+              nav_panel("Negative", plotOutput(ns("MS2_neg")))
+            ),
+          ),
+          navset_card_tab(
+            title = "Status",
+            height = 400,
+            full_screen = TRUE,
+            nav_panel("Positive", verbatimTextOutput(ns("obj_af.pos"))),
+            nav_panel("Negative", verbatimTextOutput(ns("obj_af.neg")))
+          )
         )
       )
     )
@@ -169,12 +152,15 @@ annotation_filter_ui <- function(id) {
 #' @noRd
 
 
-annotation_filter_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_anno) {
-  moduleServer(id, function(input, output, session) {
-    ns <- session$ns
-    p2_dataclean <- reactiveValues(data = NULL)
-
-
-  })
-}
-
+annotation_filter_server <-
+  function(id,
+           volumes,
+           prj_init,
+           data_import_rv,
+           data_clean_rv,
+           data_anno) {
+    moduleServer(id, function(input, output, session) {
+      ns <- session$ns
+      p2_dataclean <- reactiveValues(data = NULL)
+    })
+  }

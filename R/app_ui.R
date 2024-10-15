@@ -12,7 +12,7 @@ app_ui <- function(request) {
     # Your application UI logic
     page_navbar(
       theme = bs_theme(bootswatch = "lumen"),
-      title = "Tidymass",
+      title = "TidyMass",
 #      homepage_ui("home_id"),
       project_init_ui("project_init_id"),
       nav_menu(
@@ -58,7 +58,7 @@ golem_add_external_resources <- function() {
     favicon(),
     bundle_resources(
       path = app_sys("app/www"),
-      app_title = "Tidymass"
+      app_title = "TidyMass"
     )
     # Add here other external resources
     # for example, you can add shinyalert::useShinyalert()
