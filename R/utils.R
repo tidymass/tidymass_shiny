@@ -8,7 +8,7 @@
 
 get_volumes <- function() {
   if (Sys.info()["sysname"] == "Windows") {
-    return(getVolumes_win())
+    return(get_volumes_win())
   } else {
     return(shinyFiles::getVolumes()())
   }

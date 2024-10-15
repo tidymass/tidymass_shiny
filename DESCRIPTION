@@ -1,17 +1,59 @@
-Package: tidymassShiny
+Package: tidymassshiny
 Title: An Amazing Shiny App
-Version: 0.0.0.9000
-Authors@R: 
-    person(given = "firstname",
-           family = "lastname",
+Version: 0.0.0.91
+Authors@R: c(
+    person(given = "Xiao",
+           family = "Wang",
            role = c("aut", "cre"),
-           email = "your@email.com")
-Description: What the package does (one paragraph).
-License: What license is it under?
+           email = "shawnwang2016@126.com",
+           comment = c(ORCID = "0000-0002-9608-9964")),
+    person(given = "Xiaotao",
+           family = "Shen",
+           role = c("aut"),
+           email = "shenxt1990@outlook.com",
+           comment = c(ORCID = "0000-0002-9608-9964"))
+           )
+Description: Shiny App for tidymass
+License: MIT + file LICENSE
+URL: https://github.com/tidymass/tidymass_shiny
+BugReports: https://github.com/tidymass/tidymass_shiny/issues
+Depends: 
+    R (>= 4.1)
 Imports: 
     config (>= 0.3.2),
     golem (>= 0.4.1),
-    shiny (>= 1.8.1.1)
+    shiny (>= 1.8.1.1),
+    DT,
+    MSnbase,
+    RCurl,
+    bsicons,
+    bslib,
+    dashboardthemes,
+    dplyr,
+    furrr,
+    future,
+    ggplot2,
+    magrittr,
+    patchwork,
+    plotly,
+    purrr,
+    shinyFiles,
+    shinyWidgets,
+    shinyjqui,
+    shinyjs,
+    stringr,
+    tibble,
+    metid,
+    masstools,
+    metpath,
+    massdataset,
+    massprocesser
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
+Remotes: 
+    gitlab::tidymass/metid,
+    gitlab::tidymass/masstools,
+    gitlab::tidymass/metpath,
+    gitlab::tidymass/massdataset,
+    gitlab::tidymass/massprocesser

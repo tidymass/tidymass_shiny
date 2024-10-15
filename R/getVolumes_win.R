@@ -11,7 +11,7 @@
 #' to handling paths with Chinese characters, ensuring correct handling of such paths.
 #' @export
 
-getVolumes_win <- function (exclude = NULL) {
+get_volumes_win <- function (exclude = NULL) {
   osSystem <- Sys.info()["sysname"]
   if (osSystem == "Darwin") {
     volumes <- dir_ls("/Volumes")
