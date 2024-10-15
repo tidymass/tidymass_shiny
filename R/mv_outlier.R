@@ -16,7 +16,7 @@ remove_outlier_ui <- function(id) {
   ns <- NS(id)
   nav_panel(
     title = 'Filter outlier samples',
-    icon = bs_icon("person-fill-dash"),
+    icon = bs_icon("funnel"),
     layout_sidebar(
       sidebar = accordion(
         accordion_panel(

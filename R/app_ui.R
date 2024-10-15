@@ -23,11 +23,17 @@ app_ui <- function(request) {
       ),
       data_overview_ui("data_overview_id"),
       nav_menu(
-        title = 'Data Cleaning',icon = bs_icon("filter"),
+        title = 'Data Cleaning',icon = bs_icon("wind"),
         remove_noise_ui("remove_noise_features_id"),
         remove_outlier_ui("remove_outlier_id"),
         mv_impute_ui("mv_impute_id"),
-        data_normalize_ui("data_normalize_id"),
+        data_normalize_ui("data_normalize_id")
+      ),
+      nav_menu(
+        title = 'Annotation',icon = bs_icon('person-vcard'),
+        feature_annotation_ui("feature_annotation_id"),
+        annotation_filter_ui("annotation_filter_id"),
+        feature_class_ui("feature_class_id")
       )
 
     )

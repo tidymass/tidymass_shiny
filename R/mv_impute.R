@@ -16,7 +16,7 @@ mv_impute_ui <- function(id) {
   ns <- NS(id)
   nav_panel(
     title = 'Missing value imputation',
-    icon = bs_icon("person-fill-dash"),
+    icon = bs_icon("grid-fill"),
     layout_sidebar(
       sidebar = accordion(
         accordion_panel(

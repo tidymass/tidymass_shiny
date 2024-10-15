@@ -82,4 +82,32 @@ app_server <- function(input, output, session) {
     data_import_rv = data_import_rv,
     data_clean_rv = data_clean_rv
   )
+  ## data_anno
+  data_anno<- reactiveValues(data = NULL)
+  feature_annotation_server(
+    id = "feature_annotation_id",
+    volumes = volumes,
+    prj_init = prj_init,
+    data_import_rv = data_import_rv,
+    data_clean_rv = data_clean_rv,
+    data_anno = data_anno
+  )
+
+  annotation_filter_server(
+    id = "annotation_filter_id",
+    volumes = volumes,
+    prj_init = prj_init,
+    data_import_rv = data_import_rv,
+    data_clean_rv = data_clean_rv,
+    data_anno = data_anno
+  )
+
+  feature_class_server(
+    id = "feature_class_ui",
+    volumes = volumes,
+    prj_init = prj_init,
+    data_import_rv = data_import_rv,
+    data_clean_rv = data_clean_rv,
+    data_anno = data_anno
+  )
 }
