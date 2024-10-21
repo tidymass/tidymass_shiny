@@ -14,9 +14,7 @@ project_init_ui <- function(id) {
   nav_panel(
     title = 'Initialize project',
     icon = bsicons::bs_icon("play-circle"),
-    navset_card_tab(
-      title = "Start your project.",
-      header = "Step 1",
+    layout_sidebar(
       sidebar = accordion(
         accordion_panel(
           title = "Working directory",
@@ -98,43 +96,43 @@ project_init_ui <- function(id) {
           p('Make sure your input .rda file is AUTO saved file by Annotation step, only needed in re-analysis annotation filtering step.',style = "color: #7a8788;font-size: 12px; font-style:Italic"),
         )
       ),
-      nav_panel(
-        title = "Setting working directory",
-        icon = bsicons::bs_icon("power"),
-        actionButton(inputId = ns('action_init'),'Initialize project',icon = icon("play"), style = "width: 200px;"),
-        tags$h3("Summary of input file",style = 'color: #008080'),
-        hr_head(),
-        htmlOutput(outputId = ns("file_check_init")),
-        card(
-          full_screen = T,
-          height = 350,
-          card_header(
-            "Sample information"
-          ),
-          DT::dataTableOutput(ns("tbl_sample_info"))
-        )
-      ),
-      nav_panel(
-        title = "Resuming analysis from the unfinished steps",
-        icon = bsicons::bs_icon("repeat"),
-        layout_column_wrap(
-          width = 1/2,
-          height = 300,
+      page_fluid(
+        nav_panel(
+          title = "Setting working directory",
+          icon = bsicons::bs_icon("power"),
+          actionButton(inputId = ns('action_init'),'Initialize project',icon = icon("play"), style = "width: 200px;"),
+          tags$h3("Summary of input file",style = 'color: #008080'),
+          hr_head(),
+          htmlOutput(outputId = ns("file_check_init")),
           card(
             full_screen = T,
             height = 350,
             card_header(
-              "Positive model"
+              "Sample information"
             ),
-            verbatimTextOutput(ns("res_pos_mod"))
+            DT::dataTableOutput(ns("tbl_sample_info"))
           ),
-          card(
-            full_screen = T,
-            height = 350,
-            card_header(
-              "Negative model"
+          tags$h3("Resuming task information",style = 'color: #008080'),
+          hr_head(),
+          layout_column_wrap(
+            width = 1/2,
+            height = 300,
+            card(
+              full_screen = T,
+              height = 350,
+              card_header(
+                "Positive model"
+              ),
+              verbatimTextOutput(ns("res_pos_mod"))
             ),
-            verbatimTextOutput(ns("res_neg_mod"))
+            card(
+              full_screen = T,
+              height = 350,
+              card_header(
+                "Negative model"
+              ),
+              verbatimTextOutput(ns("res_neg_mod"))
+            )
           )
         )
       )
