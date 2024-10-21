@@ -7,6 +7,7 @@
 #' @noRd
 app_server <-
   function(input, output, session) {
+
     # Your application server logic
     bslib::bs_themer()
     # Call module server functions

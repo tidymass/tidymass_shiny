@@ -5,39 +5,77 @@
 #' @import shiny
 #' @import bslib
 #' @noRd
+
+
 app_ui <- function(request) {
   tagList(
     # Leave this function for adding external resources
     golem_add_external_resources(),
+
     # Your application UI logic
     page_navbar(
       theme = bs_theme(bootswatch = "lumen"),
       title = "TidyMass",
-#      homepage_ui("home_id"),
       project_init_ui("project_init_id"),
       nav_menu(
-        title = 'Data import',icon = bs_icon("upload"),
+        title = 'Data import', icon = bs_icon("upload"),
         data_import_raw_ui("data_import_raw_id"),
         data_import_tbl_ui("data_import_tbl_id"),
         data_import_massdataset_ui("data_import_massdataset_id")
       ),
       data_overview_ui("data_overview_id"),
       nav_menu(
-        title = 'Data Cleaning',icon = bs_icon("wind"),
+        title = 'Data Cleaning', icon = bs_icon("wind"),
         remove_noise_ui("remove_noise_features_id"),
         remove_outlier_ui("remove_outlier_id"),
         mv_impute_ui("mv_impute_id"),
         data_normalize_ui("data_normalize_id")
       ),
       nav_menu(
-        title = 'Annotation',icon = bs_icon('person-vcard'),
+        title = 'Annotation', icon = bs_icon('person-vcard'),
         feature_annotation_ui("feature_annotation_id"),
         annotation_filter_ui("annotation_filter_id"),
         feature_class_ui("feature_class_id")
+      ),
+
+      # Add the fixedPanel to the footer with collapsible card
+      footer = absolutePanel(
+        id = "export_footer",
+        class = "card-no-gap",
+        draggable = TRUE,
+        top = "auto",
+        right = 0,
+        bottom = 0,
+        card(
+          card_header(class = "bg-dark", "Flexible tools"),
+          card_body(
+            accordion(
+              open = FALSE,
+              accordion_panel(
+                title = "Data export",
+                icon = bs_icon("caret-down-fill"),
+                radioButtons(
+                  inputId = "export_format",
+                  label = "Data format",
+                  choices = c("mass_dataset", "readable tables", "both"),
+                  selected = "both"
+                ),
+                textInput(
+                  inputId = "export_prefix",
+                  label = "Prefix of output filename",
+                  value = Sys.time()
+                ),
+                actionButton(inputId = "export_button", label = "Export", icon = icon("file-export"))
+              )
+            )
+          )
+        )
       )
 
-    )
-  )
+
+      )
+      )
+
 }
 
 #' Add external Resources to the Application

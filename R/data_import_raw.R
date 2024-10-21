@@ -12,6 +12,7 @@
 
 data_import_raw_ui <- function(id) {
   ns <- NS(id)
+
   nav_panel(
     title = 'Start with MS file',
     icon = bs_icon("upload"),

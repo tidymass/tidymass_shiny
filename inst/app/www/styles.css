@@ -1,0 +1,21 @@
+.text-wrap {
+  color: green;
+  font-size: 14px;
+  font-style: italic;
+  width: 100%;
+  word-wrap: break-word;
+}
+
+/* styles.css */
+.no-gap {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.card-no-gap .card-body {
+  padding: 0 !important;
+}
+
+.accordion-no-gap .accordion-body {
+  padding: 0 !important;
+}

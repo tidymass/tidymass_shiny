@@ -15,8 +15,7 @@ data_import_massdataset_ui <- function(id) {
   nav_panel(
     title = 'Start with mass_dataset',
     icon = bs_icon("upload"),
-    navs_tab_card(
-      title = "Start with mass_dataset",
+    layout_sidebar(
       sidebar = sidebar(
         shinyFilesButton(
           id = ns('Pos_obj_mass'),buttonType = "default",title = "load mass dataset object (positive) ",
@@ -31,68 +30,87 @@ data_import_massdataset_ui <- function(id) {
           class = NULL,
           icon = bs_icon("folder"), multiple = FALSE
         ),
-        tags$span(textOutput(outputId = ns("obj_neg_filepath")), class = "text-wrap")
-    ),
-    nav_panel(
-      title = "File check",
-      icon = bsicons::bs_icon("inbox"),
-      actionButton(ns('action1.3'),'1. Input file preview',icon = icon("computer-mouse"),width = "15%"),
-      tags$h3("Summary of input file",style = 'color: #008080'),
-      hr_head(),
-      htmlOutput(ns("obj_mass_res_path2")),
-      hr_head(),
-      layout_column_wrap(
-        width = 1/2,
-        height = 350,
-        card(
-          full_screen = T,
+        tags$span(textOutput(outputId = ns("obj_neg_filepath")), class = "text-wrap"),
+
+        actionButton(ns('action1.3'),'Check input',icon = icon("play")),
+      ),
+    page_fluid(
+      nav_panel(
+        title = "File check",
+        icon = bsicons::bs_icon("inbox"),
+        tags$h3("Summary of input file",style = 'color: #008080'),
+        hr_head(),
+        htmlOutput(ns("obj_mass_res_path2")),
+        hr_head(),
+        navset_card_tab(
           height = 350,
-          card_header(
-            "variable information"
+          full_screen = T,
+          title = "data preview",
+          nav_panel(
+            title =  "variable information",
+            card(
+              full_screen = T,
+              height = 350,
+              DT::dataTableOutput(ns("obj_variable_info")),
+            )
           ),
-          DT::dataTableOutput(ns("obj_variable_info")),
+          nav_panel(
+            title =  "expression data",
+            card(
+              full_screen = T,
+              height = 350,
+              DT::dataTableOutput(ns("obj_expmat"))
+            )
+          )
         ),
-        card(
-          full_screen = T,
+        navset_card_tab(
           height = 350,
-          card_header(
-            "expression table"
+          full_screen = T,
+          title = "Progress record of mass_dataset",
+          nav_panel(
+            title = "Positive",
+            card(
+              full_screen = T,
+              height = 350,
+              verbatimTextOutput(ns("obj_porgress.pos_info"))
+            )
           ),
-          DT::dataTableOutput(ns("obj_expmat"))
+          nav_panel(
+            title = "Negative",
+            card(
+              full_screen = T,
+              height = 350,
+              verbatimTextOutput(ns("obj_porgress.neg_info"))
+            )
+          )
         )
-      )
-    ),
-    nav_panel(
-      title = "Import from peak picking data",
-      icon = bsicons::bs_icon("table"),
-      actionButton(ns('action2.3'),'2. Mass_dataset information',icon = icon("computer-mouse"),width = '25%'),
-      tags$h3("Output file path",style = 'color: #008080'),
-      hr_head(),
-      htmlOutput(ns("obj_mass_res_path")),
-      hr_head(),
-      layout_column_wrap(
-        width = 1/2,
-        height = 350,
-        card(
-          full_screen = T,
+      ),
+      nav_panel(
+        title = "Import from mass_dataset",
+        icon = bsicons::bs_icon("table"),
+        layout_column_wrap(
+          width = 1/2,
           height = 350,
-          card_header(
-            "Positive"
+          card(
+            full_screen = T,
+            height = 350,
+            card_header(
+              "Positive"
+            ),
+            verbatimTextOutput(ns("obj_mass_check.pos_tbl2"))
           ),
-          verbatimTextOutput(ns("obj_mass_check.pos_tbl2")),
-        ),
-        card(
-          full_screen = T,
-          height = 350,
-          card_header(
-            "negative"
-          ),
-          verbatimTextOutput(ns("obj_mass_check.neg_tbl2"))
+          card(
+            full_screen = T,
+            height = 350,
+            card_header(
+              "negative"
+            ),
+            verbatimTextOutput(ns("obj_mass_check.neg_tbl2"))
+          )
         )
       )
     )
-  )
-
+    ),
   )
 
 }
@@ -193,14 +211,17 @@ data_import_massdataset_server <- function(id,volumes,prj_init,data_import_rv) {
           filename.a = "3.5.mass_datasetimport_vari_info_check",
           tbl = para_obj_check$exp_tbl
         )
-      }
-    )
 
+        #> progress
+        #> information of mass datasets
 
+        output$obj_porgress.pos_info = renderPrint({
+          print(data_import_rv$object_pos %>%  massdataset::extract_process_info())
+        })
 
-    observeEvent(
-      input$action2.3,
-      {
+        output$obj_porgress.neg_info = renderPrint({
+          print(data_import_rv$object_neg %>%  massdataset::extract_process_info())
+        })
         if(is.null(input$Pos_obj_mass)){return()}
         if(is.null(input$Neg_obj_mass)){return()}
         ## replace sample_info data and export

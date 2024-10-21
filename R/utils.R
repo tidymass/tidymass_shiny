@@ -222,3 +222,23 @@ get_compound_info <- function(compound_id) {
 
   return(result)
 }
+
+
+#' export mass_dataset
+#'
+#' match kegg cid 2 pathway.
+#' @return A dataframe to get term2gene
+#' @param compound_id kegg cid.
+#' @importFrom stringr str_extract_all
+#' @importFrom RCurl getURL
+#' @export
+#'
+
+export_data_for_shiny <- function(object,format,file_path,file_name) {
+  check_object_class(object = object, class = "mass_dataset")
+  format = match.arg(format)
+  if(format == "mass_dataset") {
+    save(object,file = file_path)
+  }
+
+}
