@@ -43,14 +43,7 @@ data_import_tbl_ui <- function(id) {
         selectInput(
           inputId = ns("exp_ion"),label = "polarity",choices = c('variable_id','mz','rt','ion'),
           selected = 'ion'
-        ),
-        shinyDirButton(id = ns("MS2_table"), label = "Select MS2 folder" ,
-                       title = "The MS2 file folder:",
-                       buttonType = "default", class = NULL,
-                       icon = bs_icon("folder"), multiple = FALSE),
-        tags$span(textOutput(outputId = ns("MS2_path_table")), class = "text-wrap"),
-        textInput(inputId = ns("tbl_ms2_mz_tol"),label = "ms2 mz tolarance",value = 30),
-        textInput(inputId = ns("tbl_ms2_rt_tol"),label = "ms2 rt tolarance",value = 15)
+        )
       ),
       page_fluid(
         nav_panel(
@@ -147,17 +140,6 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv) {
     })
 
 
-    #> Import MS2 folder: from table
-    observe({
-      shinyDirChoose(input, "MS2_table", roots = volumes, session = session)
-      if(!is.null(input$MS2_table)){
-        # browser()
-        ms2_folder_selected<-parseDirPath(roots = volumes,  input$MS2_table)
-        output$MS2_path_table <- renderText(ms2_folder_selected)
-      }})
-
-
-
     #> File check
     para_tbl_check <- reactiveValues(data = NULL)
 
@@ -179,8 +161,6 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv) {
         para_tbl_check$rt_n = as.character(input$exp_rt)
         para_tbl_check$ion_n = as.character(input$exp_ion)
 
-
-
         #> format files
         para_tbl_check$temp_vari_exp =
           para_tbl_check$temp_vari_exp %>%
@@ -188,7 +168,7 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv) {
             "variable_id" = para_tbl_check$variable_id_n,
             "mz" = para_tbl_check$mz_n,
             "rt" = para_tbl_check$rt_n,
-            "ion" = para_tbl_check$ion_n,
+            "ion" = para_tbl_check$ion_n
           )
         #> minute to second
         if(para_tbl_check$RT_tbl == "minute") {
@@ -260,33 +240,6 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv) {
           filter(class == "QC") %>%
           nrow()
 
-
-        para_tbl_check$ms2_folder_selected <- parseDirPath(volumes, input$MS2_table)
-        para_tbl_check$MS2_path <- para_tbl_check$ms2_folder_selected %>%  as.character()
-        para_tbl_check$QC_number.n2 <- list.files(paste0(para_tbl_check$MS2_path,"/NEG/QC"))
-        para_tbl_check$QC_number.p2 <- list.files(paste0(para_tbl_check$MS2_path,"/POS/QC"))
-        para_tbl_check$S_number.n2 <- list.files(paste0(para_tbl_check$MS2_path,"/NEG/Subject"))
-        para_tbl_check$S_number.p2 <- list.files(paste0(para_tbl_check$MS2_path,"/POS/Subject"))
-
-        #> MS2 file tbl
-        temp_tbl_ms2 = data.frame(
-          FileName = c(para_tbl_check$QC_number.n2,
-                       para_tbl_check$QC_number.p2,
-                       para_tbl_check$S_number.n2,
-                       para_tbl_check$S_number.p2),
-          Type = rep(c('QC_neg','QC_pos','Subject_neg','Subject_pos'),
-                     c(length(para_tbl_check$QC_number.n2),
-                       length(para_tbl_check$QC_number.p2),
-                       length(para_tbl_check$S_number.n2),
-                       length(para_tbl_check$S_number.p2)))
-        )
-
-        output$tbl_ms2 = renderDataTable_formated(
-          actions = input$action1.1,
-          tbl = temp_tbl_ms2,filename.a = "tblImport_ms2_file_check"
-        )
-
-
         #> MS1 information
         output$file_check2 = renderUI({
           isolate(HTML(
@@ -330,7 +283,6 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv) {
         pro_step_tbl = c(
           'Create mass_dataset class:\nPositive model ...',
           'Create mass_dataset class:\nNegative model ...',
-          'Add MS2 spectra data',
           'All finish'
         )
         data_import_rv$tbl_ms2_mz_tol = input$tbl_ms2_mz_tol %>%  as.numeric()
@@ -355,7 +307,6 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv) {
                              inner_join(variable_pos) %>%
                              column_to_rownames("variable_id") %>%
                              select(sample_info_pos %>%  pull(sample_id))
-
                            ##> pos variables informations
                            variable_info_pos =
                              para_tbl_check$vari_info %>%
@@ -376,7 +327,6 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv) {
                              filter(ion == "neg") %>%
                              select(variable_id)
                            ##> neg expression table
-
                            ##> neg sample informations
                            sample_info_neg = prj_init$sample_info
                            expression_data_neg =
@@ -397,28 +347,11 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv) {
                                variable_info = variable_info_neg
                              )
                          } else if (i == 3) {
-                           data_import_rv$object_pos =
-                             data_import_rv$object_pos %>%
-                             mutate_ms2(
-                               object = .,polarity = "positive",
-                               ms1.ms2.match.mz.tol = data_import_rv$tbl_ms2_mz_tol,
-                               ms1.ms2.match.rt.tol = data_import_rv$tbl_ms2_rt_tol,
-                               path = paste0(para_tbl_check$MS2_path,"/POS/")
-                             )
                            save_massobj(
                              polarity = 'positive',
                              file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
                              stage = 'step1',
                              obj = data_import_rv$object_pos)
-
-                           data_import_rv$object_neg =
-                             data_import_rv$object_neg %>%
-                             mutate_ms2(
-                               object = .,polarity = "negative",
-                               ms1.ms2.match.mz.tol = data_import_rv$tbl_ms2_mz_tol,
-                               ms1.ms2.match.rt.tol = data_import_rv$tbl_ms2_rt_tol,
-                               path = paste0(para_tbl_check$MS2_path,"/NEG/")
-                             )
                            save_massobj(
                              polarity = 'negative',
                              file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
