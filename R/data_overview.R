@@ -32,32 +32,90 @@ data_overview_ui <- function(id) {
                 height = 350,
                 full_screen = TRUE,
                 title = "Peak distribution",
+                sidebar = sidebar(
+                  open = 'closed',
+                  radioButtons(inputId = ns("Hex_distribution"),
+                               label = "Hex",
+                               choices = c("TRUE","FALSE"),
+                               selected = "TRUE"),
+                ),
                 nav_panel(
                   "Positive",
                   card_title("Peak distribution plot in positive model"),
-                  uiOutput(ns("summary_pd_plt.pos"),fill = T)
+                  uiOutput(ns("peak_dis_plot.pos"),fill = T)
                 ),
                 nav_panel(
                   "Negative",
                   card_title("Peak distribution plot in negative model"),
-                  uiOutput(ns("summary_pd_plt.neg"),fill = T)
-
+                  uiOutput(ns("peak_dis_plot.neg"),fill = T)
                 )
               ),
               navset_card_tab(
                 height = 350,
                 full_screen = TRUE,
                 title = "Check missing value",
+                sidebar = sidebar(
+                  open = 'closed',
+                  radioButtons(
+                    inputId = ns('show_row_names_smv'),
+                    label = 'show row names',
+                    choices = c("TRUE","FALSE"),
+                    selected = 'FALSE'
+                  ),
+                  radioButtons(
+                    inputId = ns('show_column_names_smv'),
+                    label = 'show row names',
+                    choices = c("TRUE","FALSE"),
+                    selected = 'TRUE'
+                  ),
+                  radioButtons(
+                    inputId = ns('percentage_smv'),
+                    label = 'percentage',
+                    choices = c("TRUE","FALSE"),
+                    selected = 'FALSE'
+                  ),
+                  radioButtons(
+                    inputId = ns('only_outlier_samples_smv'),
+                    label = 'only outlier samples',
+                    choices = c("TRUE","FALSE"),
+                    selected = 'FALSE'
+                  ),
+                  radioButtons(
+                    inputId = ns('only_outlier_variables_smv'),
+                    label = 'only outlier variables',
+                    choices = c("TRUE","FALSE"),
+                    selected = 'FALSE'
+                  ),
+                  radioButtons(
+                    inputId = ns('row_names_side_smv'),
+                    label = 'row name side',
+                    choices = c("left","right"),
+                    selected = 'right'
+                  ),
+                  sliderInput(
+                    inputId = ns('sample_na_cutoff_smv'),
+                    label = 'sample NA cutoff',
+                    min = 1,
+                    max = 100,step = 1,
+                    value = 50
+                  ),
+                  sliderInput(
+                    inputId = ns('variable_na_cutoff_smv'),
+                    label = 'variable NA cutoff',
+                    min = 1,
+                    max = 100,step = 1,
+                    value = 50
+                  )
+                ),
                 nav_panel(
                   "Positive",
                   card_title("Missing value summary in positive model"),
-                  uiOutput(ns("summary_mvs_plt.pos"),fill = T)
-
+                  plotOutput(ns("mv_plot_all.pos"))
                 ),
                 nav_panel(
                   "Negative",
                   card_title("Missing value summary in negative model"),
-                  uiOutput(ns("summary_mvs_plt.neg"),fill = T)
+                  plotOutput(ns("mv_plot_all.neg"))
 
                 ),
                 nav_panel(
@@ -99,6 +157,16 @@ data_overview_ui <- function(id) {
                 height = 350,
                 full_screen = TRUE,
                 title = "Missing value in variables",
+
+                sidebar = sidebar(
+                  id = ns("summ_mv_sidebar"),
+                  open = 'closed',
+                  selectInput(
+                    inputId = ns("mv_color_by"),label = "color by",
+                    choices = c("class","group","..."),selected = "class",
+                    multiple = F
+                  )
+                ),
                 nav_panel(
                   "Positive",
                   card_title("MV percentage (variable) in positive model"),
@@ -219,10 +287,11 @@ data_overview_ui <- function(id) {
 #' @param prj_init use project init variables.
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
+#' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
 
 
-data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv) {
+data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     p2_dataclean <- reactiveValues(data = NULL)
@@ -244,6 +313,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
           return()
         }
 
+
         p2_dataclean$object_neg =
           p2_dataclean$object_neg %>%
           activate_mass_dataset('sample_info') %>%
@@ -256,82 +326,100 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
           dplyr::select(sample_id) %>%
           dplyr::left_join(prj_init$sample_info)
 
-        #> color key of missing value
-        p2_dataclean$color_key_batch = input$data_clean_col_key
-        p2_dataclean$colby = input$mv_color_by
-        p2_dataclean$orderby = input$mv_order_by
 
-        #> batch effect
+# peak distribution -------------------------------------------------------
+
+
+        temp_hex = input$Hex_distribution %>% as.logical()
         #> plot.pos
-        output$data_clean_batch_plt.pos <- renderUI({
+
+        output$peak_dis_plot.pos <- renderUI({
           plot_type <- input$data_clean_plt_format
 
           if (plot_type) {
-            plotlyOutput(outputId = ns("plotly_plot_checkbatch.pos"))
+            plotlyOutput(outputId = ns("plotly_peak_dis_plot.pos"))
           } else {
-            plotOutput(outputId = ns("plot_checkbatch.pos"))
+            plotOutput(outputId = ns("plot_peak_dis_plot.pos"))
           }
+        })
 
+        output$plot_peak_dis_plot.pos <- renderPlot({
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          p2_dataclean$object_pos %>% massqc::show_mz_rt_plot(hex = temp_hex)
         })
 
 
-        output$plot_checkbatch.pos <- renderPlot({
+        output$plotly_peak_dis_plot.pos <- renderPlotly({
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
-          QC_boxplot(object = p2_dataclean$object_pos,colby = p2_dataclean$color_key_batch,type = 'plot')
-        })
-
-
-        output$plotly_plot_checkbatch.pos <- renderPlotly({
-          if(is.null(input$data_clean_start)){return()}
-          if(is.null(p2_dataclean$object_pos)){return()}
-          QC_boxplot(object = p2_dataclean$object_pos,colby = p2_dataclean$color_key_batch,type = 'plotly')
+          p2_dataclean$object_pos %>% massqc::show_mz_rt_plot(hex = temp_hex) %>% plotly::ggplotly()
         })
 
         #> plot.neg
-        output$data_clean_batch_plt.neg <- renderUI({
+        output$peak_dis_plot.neg <- renderUI({
           plot_type <- input$data_clean_plt_format
 
           if (plot_type) {
-            plotlyOutput(outputId = ns("plotly_plot_checkbatch.neg"))
+            plotlyOutput(outputId = ns("plotly_peak_dis_plot.neg"))
           } else {
-            plotOutput(outputId = ns("plot_checkbatch.neg"))
+            plotOutput(outputId = ns("plot_peak_dis_plot.neg"))
           }
         })
 
-        output$plot_checkbatch.neg <- renderPlot({
+        output$plot_peak_dis_plot.neg <- renderPlot({
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
-          QC_boxplot(object = p2_dataclean$object_neg,colby = p2_dataclean$color_key_batch,type = 'plot')
+          p2_dataclean$object_neg %>% massqc::show_mz_rt_plot(hex = temp_hex)
         })
 
-        output$plotly_plot_checkbatch.neg <- renderPlotly({
+
+        output$plotly_peak_dis_plot.neg <- renderPlotly({
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
-          QC_boxplot(object = p2_dataclean$object_neg,colby = p2_dataclean$color_key_batch,type = 'plotly')
+          p2_dataclean$object_neg %>% massqc::show_mz_rt_plot(hex = temp_hex) %>% plotly::ggplotly()
         })
 
-        #> plot.pos
-        output$data_clean_mv_plt.pos <- renderUI({
-          plot_type <- input$data_clean_plt_format
 
-          if (plot_type) {
-            plotlyOutput(outputId = ns("plotly_plot_checkmv.pos"))
-          } else {
-            plotOutput(outputId = ns("plot_checkmv.pos"))
-          }
-        })
+# plot mv--------------------------------------------------------------------
+        show_row_names = as.logical(input$show_row_names_smv)
+        show_column_names = as.logical(input$show_column_names_smv)
+        percentage = as.logical(input$percentage_smv)
+        row_names_side = as.character(input$row_names_side_smv)
+        sample_na_cutoff = as.numeric(input$sample_na_cutoff_smv)
+        variable_na_cutoff = as.numeric(input$variable_na_cutoff_smv)
+        only_outlier_samples = as.logical(input$only_outlier_samples_smv)
+        only_outlier_variables = as.logical(input$only_outlier_variables_smv)
+        print(show_row_names)
 
-        output$plot_checkmv.pos <- renderPlot({
+        output$mv_plot_all.pos <- renderPlot({
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
-          check_mv(object = p2_dataclean$object_pos,colby = p2_dataclean$colby,orderby = p2_dataclean$orderby,type = 'plot')
+          p2_dataclean$object_pos %>% massqc::show_missing_values(
+            show_row_names = show_row_names,
+            show_column_names = show_column_names,
+            percentage = percentage,
+            row_names_side = row_names_side,
+            sample_na_cutoff = sample_na_cutoff,
+            variable_na_cutoff = variable_na_cutoff,
+            only_outlier_samples = only_outlier_samples,
+            only_outlier_variables = only_outlier_variables
+          )
         })
 
-        output$plotly_plot_checkmv.pos <- renderPlotly({
+        output$mv_plot_all.neg <- renderPlot({
           if(is.null(input$data_clean_start)){return()}
-          if(is.null(p2_dataclean$object_pos)){return()}
-          check_mv(object = p2_dataclean$object_pos,colby = p2_dataclean$colby,orderby = p2_dataclean$orderby,type = 'plotly')
+          if(is.null(p2_dataclean$object_neg)){return()}
+          p2_dataclean$object_neg %>% massqc::show_missing_values(
+            show_row_names = show_row_names,
+            show_column_names = show_column_names,
+            percentage = percentage,
+            row_names_side = row_names_side,
+            sample_na_cutoff = sample_na_cutoff,
+            variable_na_cutoff = variable_na_cutoff,
+            only_outlier_samples = only_outlier_samples,
+            only_outlier_variables = only_outlier_variables
+          )
         })
 
         #> plot.neg

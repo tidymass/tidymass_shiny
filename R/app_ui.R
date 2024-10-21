@@ -37,42 +37,8 @@ app_ui <- function(request) {
         annotation_filter_ui("annotation_filter_id"),
         feature_class_ui("feature_class_id")
       ),
-
-      # Add the fixedPanel to the footer with collapsible card
-      footer = absolutePanel(
-        id = "export_footer",
-        class = "card-no-gap",
-        draggable = TRUE,
-        top = "auto",
-        right = 0,
-        bottom = 0,
-        card(
-          card_header(class = "bg-dark", "Flexible tools"),
-          card_body(
-            accordion(
-              open = FALSE,
-              accordion_panel(
-                title = "Data export",
-                icon = bs_icon("caret-down-fill"),
-                radioButtons(
-                  inputId = "export_format",
-                  label = "Data format",
-                  choices = c("mass_dataset", "readable tables", "both"),
-                  selected = "both"
-                ),
-                textInput(
-                  inputId = "export_prefix",
-                  label = "Prefix of output filename",
-                  value = Sys.time()
-                ),
-                actionButton(inputId = "export_button", label = "Export", icon = icon("file-export"))
-              )
-            )
-          )
-        )
-      )
-
-
+      # flexible tools
+      footer = flexible_tools_ui("flexible_tools")
       )
       )
 

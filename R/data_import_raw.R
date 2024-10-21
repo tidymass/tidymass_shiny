@@ -197,10 +197,11 @@ data_import_raw_ui <- function(id) {
 #' @param volumes shinyFiles volumes
 #' @param prj_init use project init variables.
 #' @param data_import_rv reactivevalues mass_dataset out
+#' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
 
 
-data_import_raw_server <- function(id,volumes,prj_init,data_import_rv) {
+data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 

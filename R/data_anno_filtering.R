@@ -149,6 +149,7 @@ annotation_filter_ui <- function(id) {
 #' @param prj_init use project init variables.
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
+#' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
 
 
@@ -158,6 +159,7 @@ annotation_filter_server <-
            prj_init,
            data_import_rv,
            data_clean_rv,
+           data_export_rv,
            data_anno) {
     moduleServer(id, function(input, output, session) {
       ns <- session$ns

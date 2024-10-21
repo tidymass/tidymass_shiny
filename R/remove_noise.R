@@ -134,10 +134,11 @@ remove_noise_ui <- function(id) {
 #' @param prj_init use project init variables.
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
+#' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
 
 
-remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv) {
+remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     p2_dataclean <- reactiveValues(data = NULL)

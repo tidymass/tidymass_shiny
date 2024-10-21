@@ -21,18 +21,27 @@ app_server <-
     project_init_server(id = "project_init_id", volumes = volumes, prj_init)
     #> data import
     data_import_rv <- reactiveValues(data = NULL)
+    data_export_rv <- reactiveValues(data = NULL)
+    flexible_tools_server(
+      id = "flexible_tools",
+      volumes = volumes,
+      data_export_rv = data_export_rv,
+      prj_init = prj_init
+    )
     data_import_raw_server(
       id = "data_import_raw_id",
       volumes = volumes,
       prj_init = prj_init,
-      data_import_rv = data_import_rv
+      data_import_rv = data_import_rv,
+      data_export_rv = data_export_rv
     )
     ##> from peak picking table
     data_import_tbl_server(
       id = "data_import_tbl_id",
       volumes = volumes,
       prj_init = prj_init,
-      data_import_rv = data_import_rv
+      data_import_rv = data_import_rv,
+      data_export_rv = data_export_rv
     )
 
     ##> from peak picking table
@@ -40,7 +49,8 @@ app_server <-
       id = "data_import_massdataset_id",
       volumes = volumes,
       prj_init = prj_init,
-      data_import_rv = data_import_rv
+      data_import_rv = data_import_rv,
+      data_export_rv = data_export_rv
     )
 
     #> Data clean
@@ -50,7 +60,8 @@ app_server <-
       volumes = volumes,
       prj_init = prj_init,
       data_import_rv = data_import_rv,
-      data_clean_rv = data_clean_rv
+      data_clean_rv = data_clean_rv,
+      data_export_rv = data_export_rv
     )
 
     remove_noise_server(
@@ -58,7 +69,8 @@ app_server <-
       volumes = volumes,
       prj_init = prj_init,
       data_import_rv = data_import_rv,
-      data_clean_rv = data_clean_rv
+      data_clean_rv = data_clean_rv,
+      data_export_rv = data_export_rv
     )
 
     remove_outlier_server(
@@ -66,7 +78,8 @@ app_server <-
       volumes = volumes,
       prj_init = prj_init,
       data_import_rv = data_import_rv,
-      data_clean_rv = data_clean_rv
+      data_clean_rv = data_clean_rv,
+      data_export_rv = data_export_rv
     )
 
     mv_impute_server(
@@ -74,7 +87,8 @@ app_server <-
       volumes = volumes,
       prj_init = prj_init,
       data_import_rv = data_import_rv,
-      data_clean_rv = data_clean_rv
+      data_clean_rv = data_clean_rv,
+      data_export_rv = data_export_rv
     )
 
     data_normalize_server(
@@ -82,7 +96,8 @@ app_server <-
       volumes = volumes,
       prj_init = prj_init,
       data_import_rv = data_import_rv,
-      data_clean_rv = data_clean_rv
+      data_clean_rv = data_clean_rv,
+      data_export_rv = data_export_rv
     )
     ## data_anno
     data_anno <- reactiveValues(data = NULL)
@@ -92,7 +107,8 @@ app_server <-
       prj_init = prj_init,
       data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv,
-      data_anno = data_anno
+      data_anno = data_anno,
+      data_export_rv = data_export_rv
     )
 
     annotation_filter_server(
@@ -101,7 +117,8 @@ app_server <-
       prj_init = prj_init,
       data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv,
-      data_anno = data_anno
+      data_anno = data_anno,
+      data_export_rv = data_export_rv
     )
 
     feature_class_server(
@@ -110,6 +127,7 @@ app_server <-
       prj_init = prj_init,
       data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv,
-      data_anno = data_anno
+      data_anno = data_anno,
+      data_export_rv = data_export_rv
     )
   }
