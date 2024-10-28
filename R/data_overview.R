@@ -9,6 +9,7 @@
 #' @importFrom shinyFiles shinyDirButton
 #' @importFrom shinyWidgets materialSwitch
 #' @importFrom DT dataTableOutput
+#' @importFrom colourpicker colourInput
 #' @noRd
 
 
@@ -52,7 +53,7 @@ data_overview_ui <- function(id) {
                     ),
                     selectInput(
                       inputId = ns("fig1_format"),label = "format",
-                      choices = c("jepg","pdf","png"),
+                      choices = c("jpg","pdf","png","tiff"),
                       selected = "pdf",selectize = F
                     ),
                     downloadButton(outputId = ns("fig1_download"),label = "Download",icon = icon("download"))
@@ -84,7 +85,7 @@ data_overview_ui <- function(id) {
                     ),
                     radioButtons(
                       inputId = ns('show_column_names_mv'),
-                      label = 'show row names',
+                      label = 'show column names',
                       choices = c("TRUE","FALSE"),
                       selected = 'TRUE'
                     ),
@@ -138,7 +139,7 @@ data_overview_ui <- function(id) {
                     ),
                     selectInput(
                       inputId = ns("fig2_format"),label = "format",
-                      choices = c("jepg","pdf","png"),
+                      choices = c("jpg","pdf","png","tiff"),
                       selected = "pdf",selectize = F
                     ),
                     downloadButton(outputId = ns("fig2_download"),label = "Download",icon = icon("download"))
@@ -167,30 +168,48 @@ data_overview_ui <- function(id) {
                 height = 350,
                 full_screen = TRUE,
                 title = "Missing value in samples",
-                sidebar = sidebar(
-                  id = ns("summ_mv_sidebar"),
-                  open = 'closed',
-                  selectInput(
-                    inputId = ns("color_by_smv"),label = "color by",
-                    choices = c("class","group","..."),selected = "class",
-                    multiple = F
+                sidebar = accordion(
+                  open = FALSE,
+                  accordion_panel(
+                    title = 'Parameters',
+                    selectInput(
+                      inputId = ns("color_by_smv"),label = "color by",
+                      choices = c("class","group","..."),selected = "class",
+                      multiple = F
+                    ),
+                    selectInput(
+                      inputId = ns("order_by_smv"),label = "order by",
+                      choices = c("injection.order","class","..."),selected = "class",
+                      multiple = F
+                    ),
+                    radioButtons(
+                      inputId = ns('percentage_smv'),label = 'percentage',choices = c("TRUE","FALSE"),selected = "FALSE"
+                    ),
+                    radioButtons(
+                      inputId = ns('show_x_text_smv'),label = 'show x text',choices = c("TRUE","FALSE"),selected = "TRUE"
+                    ),
+                    radioButtons(
+                      inputId = ns('show_x_ticks_smv'),label = 'show x ticks',choices = c("TRUE","FALSE"),selected = "TRUE"
+                    ),
+                    radioButtons(
+                      inputId = ns('desc_smv'),label = 'descend sample order or not',choices = c("TRUE","FALSE"),selected = "FALSE"
+                    )
                   ),
-                  selectInput(
-                    inputId = ns("order_by_smv"),label = "order by",
-                    choices = c("injection.order","class","..."),selected = "class",
-                    multiple = F
-                  ),
-                  radioButtons(
-                    inputId = ns('percentage_smv'),label = 'percentage',choices = c("TRUE","FALSE"),selected = "FALSE"
-                  ),
-                  radioButtons(
-                    inputId = ns('show_x_text_smv'),label = 'show x text',choices = c("TRUE","FALSE"),selected = "TRUE"
-                  ),
-                  radioButtons(
-                    inputId = ns('show_x_ticks_smv'),label = 'show x ticks',choices = c("TRUE","FALSE"),selected = "TRUE"
-                  ),
-                  radioButtons(
-                    inputId = ns('desc_smv'),label = 'descend sample order or not',choices = c("TRUE","FALSE"),selected = "FALSE"
+                  accordion_panel(
+                    title = 'Download',
+                    icon = bs_icon('download'),
+                    textInput(
+                      inputId = ns("fig3_height"),label = "Height",value = 7
+                    ),
+                    textInput(
+                      inputId = ns("fig3_width"),label = "width",value = 7
+                    ),
+                    selectInput(
+                      inputId = ns("fig3_format"),label = "format",
+                      choices = c("jpg","pdf","png","tiff"),
+                      selected = "pdf",selectize = F
+                    ),
+                    downloadButton(outputId = ns("fig3_download"),label = "Download",icon = icon("download"))
                   )
                 ),
                 nav_panel(
@@ -212,26 +231,61 @@ data_overview_ui <- function(id) {
                 full_screen = TRUE,
                 title = "Missing value in variables",
 
-                sidebar = sidebar(
-                  id = ns("summ_mv_sidebar"),
-                  open = 'closed',
-                  selectInput(
-                    inputId = ns("mv_color_by"),label = "color by",
-                    choices = c("class","group","..."),selected = "class",
-                    multiple = F
-                  )
-                ),
+                sidebar =
+                  accordion(
+                    open = FALSE,
+                    accordion_panel(
+                      title = 'Parameters',
+                      selectInput(
+                        inputId = ns('color_by_vmv'),
+                        label = 'color by',
+                        choices = c("mz","rt"),
+                        selected = 'mz'
+                      ),
+                      selectInput(
+                        inputId = ns('order_by_vmv'),
+                        label = 'order by',
+                        choices = c('variable_id',"..."),
+                        selected = 'variable_id'
+                      ),
+                      radioButtons(
+                        inputId = ns('percentage_vmv'),label = 'percentage',choices = c("TRUE","FALSE"),selected = "FALSE"
+                      ),
+                      radioButtons(
+                        inputId = ns('show_x_text_vmv'),label = 'show x text',choices = c("TRUE","FALSE"),selected = "TRUE"
+                      ),
+                      radioButtons(
+                        inputId = ns('show_x_ticks_vmv'),label = 'show x ticks',choices = c("TRUE","FALSE"),selected = "TRUE"
+                      ),
+                      radioButtons(
+                        inputId = ns('desc_vmv'),label = 'descend variable order or not',choices = c("TRUE","FALSE"),selected = "FALSE"
+                      )
+                    ),accordion_panel(
+                      title = 'Download',
+                      icon = bs_icon('download'),
+                      textInput(
+                        inputId = ns("fig4_height"),label = "Height",value = 7
+                      ),
+                      textInput(
+                        inputId = ns("fig4_width"),label = "width",value = 7
+                      ),
+                      selectInput(
+                        inputId = ns("fig4_format"),label = "format",
+                        choices = c("jpg","pdf","png","tiff"),
+                        selected = "pdf",selectize = F
+                      ),
+                      downloadButton(outputId = ns("fig4_download"),label = "Download",icon = icon("download"))
+                    )
+                  ),
                 nav_panel(
                   "Positive",
                   card_title("MV percentage (variable) in positive model"),
-                  uiOutput(ns("summary_mvp.v_plt.pos"),fill = T)
-
+                  plotOutput(ns("plot_vmv_plt.pos"),fill = T)
                 ),
                 nav_panel(
                   "Negative",
                   card_title("MV percentage (variable) in positive model"),
-                  uiOutput(ns("summary_mvp.v_plt.neg"),fill = T)
-
+                  plotOutput(ns("plot_vmv_plt.neg"),fill = T)
                 )
               )),
             layout_column_wrap(
@@ -241,16 +295,44 @@ data_overview_ui <- function(id) {
                 height = 350,
                 full_screen = TRUE,
                 title = "RSD distribution",
+                sidebar = accordion(
+                  open = 'closed',
+                  accordion_panel(
+                    title = 'Parameter',
+                    sliderInput(
+                      inputId = ns('rsd_cutoff'),label = 'rsd cutoff',min = 0,max = 100,step = 1,value = 30
+                    ),
+                    colourpicker::colourInput(inputId = ns("color_rsd"),
+                                              label = "color",
+                                              value = "red"),
+                  ),
+                  accordion_panel(
+                    title = 'Download',
+                    icon = bs_icon('download'),
+                    textInput(
+                      inputId = ns("fig5_height"),label = "Height",value = 7
+                    ),
+                    textInput(
+                      inputId = ns("fig5_width"),label = "width",value = 7
+                    ),
+                    selectInput(
+                      inputId = ns("fig5_format"),label = "format",
+                      choices = c("jpg","pdf","png","tiff"),
+                      selected = "pdf",selectize = F
+                    ),
+                    downloadButton(outputId = ns("fig5_download"),label = "Download",icon = icon("download"))
+                  )
+                ),
                 nav_panel(
                   "Positive",
                   card_title("RSD distribution in positive model"),
-                  uiOutput(ns("summary_rsd_plt.pos"),fill = T)
+                  uiOutput(ns("rsd_plt.pos"),fill = T)
 
                 ),
                 nav_panel(
                   "Negative",
                   card_title("RSD distribution in negative model"),
-                  uiOutput(ns("summary_rsd_plt.neg"),fill = T)
+                  uiOutput(ns("rsd_plt.neg"),fill = T)
 
                 )
               ),
@@ -353,16 +435,16 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
     ns <- session$ns
     p2_dataclean <- reactiveValues(data = NULL)
     ## parameters for color
-    observe({
-      updateSelectInput(session, "color_by_smv",choices = colnames(prj_init$sample_info),selected = colnames(prj_init$sample_info)[3])
-      updateSelectInput(session, "order_by_smv",choices = colnames(prj_init$sample_info),selected = colnames(prj_init$sample_info)[2])
-    })
+
     ##> set plot parameters =============
-    plot_para = reactive({
+    plot1_para = reactive({
       list(
         ##> fig1
-        fig1_hex = input$Hex_distribution %>% as.logical(),
-        ##> fig2
+        fig1_hex = input$Hex_distribution %>% as.logical()
+      )
+    })
+    plot2_para = reactive({
+      list(
         fig2_show_row_names = as.logical(input$show_row_names_mv),
         fig2_show_column_names = as.logical(input$show_column_names_mv),
         fig2_percentage = as.logical(input$percentage_mv),
@@ -370,24 +452,52 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         fig2_sample_na_cutoff = as.numeric(input$sample_na_cutoff_mv),
         fig2_variable_na_cutoff = as.numeric(input$variable_na_cutoff_mv),
         fig2_only_outlier_samples = as.logical(input$only_outlier_samples_mv),
-        fig2_only_outlier_variables = as.logical(input$only_outlier_variables_mv),
-        ##> fig3
+        fig2_only_outlier_variables = as.logical(input$only_outlier_variables_mv)
+        )
+    })
+    plot3_para = reactive({
+      list(
         fig3_color_by = input$color_by_smv %>% as.character(),
         fig3_order_by = input$order_by_smv %>% as.character(),
         fig3_percentage = input$percentage_smv %>% as.logical(),
         fig3_show_x_text = input$show_x_text_smv %>% as.logical(),
         fig3_show_x_ticks = input$show_x_ticks_smv %>% as.logical(),
         fig3_desc = input$desc_smv %>% as.logical()
-        ##> fig4
-        ##> fig5
-        ##> fig6
-        ##> fig7
+      )
+    })
+    plot4_para = reactive({
+      list(
+        fig4_color_by = input$color_by_vmv %>% as.character(),
+        fig4_order_by = input$order_by_vmv %>% as.character(),
+        fig4_percentage = input$percentage_vmv %>% as.logical(),
+        fig4_show_x_text = input$show_x_text_vmv %>% as.logical(),
+        fig4_show_x_ticks = input$show_x_ticks_vmv %>% as.logical(),
+        fig4_desc = input$desc_vmv %>% as.logical()
+      )
+    })
+    plot5_para = reactive({
+      list(
+        fig5_rsd_cutoff = input$rsd_cutoff %>% as.numeric(),
+        fig5_color = input$color_rsd %>% as.character()
+      )
+    })
+    plot6_para = reactive({
+      list(
+        fig3_color_by = input$color_by_smv %>% as.character(),
+        fig3_order_by = input$order_by_smv %>% as.character(),
+        fig3_percentage = input$percentage_smv %>% as.logical(),
+        fig3_show_x_text = input$show_x_text_smv %>% as.logical(),
+        fig3_show_x_ticks = input$show_x_ticks_smv %>% as.logical(),
+        fig3_desc = input$desc_smv %>% as.logical()
       )
     })
     ##> download parameters ================
     download_para = reactive({
       list(
         ##> fig1
+        fig1_width = as.numeric(input$fig1_width),
+        fig1_height = as.numeric(input$fig1_height),
+        fig1_format = as.character(input$fig1_format),
         ##> fig2
         fig2_width = as.numeric(input$fig2_width),
         fig2_height = as.numeric(input$fig2_height),
@@ -422,8 +532,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         } else {
           return()
         }
-        para = plot_para()
-        ###> fig1 ========
+        ###> fig1 peak distribution ========
         output$peak_dis_plot.pos <- renderUI({
           plot_type <- input$data_clean_plt_format
           if (plot_type) {
@@ -433,29 +542,22 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
           }
         })
 
-        p2_dataclean$fig1.pos =
-          p2_dataclean$object_pos %>% massqc::show_mz_rt_plot(hex = para$fig1_hex)
-
-
         output$plot_peak_dis_plot.pos <- renderPlot({
-
+          para = plot1_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
-          p2_dataclean$fig1.pos
+          p2_dataclean$object_pos %>% massqc::show_mz_rt_plot(hex = para$fig1_hex)
         })
 
 
         output$plotly_peak_dis_plot.pos <- renderPlotly({
-
+          para = plot1_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
-          p2_dataclean$fig1.pos %>% plotly::ggplotly()
+          p2_dataclean$object_pos %>% massqc::show_mz_rt_plot(hex = para$fig1_hex) %>% plotly::ggplotly()
         })
 
         #> plot.neg
-        p2_dataclean$fig1.neg =
-          p2_dataclean$object_neg %>% massqc::show_mz_rt_plot(hex = para$fig1_hex)
-
         output$peak_dis_plot.neg <- renderUI({
           plot_type <- input$data_clean_plt_format
           if (plot_type) {
@@ -466,22 +568,22 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         })
 
         output$plot_peak_dis_plot.neg <- renderPlot({
-
+          para = plot1_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
-          p2_dataclean$fig1.neg
+          p2_dataclean$object_neg %>% massqc::show_mz_rt_plot(hex = para$fig1_hex)
         })
 
         output$plotly_peak_dis_plot.neg <- renderPlotly({
-
+          para = plot1_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
-          p2_dataclean$fig1.neg %>% plotly::ggplotly()
+          p2_dataclean$object_neg %>% massqc::show_mz_rt_plot(hex = para$fig1_hex) %>% plotly::ggplotly()
         })
 
-        ###> fig2 ===================
+        ###> fig2 missing value summary ===================
         output$mv_plot_all.pos <- renderPlot({
-          para = plot_para()
+          para = plot2_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
           p2_dataclean$object_pos %>% massqc::show_missing_values(
@@ -497,7 +599,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         })
 
         output$mv_plot_all.neg <- renderPlot({
-          para = plot_para()
+          para = plot2_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
           p2_dataclean$object_neg %>% massqc::show_missing_values(
@@ -512,7 +614,11 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
           )
         })
 
-        ###> fig3 ================
+        ###> fig3 missing value in samples ================
+      observe({
+        updateSelectInput(session, "color_by_smv",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "group")
+        updateSelectInput(session, "order_by_smv",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "sample_id")
+      })
         # positive
         output$smv_plt.pos <- renderUI({
           plot_type <- input$data_clean_plt_format
@@ -522,9 +628,8 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
             plotOutput(outputId = ns("plot_smv_plt.pos"))
           }
         })
-
         output$plot_smv_plt.pos <- renderPlot({
-          para = plot_para()
+          para = plot3_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
           p2_dataclean$object_pos %>% massqc::show_sample_missing_values(
@@ -536,9 +641,8 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
             desc = para$fig3_desc
           )
         })
-
         output$plotly_smv_plt.pos <- renderPlotly({
-          para = plot_para()
+          para = plot3_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
           p2_dataclean$object_pos %>% massqc::show_sample_missing_values(
@@ -550,9 +654,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
             desc = para$fig3_desc
           ) %>% plotly::ggplotly()
         })
-
         # negative
-
         output$smv_plt.neg <- renderUI({
           plot_type <- input$data_clean_plt_format
           if (plot_type) {
@@ -561,9 +663,8 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
             plotOutput(outputId = ns("plot_smv_plt.neg"))
           }
         })
-
         output$plot_smv_plt.neg <- renderPlot({
-          para = plot_para()
+          para = plot3_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
           p2_dataclean$object_neg %>% massqc::show_sample_missing_values(
@@ -575,10 +676,8 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
             desc = para$fig3_desc
           )
         })
-
-
         output$plotly_smv_plt.neg <- renderPlotly({
-          para = plot_para()
+          para = plot3_para()
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
           p2_dataclean$object_neg %>% massqc::show_sample_missing_values(
@@ -590,61 +689,406 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
             desc = para$fig3_desc
           ) %>% plotly::ggplotly()
         })
+        ###> fig4 missing value in variable =======
+        temp_variable = p2_dataclean$object_neg %>% extract_variable_info_note()
+        observe({
+          updateSelectInput(session, "order_by_vmv",choices = temp_variable,selected = "variable_id")
+          updateSelectInput(session, "color_by_vmv",choices = temp_variable,selected = "mz")
+        })
+        # positive
+        output$plot_vmv_plt.pos <- renderPlot({
+          para = plot4_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          p2_dataclean$object_pos %>% massqc::show_variable_missing_values(
+            color_by = para$fig4_color_by,
+            order_by = para$fig4_order_by,
+            percentage = para$fig4_percentage,
+            show_x_text = para$fig4_show_x_text,
+            show_x_ticks = para$fig4_show_x_ticks,
+            desc = para$fig4_desc
+          )
+        })
+        # negative
+        output$plot_vmv_plt.neg <- renderPlot({
+          para = plot4_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
+          p2_dataclean$object_neg %>% massqc::show_variable_missing_values(
+            color_by = para$fig4_color_by,
+            order_by = para$fig4_order_by,
+            percentage = para$fig4_percentage,
+            show_x_text = para$fig4_show_x_text,
+            show_x_ticks = para$fig4_show_x_ticks,
+            desc = para$fig4_desc
+          )
+        })
+        ###> fig5 rsd =======
 
-
+        # positive
+        output$rsd_plt.pos <- renderUI({
+          plot_type <- input$data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_rsd_plt.pos"))
+          } else {
+            plotOutput(outputId = ns("plot_rsd_plt.pos"))
+          }
+        })
+        output$plot_rsd_plt.pos <- renderPlot({
+          para = plot5_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          p2_dataclean$object_pos %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_cumulative_rsd_plot(
+            rsd_cutoff = para$fig5_rsd_cutoff,
+            color = para$fig5_color,
+            title = 'All of QC sample'
+          )
+        })
+        output$plotly_rsd_plt.pos <- renderPlotly({
+          para = plot5_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          p2_dataclean$object_pos %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig5_rsd_cutoff,
+              color = para$fig5_color,
+              title = 'All of QC sample'
+            ) %>% plotly::ggplotly()
+        })
+        # negative
+        output$rsd_plt.neg <- renderUI({
+          plot_type <- input$data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_rsd_plt.neg"))
+          } else {
+            plotOutput(outputId = ns("plot_rsd_plt.neg"))
+          }
+        })
+        output$plot_rsd_plt.neg <- renderPlot({
+          para = plot5_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
+          p2_dataclean$object_neg %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig5_rsd_cutoff,
+              color = para$fig5_color,
+              title = 'All of QC sample'
+            )
+        })
+        output$plotly_rsd_plt.neg <- renderPlotly({
+          para = plot5_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
+          p2_dataclean$object_neg %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig5_rsd_cutoff,
+              color = para$fig5_color,
+              title = 'All of QC sample'
+            ) %>% plotly::ggplotly()
+        })
       }
     )
+
+
+
     ##> download plot ==================
-    ###> fig1
+    ###> fig1 =====
     output$fig1_download = downloadHandler(
       filename = function() {
-        "01.Peak_distribution"
-      },
-      content = function(file,format) {
-        para = download_para()
-        ggsave(
-          filename = paste0(file,"_pos.",para$fig1_format),
-          plot = p2_dataclean$object_pos %>% massqc::show_mz_rt_plot(hex = para$fig1_hex),
-          width = para$fig1_width,
-          height = para$fig1_height
-        )
-        ggsave(
-          filename = paste0(file,"_neg.",para$fig1_format),
-          plot = p2_dataclean$object_neg %>% massqc::show_mz_rt_plot(hex = para$fig1_hex),
-          width = para$fig1_width,
-          height = para$fig1_height
-        )
-      }
-    )
-    ###> fig2
-    output$fig2_download = downloadHandler(
-      filename = function() {
-        para_1 = download_para()
-        paste0("01.Missing_value_summary.",para_1$fig2_format)
+        paste0("01.Peak_distribution.", download_para()$fig1_format)
       },
       content = function(file) {
-        para = plot_para()
-        para_1 = download_para()
-        if(is.null(p2_dataclean$fig1.neg) & is.null(p2_dataclean$fig1.pos)) {
-          return()
-        } else if(is.null(p2_dataclean$fig1.neg))
+        # extract parameters
+        para <- plot1_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+          para_d$fig1_width = para_d$fig1_width * 2
+          p1 <- p2_dataclean$object_pos %>% massqc::show_mz_rt_plot(hex = para$fig1_hex)
+          p2 <- p2_dataclean$object_neg %>% massqc::show_mz_rt_plot(hex = para$fig1_hex)
+          p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          p <- p2_dataclean$object_pos %>% massqc::show_mz_rt_plot(hex = para$fig1_hex)
+        } else {
+          p <- p2_dataclean$object_neg %>% massqc::show_mz_rt_plot(hex = para$fig1_hex)
+        }
+
+        # save plot
         ggsave(
           filename = file,
-          plot = ,
-          width = para_1$fig2_width,
-          height = para_1$fig2_height
+          plot = p,
+          width = para_d$fig1_width,
+          height = para_d$fig1_height,
+          device = para_d$fig1_format
         )
       }
     )
-    ###> fig3
-    ###> fig4
-    ###> fig5
-    ###> fig6
+
+    ###> fig2 ====
+    output$fig2_download = downloadHandler(
+      filename = function() {
+        paste0("01.Missing_value_summary.", download_para()$fig2_format)
+      },
+      content = function(file) {
+        # extract parameters
+        para <- plot2_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+          para_d$fig2_width = para_d$fig2_width * 2
+          p1 <- p2_dataclean$object_pos %>% massqc::show_missing_values(
+            show_row_names = para$fig2_show_row_names,
+            show_column_names = para$fig2_show_column_names,
+            percentage = para$fig2_percentage,
+            row_names_side = para$fig2_row_names_side,
+            sample_na_cutoff = para$fig2_sample_na_cutoff,
+            variable_na_cutoff = para$fig2_variable_na_cutoff,
+            only_outlier_samples = para$fig2_only_outlier_samples,
+            only_outlier_variables = para$fig2_only_outlier_variables,
+            return_as_ggplot = TRUE
+          )
+          p2 <- p2_dataclean$object_neg %>% massqc::show_missing_values(
+            show_row_names = para$fig2_show_row_names,
+            show_column_names = para$fig2_show_column_names,
+            percentage = para$fig2_percentage,
+            row_names_side = para$fig2_row_names_side,
+            sample_na_cutoff = para$fig2_sample_na_cutoff,
+            variable_na_cutoff = para$fig2_variable_na_cutoff,
+            only_outlier_samples = para$fig2_only_outlier_samples,
+            only_outlier_variables = para$fig2_only_outlier_variables,
+            return_as_ggplot = TRUE
+          )
+          p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          p <- p2_dataclean$object_pos %>% massqc::show_missing_values(
+            show_row_names = para$fig2_show_row_names,
+            show_column_names = para$fig2_show_column_names,
+            percentage = para$fig2_percentage,
+            row_names_side = para$fig2_row_names_side,
+            sample_na_cutoff = para$fig2_sample_na_cutoff,
+            variable_na_cutoff = para$fig2_variable_na_cutoff,
+            only_outlier_samples = para$fig2_only_outlier_samples,
+            only_outlier_variables = para$fig2_only_outlier_variables,
+            return_as_ggplot = TRUE
+          )
+        } else {
+          p <- p2_dataclean$object_neg %>% massqc::show_missing_values(
+            show_row_names = para$fig2_show_row_names,
+            show_column_names = para$fig2_show_column_names,
+            percentage = para$fig2_percentage,
+            row_names_side = para$fig2_row_names_side,
+            sample_na_cutoff = para$fig2_sample_na_cutoff,
+            variable_na_cutoff = para$fig2_variable_na_cutoff,
+            only_outlier_samples = para$fig2_only_outlier_samples,
+            only_outlier_variables = para$fig2_only_outlier_variables,
+            return_as_ggplot = TRUE
+          )
+        }
+
+        # save plot
+
+        ggsave(
+          filename = file,
+          plot = p,
+          width = para_d$fig2_width,
+          height = para_d$fig2_height,
+          device = para_d$fig2_format
+        )
+      }
+    )
+    ###> fig3 ======
+    output$fig3_download = downloadHandler(
+      filename = function() {
+        paste0("03.Sample_missing_value.", download_para()$fig3_format)
+      },
+      content = function(file) {
+        # extract parameters
+        para <- plot3_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+          para_d$fig3_width = para_d$fig3_width * 2
+          p1 <- p2_dataclean$object_pos %>% massqc::show_sample_missing_values(
+            color_by = para$fig3_color_by,
+            order_by = para$fig3_order_by,
+            percentage = para$fig3_percentage,
+            show_x_text = para$fig3_show_x_text,
+            show_x_ticks = para$fig3_show_x_ticks,
+            desc = para$fig3_desc
+          )
+          p2 <- p2_dataclean$object_neg %>% massqc::show_sample_missing_values(
+            color_by = para$fig3_color_by,
+            order_by = para$fig3_order_by,
+            percentage = para$fig3_percentage,
+            show_x_text = para$fig3_show_x_text,
+            show_x_ticks = para$fig3_show_x_ticks,
+            desc = para$fig3_desc
+          )
+          p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          p <- p2_dataclean$object_pos %>% massqc::show_sample_missing_values(
+            color_by = para$fig3_color_by,
+            order_by = para$fig3_order_by,
+            percentage = para$fig3_percentage,
+            show_x_text = para$fig3_show_x_text,
+            show_x_ticks = para$fig3_show_x_ticks,
+            desc = para$fig3_desc
+          )
+        } else {
+          p <- p2_dataclean$object_neg %>% massqc::show_sample_missing_values(
+            color_by = para$fig3_color_by,
+            order_by = para$fig3_order_by,
+            percentage = para$fig3_percentage,
+            show_x_text = para$fig3_show_x_text,
+            show_x_ticks = para$fig3_show_x_ticks,
+            desc = para$fig3_desc
+          )
+        }
+
+        # save plot
+        ggsave(
+          filename = file,
+          plot = p,
+          width = para_d$fig3_width,
+          height = para_d$fig3_height,
+          device = para_d$fig3_format
+        )
+      }
+    )
+    ###> fig4 =======
+
+    output$fig4_download = downloadHandler(
+      filename = function() {
+        paste0("04.Variable_missing_value.", download_para()$fig4_format)
+      },
+      content = function(file) {
+        # extract parameters
+        para <- plot4_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+          para_d$fig4_width = para_d$fig4_width * 2
+          p1 <- p2_dataclean$object_pos %>% massqc::show_variable_missing_values(
+            color_by = para$fig4_color_by,
+            order_by = para$fig4_order_by,
+            percentage = para$fig4_percentage,
+            show_x_text = para$fig4_show_x_text,
+            show_x_ticks = para$fig4_show_x_ticks,
+            desc = para$fig4_desc
+          )
+          p2 <- p2_dataclean$object_neg %>% massqc::show_variable_missing_values(
+            color_by = para$fig4_color_by,
+            order_by = para$fig4_order_by,
+            percentage = para$fig4_percentage,
+            show_x_text = para$fig4_show_x_text,
+            show_x_ticks = para$fig4_show_x_ticks,
+            desc = para$fig4_desc
+          )
+          p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          p <- p2_dataclean$object_pos %>% massqc::show_variable_missing_values(
+            color_by = para$fig4_color_by,
+            order_by = para$fig4_order_by,
+            percentage = para$fig4_percentage,
+            show_x_text = para$fig4_show_x_text,
+            show_x_ticks = para$fig4_show_x_ticks,
+            desc = para$fig4_desc
+          )
+        } else {
+          p <- p2_dataclean$object_neg %>% massqc::show_variable_missing_values(
+            color_by = para$fig4_color_by,
+            order_by = para$fig4_order_by,
+            percentage = para$fig4_percentage,
+            show_x_text = para$fig4_show_x_text,
+            show_x_ticks = para$fig4_show_x_ticks,
+            desc = para$fig4_desc
+          )
+        }
+
+        # save plot
+        ggsave(
+          filename = file,
+          plot = p,
+          width = para_d$fig4_width,
+          height = para_d$fig4_height,
+          device = para_d$fig4_format
+        )
+      }
+    )
+    ###> fig5 ==============
+    output$fig5_download = downloadHandler(
+    filename = function() {
+      paste0("05.rsd_plot.", download_para()$fig5_format)
+    },
+    content = function(file) {
+      # extract parameters
+      para <- plot5_para()
+      para_d <- download_para()
+
+      # draw condition
+      if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+        para_d$fig5_width = para_d$fig5_width * 2
+        p1 <- p2_dataclean$object_pos %>%
+          dplyr::filter(class == "QC")%>%
+          massqc::massqc_cumulative_rsd_plot(
+            rsd_cutoff = para$fig5_rsd_cutoff,
+            color = para$fig5_color,
+            title = 'All of QC sample'
+          )
+        p2 <- p2_dataclean$object_neg %>%
+          dplyr::filter(class == "QC")%>%
+          massqc::massqc_cumulative_rsd_plot(
+            rsd_cutoff = para$fig5_rsd_cutoff,
+            color = para$fig5_color,
+            title = 'All of QC sample'
+          )
+        p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+      } else if (!is.null(p2_dataclean$object_pos)) {
+        p <- p2_dataclean$object_pos %>%
+          dplyr::filter(class == "QC")%>%
+          massqc::massqc_cumulative_rsd_plot(
+            rsd_cutoff = para$fig5_rsd_cutoff,
+            color = para$fig5_color,
+            title = 'All of QC sample'
+          )
+      } else {
+        p <- p2_dataclean$object_neg %>%
+          dplyr::filter(class == "QC")%>%
+          massqc::massqc_cumulative_rsd_plot(
+            rsd_cutoff = para$fig5_rsd_cutoff,
+            color = para$fig5_color,
+            title = 'All of QC sample'
+          )
+      }
+
+      # save plot
+      ggsave(
+        filename = file,
+        plot = p,
+        width = para_d$fig5_width,
+        height = para_d$fig5_height,
+        device = para_d$fig5_format
+      )
+    }
+    )
+
+    ###> fig6 ==============
+    ###>
+    ###>
   }
   )
   }
 
 
-##> download
+
 
 
