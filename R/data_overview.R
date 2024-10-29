@@ -325,13 +325,13 @@ data_overview_ui <- function(id) {
                 ),
                 nav_panel(
                   "Positive",
-                  card_title("RSD distribution in positive model"),
+                  card_title("Cumulative RSD in QC in positive model"),
                   uiOutput(ns("rsd_plt.pos"),fill = T)
 
                 ),
                 nav_panel(
                   "Negative",
-                  card_title("RSD distribution in negative model"),
+                  card_title("Cumulative RSD in QC in negative model"),
                   uiOutput(ns("rsd_plt.neg"),fill = T)
 
                 )
@@ -392,6 +392,13 @@ data_overview_ui <- function(id) {
             layout_column_wrap(
               width = 1/2,
               height = 350,
+              sidebar =
+                accordion(
+                  open = FALSE,
+                  accordion_panel(
+                    title = 'Parameters',
+                  )
+                ),
               navset_card_tab(
                 height = 350,
                 full_screen = TRUE,
