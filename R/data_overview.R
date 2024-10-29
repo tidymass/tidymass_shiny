@@ -340,26 +340,53 @@ data_overview_ui <- function(id) {
                 height = 350,
                 full_screen = TRUE,
                 title = "Intensity for all the variables",
-                sidebar = sidebar(
-                  id = ns("summ_Intensity_sidebar"),
-                  open = 'closed',
-                  selectInput(
-                    inputId = ns("boxplot_color_by"),label = "color by",
-                    choices = c("class","group","..."),selected = "batch",
-                    multiple = F
-                  )
-                ),
+                sidebar =
+                  accordion(
+                    open = FALSE,
+                    accordion_panel(
+                      title = 'Parameters',
+                      selectInput(
+                        inputId = ns('fig6_color_by'),label = "color by",choices = c("batch",'class'),selected = 'batch',multiple = F
+                      ),
+                      selectInput(
+                        inputId = ns('fig6_fill_by'),label = 'fill by',choices = c("batch",'class'),selected = 'class',multiple = F
+                      ),
+                      selectInput(
+                        inputId = ns('fig6_order_by'),label = 'fill by',choices = c("sample_id",'class'),selected = 'sample_id',multiple = F
+                      ),
+                      radioButtons(
+                        inputId = ns('fig6_point'),label = "point",choices = c('TRUE','FALSE'),selected = 'FALSE'
+                      ),
+                      sliderInput(
+                        inputId = ns('fig6_point_alpha'),label = 'point alpha',min = 0,max = 1,step = 0.1,value = 0.8
+                      )
+                    ),
+                    accordion_panel(
+                      title = 'Download',
+                      icon = bs_icon('download'),
+                      textInput(
+                        inputId = ns("fig6_height"),label = "Height",value = 7
+                      ),
+                      textInput(
+                        inputId = ns("fig6_width"),label = "width",value = 7
+                      ),
+                      selectInput(
+                        inputId = ns("fig6_format"),label = "format",
+                        choices = c("jpg","pdf","png","tiff"),
+                        selected = "pdf",selectize = F
+                      ),
+                      downloadButton(outputId = ns("fig6_download"),label = "Download",icon = icon("download"))
+                    )
+                  ),
                 nav_panel(
                   "Positive",
                   card_title("boxplot in positive model"),
-                  uiOutput(ns("summary_box_plt.pos"),fill = T)
-
+                  uiOutput(ns("box_plt.pos"),fill = T)
                 ),
                 nav_panel(
                   "Negative",
                   card_title("boxplot in negative model"),
-                  uiOutput(ns("summary_box_plt.neg"),fill = T)
-
+                  uiOutput(ns("box_plt.neg"),fill = T)
                 )
               )),
             layout_column_wrap(
@@ -483,12 +510,11 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
     })
     plot6_para = reactive({
       list(
-        fig3_color_by = input$color_by_smv %>% as.character(),
-        fig3_order_by = input$order_by_smv %>% as.character(),
-        fig3_percentage = input$percentage_smv %>% as.logical(),
-        fig3_show_x_text = input$show_x_text_smv %>% as.logical(),
-        fig3_show_x_ticks = input$show_x_ticks_smv %>% as.logical(),
-        fig3_desc = input$desc_smv %>% as.logical()
+        fig6_color_by = input$fig6_color_by %>% as.character(),
+        fig6_order_by = input$fig6_order_by %>% as.character(),
+        fig6_fill_by = input$fig6_fill_by %>% as.character(),
+        fig6_point = input$fig6_point %>% as.logical(),
+        fig6_point_alpha = input$fig6_point_alpha %>% as.numeric()
       )
     })
     ##> download parameters ================
@@ -791,6 +817,85 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
               title = 'All of QC sample'
             ) %>% plotly::ggplotly()
         })
+        ###> fig6 sample boxplot
+        observe({
+          updateSelectInput(session, "color_by_msb",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "batch")
+          updateSelectInput(session, "fill_by_msb",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
+          updateSelectInput(session, "order_by_msb",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "sample_id")
+        })
+        output$box_plt.pos <- renderUI({
+          plot_type <- input$data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_box_plt.pos"))
+          } else {
+            plotOutput(outputId = ns("plot_box_plt.pos"))
+          }
+        })
+        output$plot_box_plt.pos <- renderPlot({
+          para = plot6_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          p2_dataclean$object_pos %>%log() %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_sample_boxplot(
+              color_by = para$fig6_color_by,
+              fill_by = para$fig6_fill_by,
+              order_by = para$fig6_order_by,
+              point = para$fig6_point,
+              point_alpha = para$fig6_alpha
+            )
+        })
+        output$plotly_box_plt.pos <- renderPlotly({
+          para = plot6_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          p2_dataclean$object_pos %>%log() %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_sample_boxplot(
+              color_by = para$fig6_color_by,
+              fill_by = para$fig6_fill_by,
+              order_by = para$fig6_order_by,
+              point = para$fig6_point,
+              point_alpha = para$fig6_alpha
+            ) %>% plotly::ggplotly()
+        })
+        # negative
+        output$box_plt.neg <- renderUI({
+          plot_type <- input$data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_box_plt.neg"))
+          } else {
+            plotOutput(outputId = ns("plot_box_plt.neg"))
+          }
+        })
+        output$plot_box_plt.neg <- renderPlot({
+          para = plot6_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
+          p2_dataclean$object_neg %>%log() %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_sample_boxplot(
+              color_by = para$fig6_color_by,
+              fill_by = para$fig6_fill_by,
+              order_by = para$fig6_order_by,
+              point = para$fig6_point,
+              point_alpha = para$fig6_alpha
+            )
+        })
+        output$plotly_box_plt.neg <- renderPlotly({
+          para = plot6_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
+          p2_dataclean$object_neg %>% log() %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_sample_boxplot(
+              color_by = para$fig6_color_by,
+              fill_by = para$fig6_fill_by,
+              order_by = para$fig6_order_by,
+              point = para$fig6_point,
+              point_alpha = para$fig6_alpha
+            ) %>% plotly::ggplotly()
+        })
       }
     )
 
@@ -1082,6 +1187,69 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
     )
 
     ###> fig6 ==============
+    output$fig6_download = downloadHandler(
+      filename = function() {
+        paste0("06.rsd_plot.", download_para()$fig6_format)
+      },
+      content = function(file) {
+        # extract parameters
+        para <- plot6_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+          para_d$fig6_width = para_d$fig6_width * 2
+          p1 <- p2_dataclean$object_pos %>%log() %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_sample_boxplot(
+              color_by = para$fig6_color_by,
+              fill_by = para$fig6_fill_by,
+              order_by = para$fig6_order_by,
+              point = para$fig6_point,
+              point_alpha = para$fig6_alpha
+            )
+          p2 <- p2_dataclean$object_neg %>%log() %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_sample_boxplot(
+              color_by = para$fig6_color_by,
+              fill_by = para$fig6_fill_by,
+              order_by = para$fig6_order_by,
+              point = para$fig6_point,
+              point_alpha = para$fig6_alpha
+            )
+          p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          p <- p2_dataclean$object_pos %>%log() %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_sample_boxplot(
+              color_by = para$fig6_color_by,
+              fill_by = para$fig6_fill_by,
+              order_by = para$fig6_order_by,
+              point = para$fig6_point,
+              point_alpha = para$fig6_alpha
+            )
+        } else {
+          p <- p2_dataclean$object_neg %>%log() %>%
+            dplyr::filter(class == "QC")%>%
+            massqc::massqc_sample_boxplot(
+              color_by = para$fig6_color_by,
+              fill_by = para$fig6_fill_by,
+              order_by = para$fig6_order_by,
+              point = para$fig6_point,
+              point_alpha = para$fig6_alpha
+            )
+        }
+
+        # save plot
+        ggsave(
+          filename = file,
+          plot = p,
+          width = para_d$fig6_width,
+          height = para_d$fig6_height,
+          device = para_d$fig6_format
+        )
+      }
+    )
     ###>
     ###>
   }
