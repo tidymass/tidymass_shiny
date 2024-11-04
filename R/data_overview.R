@@ -466,7 +466,6 @@ data_overview_ui <- function(id) {
                   "Negative",
                   card_title("PCA plot in negative model"),
                   uiOutput(ns("fig7_pca.neg"),fill = T)
-
                 )
               ),
               navset_card_tab(
@@ -508,26 +507,38 @@ data_overview_ui <- function(id) {
                       selectInput(
                         inputId = ns('fig8_order_by'),label = 'order by',choices = c('sample_id','injection.order')
                       )
+                    ),
+                    accordion_panel(
+                      title = 'Download',
+                      icon = bs_icon('download'),
+                      textInput(
+                        inputId = ns("fig8_height"),label = "Height",value = 7
+                      ),
+                      textInput(
+                        inputId = ns("fig8_width"),label = "width",value = 7
+                      ),
+                      selectInput(
+                        inputId = ns("fig8_format"),label = "format",
+                        choices = c("jpg","pdf","png","tiff"),
+                        selected = "pdf",selectize = F
+                      ),
+                      downloadButton(outputId = ns("fig8_download"),label = "Download",icon = icon("download"))
                     )
                   ),
                 nav_panel(
                   "Positive",
                   card_title("Sample correlation in positive model"),
-                  uiOutput(ns("summary_corr_plt.pos"),fill = T)
-
+                  uiOutput(ns("fig8_corr_plt.pos"),fill = T)
                 ),
                 nav_panel(
                   "Negative",
                   card_title("Sample correlation in negative model"),
-                  uiOutput(ns("summary_corr_plt.neg"),fill = T)
-
+                  uiOutput(ns("fig8_corr_plt.neg"),fill = T)
                 )
               )
             )
           )
         )
-
-
       )
 }
 
@@ -628,6 +639,19 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         fig7_z_axis = input$fig7_z_axis %>% as.character()
       )
     })
+    plot8_para = reactive({
+      list(
+        fig8_class_by = input$fig8_class_by %>% as.character(),
+        fig8_cor_method = input$fig8_cor_method %>% as.character(),
+        fig8_method = input$fig8_method %>% as.character(),
+        fig8_type = input$fig8_type %>% as.character(),
+        fig8_min = input$fig8_min %>% as.character(),
+        fig8_mid = input$fig8_mid %>% as.character(),
+        fig8_max = input$fig8_max %>% as.character(),
+        fig8_outlier.color = input$fig8_outlier.color %>% as.character(),
+        fig8_order_by = input$fig8_order_by %>% as.character()
+      )
+    })
     ##> download parameters ================
     download_para = reactive({
       list(
@@ -658,9 +682,12 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         ##> fig7
         fig7_width = as.numeric(input$fig7_width),
         fig7_height = as.numeric(input$fig7_height),
-        fig7_format = as.character(input$fig7_format)
+        fig7_format = as.character(input$fig7_format),
+        ##> fig8
+        fig8_width = as.numeric(input$fig8_width),
+        fig8_height = as.numeric(input$fig8_height),
+        fig8_format = as.character(input$fig8_format)
       )
-
     })
 
     ##> draw plot ==================
@@ -1107,6 +1134,107 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
               z_axis = para$fig7_z_axis
             )
         })
+        ###> fig8 Correlation =============
+        observe({
+          updateSelectInput(session, "fig8_order_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
+        })
+        output$fig8_corr_plt.pos <- renderUI({
+          plot_type <- input$data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_corr_plt.pos"))
+          } else {
+            plotOutput(outputId = ns("plot_corr_plt.pos"))
+          }
+        })
+        output$plot_corr_plt.pos <- renderPlot({
+          para = plot8_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          if(para$fig8_class_by == 'All') {
+            temp_obj.pos <- p2_dataclean$object_pos
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos  %>%  massdataset::activate_mass_dataset(what = "sample_info") %>%
+              dplyr::filter(class == para$fig8_class_by)
+          }
+          temp_obj.pos %>%
+            massqc::massqc_sample_correlation(
+              cor_method = para$fig8_cor_method,
+              method = para$fig8_method,
+              type = para$fig8_type,
+              colors = c(para$fig8_min,para$fig8_mid,para$fig8_max),
+              outline.color = para$fig8_outlier.color,
+              order_by = para$fig8_order_by
+            )
+        })
+        output$plotly_corr_plt.pos <- renderPlotly({
+          para = plot8_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          if(para$fig8_class_by == 'All') {
+            temp_obj.pos <- p2_dataclean$object_pos
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos  %>%  massdataset::activate_mass_dataset(what = "sample_info") %>%
+              dplyr::filter(class == para$fig8_class_by)
+          }
+          temp_obj.pos %>%
+            massqc::massqc_sample_correlation(
+              cor_method = para$fig8_cor_method,
+              method = para$fig8_method,
+              type = para$fig8_type,
+              colors = c(para$fig8_min,para$fig8_mid,para$fig8_max),
+              outline.color = para$fig8_outlier.color,
+              order_by = para$fig8_order_by
+            ) %>% plotly::ggplotly()
+        })
+        # negative
+        output$fig8_corr_plt.neg <- renderUI({
+          plot_type <- input$data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_corr_plt.neg"))
+          } else {
+            plotOutput(outputId = ns("plot_corr_plt.neg"))
+          }
+        })
+        output$plot_corr_plt.neg <- renderPlot({
+          para = plot8_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          if(para$fig8_class_by == 'All') {
+            temp_obj.neg <- p2_dataclean$object_neg
+          } else {
+            temp_obj.neg <- p2_dataclean$object_neg  %>%  massdataset::activate_mass_dataset(what = "sample_info") %>%
+              dplyr::filter(class == para$fig8_class_by)
+          }
+          temp_obj.neg %>%
+            massqc::massqc_sample_correlation(
+              cor_method = para$fig8_cor_method,
+              method = para$fig8_method,
+              type = para$fig8_type,
+              colors = c(para$fig8_min,para$fig8_mid,para$fig8_max),
+              outline.color = para$fig8_outlier.color,
+              order_by = para$fig8_order_by
+            )
+        })
+        output$plotly_corr_plt.neg <- renderPlotly({
+          para = plot8_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
+          if(para$fig8_class_by == 'All') {
+            temp_obj.neg <- p2_dataclean$object_neg
+          } else {
+            temp_obj.neg <- p2_dataclean$object_neg  %>%  massdataset::activate_mass_dataset(what = "sample_info") %>%
+              dplyr::filter(class == para$fig8_class_by)
+          }
+          temp_obj.neg %>%
+            massqc::massqc_sample_correlation(
+              cor_method = para$fig8_cor_method,
+              method = para$fig8_method,
+              type = para$fig8_type,
+              colors = c(para$fig8_min,para$fig8_mid,para$fig8_max),
+              outline.color = para$fig8_outlier.color,
+              order_by = para$fig8_order_by
+            ) %>% plotly::ggplotly()
+        })
       }
     )
 
@@ -1463,8 +1591,6 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         )
       }
     )
-    ###>
-    ###>
     ###> fig7 ==============
     output$fig7_download = downloadHandler(
       filename = function() {
@@ -1540,6 +1666,91 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
           width = para_d$fig7_width,
           height = para_d$fig7_height,
           device = para_d$fig7_format
+        )
+      }
+    )
+    ###> fig8 ==============
+    output$fig8_download = downloadHandler(
+      filename = function() {
+        paste0("08.sample_correlation_plot.", download_para()$fig7_format)
+      },
+      content = function(file) {
+        # extract parameters
+        para <- plot8_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+          if(para$fig8_class_by == 'All') {
+            temp_obj.pos <- p2_dataclean$object_pos
+            temp_obj.neg <- p2_dataclean$object_neg
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos  %>%  massdataset::activate_mass_dataset(what = "sample_info") %>%
+              dplyr::filter(class == para$fig8_class_by)
+            temp_obj.neg <- p2_dataclean$object_neg  %>%  massdataset::activate_mass_dataset(what = "sample_info") %>%
+              dplyr::filter(class == para$fig8_class_by)
+          }
+          p1 = temp_obj.pos %>%
+            massqc::massqc_sample_correlation(
+              cor_method = para$fig8_cor_method,
+              method = para$fig8_method,
+              type = para$fig8_type,
+              colors = c(para$fig8_min,para$fig8_mid,para$fig8_max),
+              outline.color = para$fig8_outlier.color,
+              order_by = para$fig8_order_by
+            )
+
+          p2 = temp_obj.neg %>%
+            massqc::massqc_sample_correlation(
+              cor_method = para$fig8_cor_method,
+              method = para$fig8_method,
+              type = para$fig8_type,
+              colors = c(para$fig8_min,para$fig8_mid,para$fig8_max),
+              outline.color = para$fig8_outlier.color,
+              order_by = para$fig8_order_by
+            )
+          p = p1 + p2
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          if(para$fig8_class_by == 'All') {
+            temp_obj.pos <- p2_dataclean$object_pos
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos  %>%  massdataset::activate_mass_dataset(what = "sample_info") %>%
+              dplyr::filter(class == para$fig8_class_by)
+          }
+          p = temp_obj.pos %>%
+            massqc::massqc_sample_correlation(
+              cor_method = para$fig8_cor_method,
+              method = para$fig8_method,
+              type = para$fig8_type,
+              colors = c(para$fig8_min,para$fig8_mid,para$fig8_max),
+              outline.color = para$fig8_outlier.color,
+              order_by = para$fig8_order_by
+            )
+        } else if(!is.null(p2_dataclean$object_neg)){
+          if(para$fig8_class_by == 'All') {
+            temp_obj.neg <- p2_dataclean$object_neg
+          } else {
+            temp_obj.neg <- p2_dataclean$object_neg  %>%  massdataset::activate_mass_dataset(what = "sample_info") %>%
+              dplyr::filter(class == para$fig8_class_by)
+          }
+          p = temp_obj.neg %>%
+            massqc::massqc_sample_correlation(
+              cor_method = para$fig8_cor_method,
+              method = para$fig8_method,
+              type = para$fig8_type,
+              colors = c(para$fig8_min,para$fig8_mid,para$fig8_max),
+              outline.color = para$fig8_outlier.color,
+              order_by = para$fig8_order_by
+            )
+        }
+
+        # save plot
+        ggsave(
+          filename = file,
+          plot = p,
+          width = para_d$fig8_width,
+          height = para_d$fig8_height,
+          device = para_d$fig8_format
         )
       }
     )
