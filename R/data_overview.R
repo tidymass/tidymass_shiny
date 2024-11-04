@@ -25,7 +25,9 @@ data_overview_ui <- function(id) {
             materialSwitch(inputId = ns("data_clean_plt_format"),label = "Interactive plot", status = "primary"),
             actionButton(inputId = ns('generate_report_raw'),label = "Export report",icon = icon("save")),
           ),
+          ##> Main page ============
           page_fluid(
+            ###> column 1-2 ==================
             layout_column_wrap(
               width = 1/2,
               height = 350,
@@ -161,6 +163,7 @@ data_overview_ui <- function(id) {
                   markdown("Interactivecomplexheatmap DO NOT work when shiny version > 1.7.5 [issue](https://github.com/jokergoo/InteractiveComplexHeatmap/issues/114)")
                 )
               )),
+            ###> column 3 - 4 ==========================
             layout_column_wrap(
               width = 1/2,
               height = 350,
@@ -288,6 +291,7 @@ data_overview_ui <- function(id) {
                   plotOutput(ns("plot_vmv_plt.neg"),fill = T)
                 )
               )),
+            ###> column 5-6 ==================
             layout_column_wrap(
               width = 1/2,
               height = 350,
@@ -389,30 +393,79 @@ data_overview_ui <- function(id) {
                   uiOutput(ns("box_plt.neg"),fill = T)
                 )
               )),
+            ###> column 7-8 ====================
             layout_column_wrap(
               width = 1/2,
               height = 350,
-              sidebar =
-                accordion(
-                  open = FALSE,
-                  accordion_panel(
-                    title = 'Parameters',
-                  )
-                ),
               navset_card_tab(
                 height = 350,
                 full_screen = TRUE,
                 title = "PCA",
+                sidebar = accordion(
+                  open = FALSE,
+                  accordion_panel(
+                    title = 'Parameters',
+                    selectInput(
+                      inputId = ns('fig7_color_by'), label = 'color by', choices = c('group','class',"..."),selected = 'class',multiple = F
+                    ),
+                    radioButtons(
+                      inputId = ns('fig7_scale'),label = 'scale',choices = c('TRUE','FALSE'),selected = 'FALSE',
+                    ),
+                    sliderInput(
+                      inputId = ns('fig7_point_alpha'),label = 'point alpha',min = 0,max = 1,value = 0.8,step = 0.1
+                    ),
+                    radioButtons(
+                      inputId = ns('fig7_frame'),label = 'frame',choices = c('TRUE',"FALSE"),selected = 'TRUE'
+                    ),
+                    radioButtons(
+                      inputId = ns('fig7_line'),label = 'Add line', choices = c('TRUE','FALSE'),selected = 'TRUE'
+                    )
+                  ),
+                  accordion_panel(
+                    title = '3D Plot',
+                    selectInput(
+                      inputId = ns('fig7_color_by_3d'), label = 'color by', choices = c('group','class',"..."),selected = 'class',multiple = F
+                    ),
+                    radioButtons(
+                      inputId = ns('fig7_scale_3d'),label = 'scale',choices = c('TRUE','FALSE'),selected = 'FALSE',
+                    ),
+                    selectInput(
+                      inputId = ns('fig7_x_axis'),label = 'PC(n) for x axis',choices = paste0('PC',1:10),selected = 'PC1',multiple = F
+                    ),
+                    selectInput(
+                      inputId = ns('fig7_y_axis'),label = 'PC(n) for y axis',choices = paste0('PC',1:10),selected = 'PC2',multiple = F
+                    ),
+                    selectInput(
+                      inputId = ns('fig7_z_axis'),label = 'PC(n) for z axis',choices = paste0('PC',1:10),selected = 'PC3',multiple = F
+                    )
+                  ),
+                  accordion_panel(
+                    title = 'Download',
+                    icon = bs_icon('download'),
+                    textInput(
+                      inputId = ns("fig7_height"),label = "Height",value = 7
+                    ),
+                    textInput(
+                      inputId = ns("fig7_width"),label = "width",value = 7
+                    ),
+                    selectInput(
+                      inputId = ns("fig7_format"),label = "format",
+                      choices = c("jpg","pdf","png","tiff"),
+                      selected = "pdf",selectize = F
+                    ),
+                    downloadButton(outputId = ns("fig7_download"),label = "Download",icon = icon("download"))
+                  )
+                ),
                 nav_panel(
                   "Positive",
                   card_title("PCA plot in positive model"),
-                  uiOutput(ns("summary_pca_plt.pos"),fill = T)
+                  uiOutput(ns("fig7_pca.pos"),fill = T)
 
                 ),
                 nav_panel(
                   "Negative",
                   card_title("PCA plot in negative model"),
-                  uiOutput(ns("summary_pca_plt.neg"),fill = T)
+                  uiOutput(ns("fig7_pca.neg"),fill = T)
 
                 )
               ),
@@ -420,6 +473,43 @@ data_overview_ui <- function(id) {
                 height = 350,
                 full_screen = TRUE,
                 title = "Sample correlation",
+                sidebar =
+                  accordion(
+                    open = FALSE,
+                    accordion_panel(
+                      title = 'Parameters',
+                      radioButtons(
+                        inputId = ns('fig8_class_by'),label = 'class by',choices = c("QC","Subject","All"),selected = F
+                      ),
+                      selectInput(
+                        inputId = ns('fig8_cor_method'),label = 'correlation method',
+                        choices = c("spearman", "kendall", "pearson"),selected = 'spearman', multiple = F
+                      ),
+                      selectInput(
+                        inputId = ns('fig8_method'),label = 'method',choices = c("circle", "square"),selected = 'circle',
+                        multiple = F
+                      ),
+                      selectInput(
+                        inputId = ns('fig8_type'),label = 'type',choices = c("full", "lower", "upper"),selected = 'circle',
+                        multiple = F
+                      ),
+                      colourpicker::colourInput(
+                        inputId = ns('fig8_min'),label = 'minimal',value = 'blue'
+                      ),
+                      colourpicker::colourInput(
+                        inputId = ns('fig8_mid'),label = 'middle',value = 'white'
+                      ),
+                      colourpicker::colourInput(
+                        inputId = ns('fig8_max'),label = 'maximum',value = 'red'
+                      ),
+                      colourpicker::colourInput(
+                        inputId = ns('fig8_outlier.color'),label = 'outlier color',value = 'grey'
+                      ),
+                      selectInput(
+                        inputId = ns('fig8_order_by'),label = 'order by',choices = c('sample_id','injection.order')
+                      )
+                    )
+                  ),
                 nav_panel(
                   "Positive",
                   card_title("Sample correlation in positive model"),
@@ -524,6 +614,20 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         fig6_point_alpha = input$fig6_point_alpha %>% as.numeric()
       )
     })
+    plot7_para = reactive({
+      list(
+        fig7_color_by = input$fig7_color_by %>% as.character(),
+        fig7_scale = input$fig7_scale %>% as.logical(),
+        fig7_point_alpha = input$fig7_point_alpha %>% as.numeric(),
+        fig7_frame = input$fig7_frame %>% as.logical(),
+        fig7_line = input$fig7_line %>% as.logical(),
+        fig7_color_by_3d = input$fig7_color_by_3d %>% as.character(),
+        fig7_scale_3d = input$fig7_scale_3d %>% as.logical(),
+        fig7_x_axis = input$fig7_x_axis %>% as.character(),
+        fig7_y_axis = input$fig7_y_axis %>% as.character(),
+        fig7_z_axis = input$fig7_z_axis %>% as.character()
+      )
+    })
     ##> download parameters ================
     download_para = reactive({
       list(
@@ -550,8 +654,13 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         ##> fig6
         fig6_width = as.numeric(input$fig6_width),
         fig6_height = as.numeric(input$fig6_height),
-        fig6_format = as.character(input$fig6_format)
+        fig6_format = as.character(input$fig6_format),
+        ##> fig7
+        fig7_width = as.numeric(input$fig7_width),
+        fig7_height = as.numeric(input$fig7_height),
+        fig7_format = as.character(input$fig7_format)
       )
+
     })
 
     ##> draw plot ==================
@@ -824,11 +933,11 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
               title = 'All of QC sample'
             ) %>% plotly::ggplotly()
         })
-        ###> fig6 sample boxplot
+        ###> fig6 sample boxplot =========
         observe({
-          updateSelectInput(session, "color_by_msb",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "batch")
-          updateSelectInput(session, "fill_by_msb",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
-          updateSelectInput(session, "order_by_msb",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "sample_id")
+          updateSelectInput(session, "fig6_color_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "batch")
+          updateSelectInput(session, "fig6_fill_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
+          updateSelectInput(session, "fig6_order_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "sample_id")
         })
         output$box_plt.pos <- renderUI({
           plot_type <- input$data_clean_plt_format
@@ -903,8 +1012,105 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
               point_alpha = para$fig6_alpha
             ) %>% plotly::ggplotly()
         })
+        ###> fig7 PCA =============
+        observe({
+          updateSelectInput(session, "fig7_color_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
+          updateSelectInput(session, "fig7_color_by_3d",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
+        })
+        output$fig7_pca.pos <- renderUI({
+          plot_type <- input$data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_pca.pos"))
+          } else {
+            plotOutput(outputId = ns("plot_pca.pos"))
+          }
+        })
+        output$plot_pca.pos <- renderPlot({
+          para = plot7_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          if(isTRUE(para$fig7_scale)) {
+            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2)
+          }
+
+          temp_obj.pos %>%
+            massqc::massqc_pca(
+              color_by = para$fig7_color_by,
+              point_alpha = para$fig7_point_alpha,
+              frame = para$fig7_frame,
+              line = para$fig7_line
+            )
+        })
+        output$plotly_pca.pos <- renderPlotly({
+          para = plot7_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_pos)){return()}
+          if(isTRUE(para$fig7_scale_3d)) {
+            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2)
+          }
+          temp_obj.pos %>%
+            massqc_pca_3d(
+              color_by = para$fig7_color_by_3d,
+              x_axis = para$fig7_x_axis,
+              y_axis = para$fig7_y_axis,
+              z_axis = para$fig7_z_axis
+            )
+        })
+        # negative
+        output$fig7_pca.neg <- renderUI({
+          plot_type <- input$data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_pca.neg"))
+          } else {
+            plotOutput(outputId = ns("plot_pca.neg"))
+          }
+        })
+        output$plot_pca.neg <- renderPlot({
+          para = plot7_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
+
+          if(isTRUE(para$fig7_scale)) {
+            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2)
+          }
+
+          temp_obj.neg %>%
+            massqc::massqc_pca(
+              color_by = para$fig7_color_by,
+              point_alpha = para$fig7_point_alpha,
+              frame = para$fig7_frame,
+              line = para$fig7_line
+            )
+        })
+        output$plotly_pca.neg <- renderPlotly({
+          para = plot7_para()
+          if(is.null(input$data_clean_start)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
+
+          if(isTRUE(para$fig7_scale_3d)) {
+            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2)
+          }
+
+          temp_obj.neg %>%
+            massqc_pca_3d(
+              color_by = para$fig7_color_by_3d,
+              x_axis = para$fig7_x_axis,
+              y_axis = para$fig7_y_axis,
+              z_axis = para$fig7_z_axis
+            )
+        })
       }
     )
+
+
 
 
 
@@ -1259,6 +1465,84 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
     )
     ###>
     ###>
+    ###> fig7 ==============
+    output$fig7_download = downloadHandler(
+      filename = function() {
+        paste0("07.pca_plot.", download_para()$fig7_format)
+      },
+      content = function(file) {
+        # extract parameters
+        para <- plot7_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+
+          if(isTRUE(para$fig7_scale_3d)) {
+            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2) %>% scale()
+            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2)
+            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2)
+          }
+
+          para_d$fig7_width = para_d$fig7_width * 2
+
+          p1 <- temp_obj.pos %>%
+            massqc::massqc_pca(
+              color_by = para$fig7_color_by,
+              point_alpha = para$fig7_point_alpha,
+              frame = para$fig7_frame,
+              line = para$fig7_line
+            )
+          p2 <- temp_obj.neg %>%
+            massqc::massqc_pca(
+              color_by = para$fig7_color_by,
+              point_alpha = para$fig7_point_alpha,
+              frame = para$fig7_frame,
+              line = para$fig7_line
+            )
+          p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          if(isTRUE(para$fig7_scale_3d)) {
+            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2)
+          }
+
+          p <- temp_obj.pos %>%
+            massqc::massqc_pca(
+              color_by = para$fig7_color_by,
+              point_alpha = para$fig7_point_alpha,
+              frame = para$fig7_frame,
+              line = para$fig7_line
+            )
+        } else {
+          if(isTRUE(para$fig7_scale_3d)) {
+            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2)
+          }
+
+          p <- temp_obj.neg %>%
+            massqc::massqc_pca(
+              color_by = para$fig7_color_by,
+              point_alpha = para$fig7_point_alpha,
+              frame = para$fig7_frame,
+              line = para$fig7_line
+            )
+        }
+
+        # save plot
+        ggsave(
+          filename = file,
+          plot = p,
+          width = para_d$fig7_width,
+          height = para_d$fig7_height,
+          device = para_d$fig7_format
+        )
+      }
+    )
   }
   )
   }
