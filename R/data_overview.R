@@ -22,7 +22,6 @@ data_overview_ui <- function(id) {
           sidebar = sidebar(
             title = "Actions",
             actionButton(inputId = ns('data_clean_start'),label = "Start",icon = icon("play")),
-            materialSwitch(inputId = ns("data_clean_plt_format"),label = "Interactive plot", status = "primary"),
             actionButton(inputId = ns('generate_report_raw'),label = "Export report",icon = icon("save")),
           ),
           ##> Main page ============
@@ -43,6 +42,7 @@ data_overview_ui <- function(id) {
                                  label = "Hex",
                                  choices = c("TRUE","FALSE"),
                                  selected = "TRUE"),
+                    materialSwitch(inputId = ns("fig1_data_clean_plt_format"),label = "Interactive plot", status = "primary"),
                   ),
                   accordion_panel(
                     title = 'Download',
@@ -196,7 +196,8 @@ data_overview_ui <- function(id) {
                     ),
                     radioButtons(
                       inputId = ns('desc_smv'),label = 'descend sample order or not',choices = c("TRUE","FALSE"),selected = "FALSE"
-                    )
+                    ),
+                    materialSwitch(inputId = ns("fig3_data_clean_plt_format"),label = "Interactive plot", status = "primary"),
                   ),
                   accordion_panel(
                     title = 'Download',
@@ -263,6 +264,7 @@ data_overview_ui <- function(id) {
                       radioButtons(
                         inputId = ns('desc_vmv'),label = 'descend variable order or not',choices = c("TRUE","FALSE"),selected = "FALSE"
                       )
+
                     ),accordion_panel(
                       title = 'Download',
                       icon = bs_icon('download'),
@@ -309,6 +311,7 @@ data_overview_ui <- function(id) {
                     colourpicker::colourInput(inputId = ns("color_rsd"),
                                               label = "color",
                                               value = "red"),
+                    materialSwitch(inputId = ns("fig5_data_clean_plt_format"),label = "Interactive plot", status = "primary"),
                   ),
                   accordion_panel(
                     title = 'Download',
@@ -363,7 +366,8 @@ data_overview_ui <- function(id) {
                       ),
                       sliderInput(
                         inputId = ns('fig6_point_alpha'),label = 'point alpha',min = 0,max = 1,step = 0.1,value = 0.8
-                      )
+                      ),
+                      materialSwitch(inputId = ns("fig6_data_clean_plt_format"),label = "Interactive plot", status = "primary"),
                     ),
                     accordion_panel(
                       title = 'Download',
@@ -419,10 +423,11 @@ data_overview_ui <- function(id) {
                     ),
                     radioButtons(
                       inputId = ns('fig7_line'),label = 'Add line', choices = c('TRUE','FALSE'),selected = 'TRUE'
-                    )
+                    ),
                   ),
                   accordion_panel(
                     title = '3D Plot',
+                    materialSwitch(inputId = ns("fig7_data_clean_plt_format"),label = "Interactive plot", status = "primary"),
                     selectInput(
                       inputId = ns('fig7_color_by_3d'), label = 'color by', choices = c('group','class',"..."),selected = 'class',multiple = F
                     ),
@@ -478,18 +483,18 @@ data_overview_ui <- function(id) {
                     accordion_panel(
                       title = 'Parameters',
                       radioButtons(
-                        inputId = ns('fig8_class_by'),label = 'class by',choices = c("QC","Subject","All"),selected = F
+                        inputId = ns('fig8_class_by'),label = 'class by',choices = c("QC","Subject","All"),selected = "Subject"
                       ),
                       selectInput(
                         inputId = ns('fig8_cor_method'),label = 'correlation method',
                         choices = c("spearman", "kendall", "pearson"),selected = 'spearman', multiple = F
                       ),
                       selectInput(
-                        inputId = ns('fig8_method'),label = 'method',choices = c("circle", "square"),selected = 'circle',
+                        inputId = ns('fig8_method'),label = 'method',choices = c("circle", "square"),selected = 'square',
                         multiple = F
                       ),
                       selectInput(
-                        inputId = ns('fig8_type'),label = 'type',choices = c("full", "lower", "upper"),selected = 'circle',
+                        inputId = ns('fig8_type'),label = 'type',choices = c("full", "lower", "upper"),selected = 'full',
                         multiple = F
                       ),
                       colourpicker::colourInput(
@@ -505,8 +510,9 @@ data_overview_ui <- function(id) {
                         inputId = ns('fig8_outlier.color'),label = 'outlier color',value = 'grey'
                       ),
                       selectInput(
-                        inputId = ns('fig8_order_by'),label = 'order by',choices = c('sample_id','injection.order')
-                      )
+                        inputId = ns('fig8_order_by'),label = 'order by',choices = c('sample_id','injection.order'),selected = 'sample_id'
+                      ),
+                      materialSwitch(inputId = ns("fig8_data_clean_plt_format"),label = "Interactive plot", status = "primary")
                     ),
                     accordion_panel(
                       title = 'Download',
@@ -703,7 +709,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         }
         ###> fig1 peak distribution ========
         output$peak_dis_plot.pos <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig1_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_peak_dis_plot.pos"))
           } else {
@@ -728,7 +734,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
 
         #> plot.neg
         output$peak_dis_plot.neg <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig1_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_peak_dis_plot.neg"))
           } else {
@@ -790,7 +796,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
       })
         # positive
         output$smv_plt.pos <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig3_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_smv_plt.pos"))
           } else {
@@ -825,7 +831,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         })
         # negative
         output$smv_plt.neg <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig3_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_smv_plt.neg"))
           } else {
@@ -896,7 +902,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
 
         # positive
         output$rsd_plt.pos <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig5_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_rsd_plt.pos"))
           } else {
@@ -929,7 +935,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         })
         # negative
         output$rsd_plt.neg <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig5_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_rsd_plt.neg"))
           } else {
@@ -967,7 +973,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
           updateSelectInput(session, "fig6_order_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "sample_id")
         })
         output$box_plt.pos <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig6_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_box_plt.pos"))
           } else {
@@ -1004,7 +1010,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         })
         # negative
         output$box_plt.neg <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig6_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_box_plt.neg"))
           } else {
@@ -1045,7 +1051,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
           updateSelectInput(session, "fig7_color_by_3d",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
         })
         output$fig7_pca.pos <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig7_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_pca.pos"))
           } else {
@@ -1089,7 +1095,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         })
         # negative
         output$fig7_pca.neg <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig7_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_pca.neg"))
           } else {
@@ -1139,7 +1145,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
           updateSelectInput(session, "fig8_order_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
         })
         output$fig8_corr_plt.pos <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig8_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_corr_plt.pos"))
           } else {
@@ -1188,7 +1194,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
         })
         # negative
         output$fig8_corr_plt.neg <- renderUI({
-          plot_type <- input$data_clean_plt_format
+          plot_type <- input$fig8_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_corr_plt.neg"))
           } else {
@@ -1672,7 +1678,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_clean_r
     ###> fig8 ==============
     output$fig8_download = downloadHandler(
       filename = function() {
-        paste0("08.sample_correlation_plot.", download_para()$fig7_format)
+        paste0("08.sample_correlation_plot.", download_para()$fig8_format)
       },
       content = function(file) {
         # extract parameters
