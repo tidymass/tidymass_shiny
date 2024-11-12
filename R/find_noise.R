@@ -15,7 +15,7 @@
 #' @noRd
 #' @export
 #'
-find_noise = function(object,tag = "class",qc_na_freq = 0.2,S_na_freq = 0.5) {
+find_noise_multiple = function(object,tag = "class",qc_na_freq = 0.2,S_na_freq = 0.5) {
 
   if(tag == "class") {
     temp_sample_info = object %>%
@@ -37,7 +37,8 @@ find_noise = function(object,tag = "class",qc_na_freq = 0.2,S_na_freq = 0.5) {
   object <-
     object %>%
     activate_mass_dataset("sample_info") %>%
-    left_join(temp_sample_info %>% select(sample_id,key),by = "sample_id")
+    left_join(temp_sample_info %>%
+                dplyr::select(sample_id,key),by = "sample_id")
   #> na_freq
   for (i in 1:length(temp_keys)) {
     temp_id = object %>%
@@ -45,28 +46,21 @@ find_noise = function(object,tag = "class",qc_na_freq = 0.2,S_na_freq = 0.5) {
       filter(key == temp_keys[i]) %>%
       pull(sample_id)
 
-    if (i == 1) {
+    if (temp_keys[i] == "QC") {
       object <- object %>%
-        mutate_variable_na_freq(according_to_samples = temp_id) %>%
-        activate_mass_dataset(what = "variable_info")
+        mutate_variable_na_freq(according_to_samples = temp_id)
     } else {
       object <- object %>%
         mutate_variable_na_freq(according_to_samples = temp_id)
-
-      colnames_vari = object %>%
-        extract_variable_info() %>%
-        colnames()
-
-
-      na_freq_cols = colnames_vari[grep("na_freq", colnames_vari)]
-      na_freq_filter = purrr::map(na_freq_cols, ~ object %>% pull(.x) <= S_na_freq)
-      na_freq_check = purrr::reduce(na_freq_filter, `|`)
-      object_mv = object %>%
-        activate_mass_dataset(what = "variable_info") %>%
-        filter(na_freq <= qc_na_freq & na_freq_check)
     }
   }
 
+  object_mv = object %>%
+    activate_mass_dataset(what = "variable_info") %>%
+    filter(
+      na_freq <= qc_na_freq,
+      if_any(starts_with("na_freq."), ~ . <= S_na_freq)
+    )
 
   vari_ori <- object %>% extract_variable_info()
   vari_filter <- object_mv %>% extract_variable_info()

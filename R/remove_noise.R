@@ -37,7 +37,7 @@ remove_noise_ui <- function(id) {
           ),
           sliderInput(
             inputId = ns("sample_cut"),
-            label = "MV cutoff",
+            label = "MV cutoff (%)",
             min = 0,
             max = 100,
             value = 50
@@ -109,7 +109,8 @@ remove_noise_ui <- function(id) {
                 ),
                 radioButtons(
                   inputId = ns('desc_smv'),label = 'descend sample order or not',choices = c("TRUE","FALSE"),selected = "FALSE"
-                )
+                ),
+                materialSwitch(inputId = ns("fig1_data_clean_plt_format"),label = "Interactive plot", status = "primary")
               ),
               accordion_panel(
                 title = 'Download',
@@ -130,15 +131,15 @@ remove_noise_ui <- function(id) {
             ),
             nav_panel(
               "Positive",
-              plotOutput(ns("smv_plt.pos"))
+              uiOutput(ns("smv_plt.pos"),fill = T)
             ),
             nav_panel(
               "Negative",
-              plotOutput(ns("smv_plt.neg"))
+              uiOutput(ns("smv_plt.neg"),fill = T)
             ),
             nav_panel(
               shiny::icon("circle-info"),
-              markdown("[show_variable_missing_values](https://www.tidymass.org/docs/chapter6/1-data_cleaning/)")
+              HTML('<a href="https://www.tidymass.org/docs/chapter6/1-data_cleaning/" target="_blank">show_variable_missing_values</a>')
             )
           ),
           ###> status
@@ -194,6 +195,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
         sample_cut = input$sample_cut %>% as.numeric()
       )
     })
+
     plot1_para = reactive({
       list(
         fig1_sample_group = input$sample_group %>% as.character(),
@@ -214,6 +216,27 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
       )
     })
 
+
+    observe({
+      cut_index_choices <- NULL
+
+      if (!is.null(prj_init$object_negative.init)) {
+        cut_index_choices <- colnames(prj_init$object_negative.init@sample_info)
+      } else if (!is.null(prj_init$object_positive.init)) {
+        cut_index_choices <- colnames(prj_init$object_positive.init@sample_info)
+      } else if (!is.null(data_import_rv$object_neg)) {
+        cut_index_choices <- colnames(data_import_rv$object_neg@sample_info)
+      } else if (!is.null(data_import_rv$object_pos)) {
+        cut_index_choices <- colnames(data_import_rv$object_pos@sample_info)
+      }
+
+      # update
+      if (!is.null(cut_index_choices)) {
+        updateSelectInput(session, "cut_index", choices = cut_index_choices, selected = "group")
+      }
+    })
+
+
     ###> remove noise =========
     observeEvent(
       input$mv_start,
@@ -221,50 +244,47 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
         ####> check object ===============
         if(is.null(prj_init$sample_info)) {return()}
         if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "Remove noisey feature"){
-          p2_dataclean$object_neg.mv = prj_init$object_negative.init %>%
-            activate_mass_dataset('sample_info') %>%
-            dplyr::select('sample_id') %>%
-            dplyr::left_join(prj_init$sample_info)
-          p2_dataclean$object_neg.mv = prj_init$object_positive.init %>%
-            activate_mass_dataset('sample_info') %>%
-            dplyr::select('sample_id') %>%
-            dplyr::left_join(prj_init$sample_info)
+          p2_dataclean$object_neg = prj_init$object_negative.init
+          p2_dataclean$object_pos = prj_init$object_positive.init
         } else {
           if(is.null(data_import_rv$object_neg)) {return()}
           if(is.null(data_import_rv$object_pos)) {return()}
-          p2_dataclean$object_neg.mv = data_import_rv$object_neg
-          p2_dataclean$object_neg.mv = data_import_rv$object_pos
+          p2_dataclean$object_neg = data_import_rv$object_neg
+          p2_dataclean$object_pos= data_import_rv$object_pos
         }
+
         ####> remove noise ===============
         para <- anal_para()
-        p2_dataclean$temp_mv_pos_noise <- find_noise(
-          object = p2_dataclean$object_neg.mv,
+        qc_na_freq <- para$qc_cut / 100
+        S_na_freq <- para$sample_cut / 100
+        temp_mv_pos_noise <- find_noise_multiple(
+          object = p2_dataclean$object_pos,
           tag = para$cut_index,
-          qc_na_freq = para$qc_cut,
-          S_na_freq = para$sample_cut
+          qc_na_freq = qc_na_freq,
+          S_na_freq = S_na_freq
         )
-        names(p2_dataclean$temp_mv_pos_noise)
-        print((p2_dataclean$temp_mv_pos_noise$object_mv))
-        print((p2_dataclean$temp_mv_pos_noise$noisy_tbl))
-        p2_dataclean$object_neg.mv = p2_dataclean$temp_mv_pos_noise$object_mv
-        p2_dataclean$temp_mv_neg_noise <- find_noise(
-          object = p2_dataclean$object_neg.mv,
+
+        p2_dataclean$object_pos.mv = temp_mv_pos_noise$object_mv
+        temp_mv_neg_noise <- find_noise_multiple(
+          object = p2_dataclean$object_neg,
           tag = para$cut_index,
-          qc_na_freq = para$qc_cut,
-          S_na_freq = para$sample_cut
+          qc_na_freq = qc_na_freq,
+          S_na_freq = S_na_freq
         )
-        p2_dataclean$object_neg.mv = p2_dataclean$temp_mv_neg_noise$object_mv
+        p2_dataclean$object_neg.mv = temp_mv_neg_noise$object_mv
+
         ####> table ===============
         output$vari_info_pos = renderDataTable_formated(
           actions = input$mv_start,
-          tbl = p2_dataclean$temp_mv_pos_noise$noisy_tbl,
+          tbl = temp_mv_pos_noise$noisy_tbl,
           filename.a = "1.Noisy_features_pos.csv"
         )
         output$vari_info_neg = renderDataTable_formated(
           actions = input$mv_start,
-          tbl = p2_dataclean$temp_mv_neg_noise$noisy_tbl,
+          tbl = temp_mv_neg_noise$noisy_tbl,
           filename.a = "1.Noisy_features_neg.csv"
         )
+
 
         #> information of mass datasets
 
@@ -273,7 +293,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
         })
 
         output$obj_mv.neg = renderPrint({
-          print(p2_dataclean$object_neg.mv)
+          print(p2_dataclean$object_pos.mv)
         })
 
         #> save object
@@ -284,9 +304,9 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           obj = p2_dataclean$object_neg.mv)
         save_massobj(
           polarity = 'positive',
-          file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
+          file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
           stage = 'mv',
-          obj = p2_dataclean$object_neg.mv)
+          obj = p2_dataclean$object_pos.mv)
         observe({
           updateSelectInput(session, "color_by_smv",choices = colnames(p2_dataclean$object_neg.mv@sample_info),selected = "group")
           updateSelectInput(session, "order_by_smv",choices = colnames(p2_dataclean$object_neg.mv@sample_info),selected = "sample_id")
@@ -300,7 +320,6 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
 
     ###> mv plot =====
 
-
     observeEvent(
       input$vis_butt_1,
       {
@@ -313,11 +332,16 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
             plotOutput(outputId = ns("plot_smv_plt.pos"))
           }
         })
+        print("Check point 1")
         output$plot_smv_plt.pos <- renderPlot({
           para = plot1_para()
-          if(is.null(input$data_clean_start)){return()}
-          if(is.null(p2_dataclean$object_neg.mv)){return()}
-          p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
+          if(is.null(p2_dataclean$object_pos.mv)){return()}
+          if(para$fig1_sample_group != "All") {
+            temp_obj <- p2_dataclean$object_pos.mv %>%
+              activate_mass_dataset(what = 'sample_info') %>%
+              filter(class == para$fig1_sample_group)
+          } else {temp_obj <- p2_dataclean$object_pos.mv}
+          temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -327,10 +351,14 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           )
         })
         output$plotly_smv_plt.pos <- renderPlotly({
-          para = plot1_para()()
-          if(is.null(input$data_clean_start)){return()}
-          if(is.null(p2_dataclean$object_neg.mv)){return()}
-          p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
+          para = plot1_para()
+          if(is.null(p2_dataclean$object_pos.mv)){return()}
+          if(para$fig1_sample_group != "All") {
+            temp_obj <- p2_dataclean$object_pos.mv %>%
+              activate_mass_dataset(what = 'sample_info') %>%
+              filter(class == para$fig1_sample_group)
+          } else {temp_obj <- p2_dataclean$object_pos.mv}
+          temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -349,10 +377,14 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           }
         })
         output$plot_smv_plt.neg <- renderPlot({
-          para = plot1_para()()
-          if(is.null(input$data_clean_start)){return()}
+          para = plot1_para()
           if(is.null(p2_dataclean$object_neg.mv)){return()}
-          p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
+          if(para$fig1_sample_group != "All") {
+            temp_obj <- p2_dataclean$object_neg.mv %>%
+              activate_mass_dataset(what = 'sample_info') %>%
+              filter(class == para$fig1_sample_group)
+          } else {temp_obj <- p2_dataclean$object_neg.mv}
+          temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -362,9 +394,13 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           )
         })
         output$plotly_smv_plt.neg <- renderPlotly({
-          para = plot1_para()()
-          if(is.null(input$data_clean_start)){return()}
+          para = plot1_para()
           if(is.null(p2_dataclean$object_neg.mv)){return()}
+          if(para$fig1_sample_group != "All") {
+            temp_obj <- p2_dataclean$object_neg.mv %>%
+              activate_mass_dataset(what = 'sample_info') %>%
+              filter(class == para$fig1_sample_group)
+          } else {temp_obj <- p2_dataclean$object_neg.mv}
           p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
@@ -388,13 +424,24 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
       },
       content = function(file) {
         # extract parameters
-        para <- plot1_para()()
+        para <- plot1_para()
         para_d <- download_para()
 
         # draw condition
         if (!is.null(p2_dataclean$object_neg.mv) & !is.null(p2_dataclean$object_neg.mv)) {
           para_d$fig1_width = para_d$fig1_width * 2
-          p1 <- p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
+          if(para$fig1_sample_group != "All") {
+            temp_obj.pos <- p2_dataclean$object_pos.mv %>%
+              activate_mass_dataset(what = 'sample_info') %>%
+              filter(class == para$fig1_sample_group)
+            temp_obj.neg <- p2_dataclean$object_neg.mv %>%
+              activate_mass_dataset(what = 'sample_info') %>%
+              filter(class == para$fig1_sample_group)
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos.mv
+            temp_obj.neg <- p2_dataclean$object_neg.mv
+          }
+          p1 <- temp_obj.pos %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -402,7 +449,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
             show_x_ticks = para$fig1_show_x_ticks,
             desc = para$fig1_desc
           )
-          p2 <- p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
+          p2 <- temp_obj.neg %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -412,6 +459,13 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           )
           p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
         } else if (!is.null(p2_dataclean$object_neg.mv)) {
+          if(para$fig1_sample_group != "All") {
+            temp_obj.pos <- p2_dataclean$object_pos.mv %>%
+              activate_mass_dataset(what = 'sample_info') %>%
+              filter(class == para$fig1_sample_group)
+          } else {
+            temp_obj.pos <- p2_dataclean$object_pos.mv
+          }
           p <- p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
@@ -421,6 +475,13 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
             desc = para$fig1_desc
           )
         } else {
+          if(para$fig1_sample_group != "All") {
+            temp_obj.neg <- p2_dataclean$object_neg.mv %>%
+              activate_mass_dataset(what = 'sample_info') %>%
+              filter(class == para$fig1_sample_group)
+          } else {
+            temp_obj.neg <- p2_dataclean$object_neg.mv
+          }
           p <- p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,

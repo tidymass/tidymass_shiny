@@ -225,22 +225,16 @@ data_import_massdataset_server <- function(id,volumes,prj_init,data_import_rv,da
         })
         if(is.null(input$Pos_obj_mass)){return()}
         if(is.null(input$Neg_obj_mass)){return()}
-        ## replace sample_info data and export
+        ## save object
         data_import_rv$object_pos =
-          para_obj_check$object.pos %>%
-          activate_mass_dataset("sample_info") %>%
-          dplyr::select(sample_id) %>%
-          left_join(prj_init$sample_info,by="sample_id")
+          para_obj_check$object.pos
         save_massobj(
           polarity = 'positive',
           file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
           stage = 'step1',
           obj = data_import_rv$object_pos)
         data_import_rv$object_neg =
-          para_obj_check$object.neg %>%
-          activate_mass_dataset("sample_info") %>%
-          dplyr::select(sample_id) %>%
-          left_join(prj_init$sample_info,by="sample_id")
+          para_obj_check$object.neg
         save_massobj(
           polarity = 'negative',
           file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
