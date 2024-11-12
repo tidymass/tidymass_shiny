@@ -94,6 +94,10 @@ data_import_raw_ui <- function(id) {
           hr_head(),
           selectInput(
             inputId = ns('fill_peaks'),label = 'fill_peaks',choices = c("TRUE","FALSE"),selected = "FALSE",multiple = F
+          ),
+          hr_head(),
+          selectInput(
+            inputId = ns('column'),label = 'column',choices = c("rp","hilic"),selected = "rp",multiple = F
           )
         )
       ),
@@ -215,23 +219,6 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
         output$MS1_path <- renderText(ms1_folder_selected)
       }})
 
-    #> Import MS1 object pos: from object
-    observe({
-      shinyFileChoose(input, "Pos_obj_mass", roots = volumes, session = session)
-      if(!is.null(input$Pos_obj_mass)){
-        # browser()
-        obj_pos_filepath <- parseFilePaths(roots = volumes,  input$Pos_obj_mass)
-        output$obj_pos_filepath <- renderText(obj_pos_filepath$datapath)
-      }})
-
-    #> Import MS1 object neg: from object
-    observe({
-      shinyFileChoose(input, "Neg_obj_mass", roots = volumes, session = session)
-      if(!is.null(input$Neg_obj_mass)){
-        # browser()
-        obj_neg_filepath <- parseFilePaths(roots = volumes,  input$Neg_obj_mass)
-        output$obj_neg_filepath <- renderText(obj_neg_filepath$datapath)
-      }})
 
     #> File check
     #> ##> default
@@ -262,7 +249,6 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
       input$action1,
       {
         if(is.null(input$MS1)){return()}
-        if(is.null(input$MS2)){return()}
         if(is.null(prj_init$sample_info)){return()}
 
         #> MS1 data file
@@ -486,7 +472,6 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
     })
 
     #>peak picking
-    #data_import_rv <- reactiveValues(data = NULL)
     observeEvent(
       input$action2,
       {
@@ -500,13 +485,16 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
 
         data_import_rv$parameters =
           data.frame(
-            para = c("ppm","threads","snthresh","noise","min_fraction","p_min","p_max","pre_left","pre_right","fill_peaks","fitgauss",
-                     "integrate","mzdiff","binSize","bw","out_put_peak","column"),
+            para = c("ppm","threads","snthresh","noise",
+                     "min_fraction","p_min","p_max","pre_left",
+                     "pre_right","fill_peaks","fitgauss","integrate",
+                     "mzdiff","binSize","bw","out_put_peak","column"),
             default = c(input$ppm,input$threads,input$snthresh,input$noise,
                         input$min_fraction,input$p_min,input$p_max,input$pre_left,
                         input$pre_right,input$fill_peaks,input$fitgauss,input$integrate,
                         input$mzdiff,input$binSize,input$bw,input$out_put_peak,input$column)
           )
+
 
 
         if(para_choise == "yes") {
@@ -623,13 +611,30 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
           )))
         })
 
-        #> add ms2 data
+        ##> update sample information
+        data_import_rv$object_pos <-
+        data_import_rv$object_pos %>%
+          activate_mass_dataset("sample_info") %>%
+          dplyr::select("sample_id") %>% left_join(
+            prj_init$sample_info,by = "sample_id"
+          )
+
+        data_import_rv$object_neg <-
+          data_import_rv$object_neg %>%
+          activate_mass_dataset("sample_info") %>%
+          dplyr::select("sample_id") %>% left_join(
+            prj_init$sample_info,by = "sample_id"
+          )
+
+
+        ##> export parameters
         output$para_clean_tbl = renderDataTable_formated(
           actions = input$action2,
           condition1 = input$MS1,
           condition2 = para_data_check$MS1_path,
           tbl = data_import_rv$parameters,filename.a = "3.3.rawDataImport_summary_of_parameters"
         )
+        ##> status
 
         output$obj_mass_check.pos = renderPrint({
           print(data_import_rv$object_pos)

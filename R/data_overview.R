@@ -695,6 +695,43 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
       )
     })
 
+    ##> reactive of sample info
+    observe({
+      sample_info_colnames <- NULL
+      variable_info_colnames <- NULL
+
+      if (!is.null(prj_init$object_negative.init)) {
+        sample_info_colnames <- colnames(prj_init$object_negative.init@sample_info)
+        variable_info_colnames <- colnames(prj_init$object_negative.init@variable_info)
+      } else if (!is.null(prj_init$object_positive.init)) {
+        sample_info_colnames <- colnames(prj_init$object_positive.init@sample_info)
+        variable_info_colnames <- colnames(prj_init$object_positive.init@variable_info)
+      } else if (!is.null(data_import_rv$object_neg)) {
+        sample_info_colnames <- colnames(data_import_rv$object_neg@sample_info)
+        variable_info_colnames <- colnames(data_import_rv$object_neg@variable_info)
+      } else if (!is.null(data_import_rv$object_pos)) {
+        sample_info_colnames <- colnames(data_import_rv$object_pos@sample_info)
+        variable_info_colnames <- colnames(data_import_rv$object_pos@variable_info)
+      }
+
+      # update
+      if (!is.null(sample_info_colnames)) {
+        updateSelectInput(session, "color_by_smv", choices = sample_info_colnames, selected = "group")
+        updateSelectInput(session, "order_by_smv", choices = sample_info_colnames, selected = "injection.order")
+        updateSelectInput(session, "fig6_color_by", choices = sample_info_colnames, selected = "batch")
+        updateSelectInput(session, "fig6_fill_by", choices = sample_info_colnames, selected = "class")
+        updateSelectInput(session, "fig6_order_by", choices = sample_info_colnames, selected = "injection.order")
+        updateSelectInput(session, "fig7_color_by", choices = sample_info_colnames, selected = "group")
+        updateSelectInput(session, "fig7_color_by_3d", choices = sample_info_colnames, selected = "group")
+        updateSelectInput(session, "fig8_order_by", choices = sample_info_colnames, selected = "class")
+      }
+      if (!is.null(variable_info_colnames)) {
+        updateSelectInput(session, "color_by_vmv", choices = variable_info_colnames, selected = "mz")
+        updateSelectInput(session, "order_by_vmv", choices = variable_info_colnames, selected = "rt")
+      }
+
+    })
+
     ##> draw plot ==================
     observeEvent(
       input$data_clean_start,
@@ -789,10 +826,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
         })
 
         ###> fig3 missing value in samples ================
-      observe({
-        updateSelectInput(session, "color_by_smv",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "group")
-        updateSelectInput(session, "order_by_smv",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "sample_id")
-      })
+
         # positive
         output$smv_plt.pos <- renderUI({
           plot_type <- input$fig3_data_clean_plt_format
@@ -864,11 +898,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           ) %>% plotly::ggplotly()
         })
         ###> fig4 missing value in variable =======
-        temp_variable = p2_dataclean$object_neg %>% extract_variable_info_note()
-        observe({
-          updateSelectInput(session, "order_by_vmv",choices = temp_variable,selected = "variable_id")
-          updateSelectInput(session, "color_by_vmv",choices = temp_variable,selected = "mz")
-        })
+
         # positive
         output$plot_vmv_plt.pos <- renderPlot({
           para = plot4_para()
@@ -913,7 +943,8 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
           p2_dataclean$object_pos %>%
-            dplyr::filter(class == "QC")%>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
             rsd_cutoff = para$fig5_rsd_cutoff,
             color = para$fig5_color,
@@ -925,6 +956,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
           p2_dataclean$object_pos %>%
+            activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
               rsd_cutoff = para$fig5_rsd_cutoff,
@@ -946,6 +978,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
           p2_dataclean$object_neg %>%
+            activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
               rsd_cutoff = para$fig5_rsd_cutoff,
@@ -958,6 +991,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
           p2_dataclean$object_neg %>%
+            activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
               rsd_cutoff = para$fig5_rsd_cutoff,
@@ -966,11 +1000,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
             ) %>% plotly::ggplotly()
         })
         ###> fig6 sample boxplot =========
-        observe({
-          updateSelectInput(session, "fig6_color_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "batch")
-          updateSelectInput(session, "fig6_fill_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
-          updateSelectInput(session, "fig6_order_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "sample_id")
-        })
+
         output$box_plt.pos <- renderUI({
           plot_type <- input$fig6_data_clean_plt_format
           if (plot_type) {
@@ -984,6 +1014,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
           p2_dataclean$object_pos %>%log() %>%
+            activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_sample_boxplot(
               color_by = para$fig6_color_by,
@@ -999,6 +1030,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           if(is.null(p2_dataclean$object_pos)){return()}
           p2_dataclean$object_pos %>%log() %>%
             dplyr::filter(class == "QC")%>%
+            activate_mass_dataset("sample_info") %>%
             massqc::massqc_sample_boxplot(
               color_by = para$fig6_color_by,
               fill_by = para$fig6_fill_by,
@@ -1021,6 +1053,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
           p2_dataclean$object_neg %>%log() %>%
+            activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_sample_boxplot(
               color_by = para$fig6_color_by,
@@ -1035,6 +1068,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
           if(is.null(input$data_clean_start)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
           p2_dataclean$object_neg %>% log() %>%
+            activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_sample_boxplot(
               color_by = para$fig6_color_by,
@@ -1045,10 +1079,6 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
             ) %>% plotly::ggplotly()
         })
         ###> fig7 PCA =============
-        observe({
-          updateSelectInput(session, "fig7_color_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
-          updateSelectInput(session, "fig7_color_by_3d",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
-        })
         output$fig7_pca.pos <- renderUI({
           plot_type <- input$fig7_data_clean_plt_format
           if (plot_type) {
@@ -1140,9 +1170,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
             )
         })
         ###> fig8 Correlation =============
-        observe({
-          updateSelectInput(session, "fig8_order_by",choices = colnames(p2_dataclean$object_pos@sample_info),selected = "class")
-        })
+
         output$fig8_corr_plt.pos <- renderUI({
           plot_type <- input$fig8_data_clean_plt_format
           if (plot_type) {
@@ -1609,7 +1637,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
         # draw condition
         if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
 
-          if(isTRUE(para$fig7_scale_3d)) {
+          if(isTRUE(para$fig7_scale)) {
             temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2) %>% scale()
             temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2) %>% scale()
           } else {
@@ -1635,7 +1663,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
             )
           p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
         } else if (!is.null(p2_dataclean$object_pos)) {
-          if(isTRUE(para$fig7_scale_3d)) {
+          if(isTRUE(para$fig7_scale)) {
             temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2) %>% scale()
           } else {
             temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2)
@@ -1649,7 +1677,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
               line = para$fig7_line
             )
         } else {
-          if(isTRUE(para$fig7_scale_3d)) {
+          if(isTRUE(para$fig7_scale)) {
             temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2) %>% scale()
           } else {
             temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2)
