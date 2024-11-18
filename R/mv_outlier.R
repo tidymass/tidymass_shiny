@@ -18,14 +18,14 @@ remove_outlier_ui <- function(id) {
     title = 'Filter outlier samples',
     icon = bs_icon("funnel"),
     layout_sidebar(
-      sidebar = accordion(
+      sidebar = accordion(open = T,
         accordion_panel(
-          title = "Outlier Detection",
+          title = "Show plot",
           icon = bsicons::bs_icon("play-fill"),
           actionButton(inputId = ns("vis_butt_1"),label = "Start",icon = icon("play"))
         ),
         accordion_panel(
-          title = "Parameter setting",
+          title = "Methods",
           icon = bsicons::bs_icon("gear"),
           selectInput(
             inputId = ns("mv_method"),
@@ -34,19 +34,19 @@ remove_outlier_ui <- function(id) {
             selected = "By myself"
           )
         ),
-        accordinon_panel(
+        accordion_panel(
           title = "By tidymass",
           selectInput(
             inputId = ns("by_witch"),
-            label = "remove outlier according to",
-            choices = c("NA","pc_sd","pc_mad","distance"),
-            selected = "NA",multiple = T
+            label = "remove outlier conditions",
+            choices = c("according_to_na","pc_sd","pc_mad","accordint_to_distance"),
+            selected = "according_to_na",multiple = T
           ),
-          tags$span(textOutput(outputId = ns("outlier_in_pos")), class = "text-wrap"),
+          tags$span(textOutput(outputId = ns("outlier_in_pos_1")), class = "text-wrap"),
           hr_bar(),
-          tags$span(textOutput(outputId = ns("outlier_in_neg")), class = "text-wrap")
+          tags$span(textOutput(outputId = ns("outlier_in_neg_1")), class = "text-wrap")
         ),
-        accordinon_panel(
+        accordion_panel(
           title = "By myself",
           selectInput(
             inputId = ns("outlier_in_pos"),
@@ -60,13 +60,17 @@ remove_outlier_ui <- function(id) {
             choices = c("none"),
             selected = "none",multiple = T
           )
-        )
         ),
-        actionButton(
-          inputId = ns("mv_start"),
-          label = "Start",icon = icon("play")
-        )
+        accordion_panel(
+          title = "Remove outlier",
+          icon = bsicons::bs_icon("play-fill"),
+          actionButton(
+            inputId = ns("mv_start"),
+            label = "Start",icon = icon("play")
+          ),
         ),
+        ),
+
       page_fluid(
         nav_panel(title = "remove outlier",
                   ##> column 1-2 ========
@@ -240,6 +244,7 @@ remove_outlier_ui <- function(id) {
                   )
         )
       )
+        )
     )
 }
 
@@ -317,6 +322,30 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
       )
     })
 
+    observe({
+      sample_info_colnames <- NULL
+      variable_info_colnames <- NULL
+
+      if (!is.null(prj_init$object_negative.init)) {
+        sample_info_colnames <- colnames(prj_init$object_negative.init@sample_info)
+      } else if (!is.null(prj_init$object_positive.init)) {
+        sample_info_colnames <- colnames(prj_init$object_positive.init@sample_info)
+      } else if (!is.null(data_import_rv$object_neg.mv)) {
+        sample_info_colnames <- colnames(data_import_rv$object_neg.mv@sample_info)
+      } else if (!is.null(data_import_rv$object_pos.mv)) {
+        sample_info_colnames <- colnames(data_import_rv$object_pos.mv@sample_info)
+      }
+
+      # update
+      if (!is.null(sample_info_colnames)) {
+        updateSelectInput(session, "color_by_smv", choices = sample_info_colnames, selected = "group")
+        updateSelectInput(session, "order_by_smv", choices = sample_info_colnames, selected = "injection.order")
+        updateSelectInput(session, "fig2_color_by", choices = sample_info_colnames, selected = "group")
+        updateSelectInput(session, "fig2_color_by_3d", choices = sample_info_colnames, selected = "group")
+      }
+
+    })
+
     ##> draw plot ==================
     observeEvent(
       input$vis_butt_1,
@@ -324,6 +353,7 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
 
         ####> check object ===============
         if(is.null(prj_init$sample_info)) {return()}
+
         if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "Remove outlier"){
           p2_dataclean$object_neg = prj_init$object_negative.init
           p2_dataclean$object_pos = prj_init$object_positive.init
@@ -333,6 +363,7 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           p2_dataclean$object_neg = data_import_rv$object_neg.mv
           p2_dataclean$object_pos = data_import_rv$object_neg.mv
         }
+
 
         ###> fig1 missing value in samples ================
 
@@ -346,10 +377,15 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           }
         })
         output$plot_smv_plt.pos <- renderPlot({
-          para = plot3_para()
+          para = plot1_para()
           if(is.null(input$vis_butt_1)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
-          p2_dataclean$object_pos %>% massqc::show_sample_missing_values(
+          if(is.null(data_clean_rv$object_pos.outlier)) {
+            temp_obj = p2_dataclean$object_pos
+          } else{
+            temp_obj = data_clean_rv$object_pos.outlier
+          }
+          temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -359,10 +395,15 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           )
         })
         output$plotly_smv_plt.pos <- renderPlotly({
-          para = plot3_para()
+          para = plot1_para()
           if(is.null(input$vis_butt_1)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
-          p2_dataclean$object_pos %>% massqc::show_sample_missing_values(
+          if(is.null(data_clean_rv$object_pos.outlier)) {
+            temp_obj = p2_dataclean$object_pos
+          } else{
+            temp_obj = data_clean_rv$object_pos.outlier
+          }
+          temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -381,10 +422,15 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           }
         })
         output$plot_smv_plt.neg <- renderPlot({
-          para = plot3_para()
+          para = plot1_para()
           if(is.null(input$vis_butt_1)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
-          p2_dataclean$object_neg %>% massqc::show_sample_missing_values(
+          if(is.null(data_clean_rv$object_neg.outlier)) {
+            temp_obj = p2_dataclean$object_neg
+          } else{
+            temp_obj = data_clean_rv$object_neg.outlier
+          }
+          temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -394,10 +440,15 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           )
         })
         output$plotly_smv_plt.neg <- renderPlotly({
-          para = plot3_para()
+          para = plot1_para()
           if(is.null(input$vis_butt_1)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
-          p2_dataclean$object_neg %>% massqc::show_sample_missing_values(
+          if(is.null(data_clean_rv$object_neg.outlier)) {
+            temp_obj = p2_dataclean$object_neg
+          } else{
+            temp_obj = data_clean_rv$object_neg.outlier
+          }
+          temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
             order_by = para$fig1_order_by,
             percentage = para$fig1_percentage,
@@ -417,15 +468,19 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           }
         })
         output$plot_pca.pos <- renderPlot({
-          para = plot7_para()
+          para = plot2_para()
           if(is.null(input$vis_butt_1)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
-          if(isTRUE(para$fig2_scale)) {
-            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2) %>% scale()
-          } else {
-            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2)
+          if(is.null(data_clean_rv$object_pos.outlier)) {
+            temp_obj = p2_dataclean$object_pos
+          } else{
+            temp_obj = data_clean_rv$object_pos.outlier
           }
-
+          if(isTRUE(para$fig2_scale)) {
+            temp_obj.pos <- temp_obj %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.pos <- temp_obj %>% +1 %>% log(2)
+          }
           temp_obj.pos %>%
             massqc::massqc_pca(
               color_by = para$fig2_color_by,
@@ -435,13 +490,18 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
             )
         })
         output$plotly_pca.pos <- renderPlotly({
-          para = plot7_para()
+          para = plot2_para()
           if(is.null(input$vis_butt_1)){return()}
           if(is.null(p2_dataclean$object_pos)){return()}
+          if(is.null(data_clean_rv$object_pos.outlier)) {
+            temp_obj = p2_dataclean$object_pos
+          } else{
+            temp_obj = data_clean_rv$object_pos.outlier
+          }
           if(isTRUE(para$fig2_scale_3d)) {
-            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2) %>% scale()
+            temp_obj.pos <- temp_obj %>% +1 %>% log(2) %>% scale()
           } else {
-            temp_obj.pos <- p2_dataclean$object_pos %>% +1 %>% log(2)
+            temp_obj.pos <- temp_obj %>% +1 %>% log(2)
           }
           temp_obj.pos %>%
             massqc_pca_3d(
@@ -461,14 +521,18 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           }
         })
         output$plot_pca.neg <- renderPlot({
-          para = plot7_para()
+          para = plot2_para()
           if(is.null(input$vis_butt_1)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
-
+          if(is.null(data_clean_rv$object_neg.outlier)) {
+            temp_obj = p2_dataclean$object_neg
+          } else{
+            temp_obj = data_clean_rv$object_neg.outlier
+          }
           if(isTRUE(para$fig2_scale)) {
-            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2) %>% scale()
+            temp_obj.neg <- temp_obj %>% +1 %>% log(2) %>% scale()
           } else {
-            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2)
+            temp_obj.neg <- temp_obj %>% +1 %>% log(2)
           }
 
           temp_obj.neg %>%
@@ -480,14 +544,18 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
             )
         })
         output$plotly_pca.neg <- renderPlotly({
-          para = plot7_para()
+          para = plot2_para()
           if(is.null(input$vis_butt_1)){return()}
           if(is.null(p2_dataclean$object_neg)){return()}
-
+          if(is.null(data_clean_rv$object_neg.outlier)) {
+            temp_obj = p2_dataclean$object_neg
+          } else{
+            temp_obj = data_clean_rv$object_neg.outlier
+          }
           if(isTRUE(para$fig2_scale_3d)) {
-            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2) %>% scale()
+            temp_obj.neg <- temp_obj %>% +1 %>% log(2) %>% scale()
           } else {
-            temp_obj.neg <- p2_dataclean$object_neg %>% +1 %>% log(2)
+            temp_obj.neg <- temp_obj %>% +1 %>% log(2)
           }
 
           temp_obj.neg %>%
@@ -542,26 +610,96 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
     observeEvent(
       input$mv_start,
       {
+        print('check point 1')
         if(is.null(p2_dataclean$outlier_tbl.neg)){return()}
         if(is.null(p2_dataclean$outlier_tbl.pos)){return()}
         para = analy_para()
+        print('check point 2')
+        print(para$mv_method)
 
-        if(para$by_witch == "by tidymass") {
-          p2_dataclean$outlier_tbl.neg %>%
+        if(para$mv_method == "By tidymass") {
+          print('check point 3')
+          by_witch = para$by_witch %>% paste0(collapse = "|")
+          p2_dataclean$outlier_sid.pos =
+            p2_dataclean$outlier_tbl.pos %>%
+            rownames_to_column("sample_id") %>%
+            pivot_longer(
+              !sample_id,values_to = 'judge',names_to = 'condition'
+            ) %>%
+            dplyr::filter(str_detect(condition,by_witch)) %>%
+            group_by(sample_id) %>%
+            summarise(is_outlier = all(judge == TRUE)) %>%
+            filter(is_outlier) %>%
+            ungroup() %>%
+            pull(sample_id)
+          print('check point 4')
+          p2_dataclean$outlier_sid.neg =
+            p2_dataclean$outlier_tbl.neg %>%
+            rownames_to_column("sample_id") %>%
+            pivot_longer(
+              !sample_id,values_to = 'judge',names_to = 'condition'
+            ) %>%
+            dplyr::filter(str_detect(condition,by_witch)) %>%
+            group_by(sample_id) %>%
+            summarise(is_outlier = all(judge == TRUE)) %>%
+            filter(is_outlier) %>%
+            ungroup() %>%
+            pull(sample_id)
+          print('check point 5')
 
+          if(length(p2_dataclean$outlier_sid.pos) > 0) {
+            output$outlier_in_pos_1 = renderPrint({
+              print(p2_dataclean$outlier_sid.pos)
+            })
+            print('check point 6')
+          } else {
+            output$outlier_in_pos_1 = renderPrint({
+              print("No outliers!")
+            })
+            print('check point 7')
+          }
+          if(length(p2_dataclean$outlier_sid.neg) > 0) {
+            output$outlier_in_neg_1 = renderPrint({
+              print(p2_dataclean$outlier_sid.neg)
+            })
+            print('check point 8')
+          } else {
+            output$outlier_in_neg_1 = renderPrint({
+              print("No outliers!")
+            })
+            print('check point 9')
+          }
         }
+        if(para$mv_method == "By myself") {
+          print('check point 10')
+          p2_dataclean$outlier_sid.pos = para$outlier_in_pos
+          p2_dataclean$outlier_sid.neg = para$outlier_in_neg
+        }
+        if(length(p2_dataclean$outlier_sid.pos) > 0 & !"none" %in% p2_dataclean$outlier_sid.pos ) {
+          print('check point 11')
+          p2_dataclean$object_pos =
+            p2_dataclean$object_pos %>% activate_mass_dataset(what = 'sample_info') %>%
+            filter(!sample_id %in% p2_dataclean$outlier_sid.pos)
+        }
+        if(length(p2_dataclean$outlier_sid.neg) > 0 & !"none" %in% p2_dataclean$outlier_sid.neg) {
+          print('check point 12')
+          p2_dataclean$object_neg =
+            p2_dataclean$object_neg %>% activate_mass_dataset(what = 'sample_info') %>%
+            filter(!sample_id %in% p2_dataclean$outlier_sid.neg)
+        }
+        print('check point 13')
 
+        output$obj_outlier.pos = renderPrint({
+          print(p2_dataclean$object_pos)
+        })
+        output$obj_outlier.neg = renderPrint({
+          print(p2_dataclean$object_neg)
+        })
+
+        data_clean_rv$object_pos.outlier = p2_dataclean$object_pos
+        data_clean_rv$object_neg.outlier = p2_dataclean$object_neg
 
       })
-
-
-
-
-
-
-
-
-
 
   })
 }

@@ -253,7 +253,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           p2_dataclean$object_pos= data_import_rv$object_pos
         }
 
-        print('check point 1')
+
 
         ####> remove noise ===============
         para <- anal_para()
@@ -265,7 +265,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           qc_na_freq = qc_na_freq,
           S_na_freq = S_na_freq
         )
-        print('check point 2')
+
 
         p2_dataclean$object_pos.mv = temp_mv_pos_noise$object_mv
         temp_mv_neg_noise <- find_noise_multiple(
@@ -275,7 +275,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           S_na_freq = S_na_freq
         )
         p2_dataclean$object_neg.mv = temp_mv_neg_noise$object_mv
-        print('check point 3')
+        #print('check point 3')
 
         ####> table ===============
         output$vari_info_pos = renderDataTable_formated(
@@ -288,7 +288,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           tbl = temp_mv_neg_noise$noisy_tbl,
           filename.a = "1.Noisy_features_neg.csv"
         )
-        print('check point 4')
+        #print('check point 4')
 
 
         #> information of mass datasets
@@ -300,7 +300,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
         output$obj_mv.neg = renderPrint({
           print(p2_dataclean$object_pos.mv)
         })
-        print('check point 5')
+        #print('check point 5')
         #> save object
         save_massobj(
           polarity = 'negative',
@@ -316,7 +316,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           updateSelectInput(session, "color_by_smv",choices = colnames(p2_dataclean$object_neg.mv@sample_info),selected = "group")
           updateSelectInput(session, "order_by_smv",choices = colnames(p2_dataclean$object_neg.mv@sample_info),selected = "sample_id")
         })
-        print('check point 5')
+        #print('check point 5')
         data_import_rv$object_neg.mv = p2_dataclean$object_neg.mv
         data_import_rv$object_pos.mv  = p2_dataclean$object_pos.mv
       }
