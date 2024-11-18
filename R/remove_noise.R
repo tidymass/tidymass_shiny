@@ -171,7 +171,7 @@ remove_noise_ui <- function(id) {
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @importFrom shinyjs toggle runjs useShinyjs
-#' @importFrom dplyr select left_join
+#' @importFrom dplyr select left_join filter
 #' @importFrom massdataset activate_mass_dataset
 #' @importFrom plotly renderPlotly plotlyOutput
 #' @param id module of server
@@ -253,6 +253,8 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           p2_dataclean$object_pos= data_import_rv$object_pos
         }
 
+        print('check point 1')
+
         ####> remove noise ===============
         para <- anal_para()
         qc_na_freq <- para$qc_cut / 100
@@ -263,6 +265,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           qc_na_freq = qc_na_freq,
           S_na_freq = S_na_freq
         )
+        print('check point 2')
 
         p2_dataclean$object_pos.mv = temp_mv_pos_noise$object_mv
         temp_mv_neg_noise <- find_noise_multiple(
@@ -272,6 +275,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           S_na_freq = S_na_freq
         )
         p2_dataclean$object_neg.mv = temp_mv_neg_noise$object_mv
+        print('check point 3')
 
         ####> table ===============
         output$vari_info_pos = renderDataTable_formated(
@@ -284,6 +288,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           tbl = temp_mv_neg_noise$noisy_tbl,
           filename.a = "1.Noisy_features_neg.csv"
         )
+        print('check point 4')
 
 
         #> information of mass datasets
@@ -295,7 +300,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
         output$obj_mv.neg = renderPrint({
           print(p2_dataclean$object_pos.mv)
         })
-
+        print('check point 5')
         #> save object
         save_massobj(
           polarity = 'negative',
@@ -311,7 +316,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           updateSelectInput(session, "color_by_smv",choices = colnames(p2_dataclean$object_neg.mv@sample_info),selected = "group")
           updateSelectInput(session, "order_by_smv",choices = colnames(p2_dataclean$object_neg.mv@sample_info),selected = "sample_id")
         })
-
+        print('check point 5')
         data_import_rv$object_neg.mv = p2_dataclean$object_neg.mv
         data_import_rv$object_pos.mv  = p2_dataclean$object_pos.mv
       }
@@ -339,7 +344,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           if(para$fig1_sample_group != "All") {
             temp_obj <- p2_dataclean$object_pos.mv %>%
               activate_mass_dataset(what = 'sample_info') %>%
-              filter(class == para$fig1_sample_group)
+              dplyr::filter(class == para$fig1_sample_group)
           } else {temp_obj <- p2_dataclean$object_pos.mv}
           temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
@@ -350,13 +355,14 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
             desc = para$fig1_desc
           )
         })
+        print("Check point 2")
         output$plotly_smv_plt.pos <- renderPlotly({
           para = plot1_para()
           if(is.null(p2_dataclean$object_pos.mv)){return()}
           if(para$fig1_sample_group != "All") {
             temp_obj <- p2_dataclean$object_pos.mv %>%
               activate_mass_dataset(what = 'sample_info') %>%
-              filter(class == para$fig1_sample_group)
+              dplyr::filter(class == para$fig1_sample_group)
           } else {temp_obj <- p2_dataclean$object_pos.mv}
           temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
@@ -367,6 +373,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
             desc = para$fig1_desc
           ) %>% plotly::ggplotly()
         })
+        print("Check point 3")
         # negative
         output$smv_plt.neg <- renderUI({
           plot_type <- input$fig1_data_clean_plt_format
@@ -382,7 +389,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           if(para$fig1_sample_group != "All") {
             temp_obj <- p2_dataclean$object_neg.mv %>%
               activate_mass_dataset(what = 'sample_info') %>%
-              filter(class == para$fig1_sample_group)
+              dplyr::filter(class == para$fig1_sample_group)
           } else {temp_obj <- p2_dataclean$object_neg.mv}
           temp_obj %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
@@ -399,7 +406,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           if(para$fig1_sample_group != "All") {
             temp_obj <- p2_dataclean$object_neg.mv %>%
               activate_mass_dataset(what = 'sample_info') %>%
-              filter(class == para$fig1_sample_group)
+              dplyr::filter(class == para$fig1_sample_group)
           } else {temp_obj <- p2_dataclean$object_neg.mv}
           p2_dataclean$object_neg.mv %>% massqc::show_sample_missing_values(
             color_by = para$fig1_color_by,
@@ -433,10 +440,10 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           if(para$fig1_sample_group != "All") {
             temp_obj.pos <- p2_dataclean$object_pos.mv %>%
               activate_mass_dataset(what = 'sample_info') %>%
-              filter(class == para$fig1_sample_group)
+              dplyr::filter(class == para$fig1_sample_group)
             temp_obj.neg <- p2_dataclean$object_neg.mv %>%
               activate_mass_dataset(what = 'sample_info') %>%
-              filter(class == para$fig1_sample_group)
+              dplyr::filter(class == para$fig1_sample_group)
           } else {
             temp_obj.pos <- p2_dataclean$object_pos.mv
             temp_obj.neg <- p2_dataclean$object_neg.mv
@@ -462,7 +469,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           if(para$fig1_sample_group != "All") {
             temp_obj.pos <- p2_dataclean$object_pos.mv %>%
               activate_mass_dataset(what = 'sample_info') %>%
-              filter(class == para$fig1_sample_group)
+              dplyr::filter(class == para$fig1_sample_group)
           } else {
             temp_obj.pos <- p2_dataclean$object_pos.mv
           }
@@ -478,7 +485,7 @@ remove_noise_server <- function(id,volumes,prj_init,data_import_rv,data_export_r
           if(para$fig1_sample_group != "All") {
             temp_obj.neg <- p2_dataclean$object_neg.mv %>%
               activate_mass_dataset(what = 'sample_info') %>%
-              filter(class == para$fig1_sample_group)
+              dplyr::filter(class == para$fig1_sample_group)
           } else {
             temp_obj.neg <- p2_dataclean$object_neg.mv
           }
