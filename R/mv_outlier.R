@@ -32,10 +32,9 @@ remove_outlier_ui <- function(id) {
             label = "Outlier removal strategy",
             choices = c("By tidymass","By myself"),
             selected = "By myself"
-          )
-        ),
-        accordion_panel(
-          title = "By tidymass",
+          ),
+          hr_bar(),
+          h5("By tidymass"),
           selectInput(
             inputId = ns("by_witch"),
             label = "remove outlier conditions",
@@ -43,11 +42,10 @@ remove_outlier_ui <- function(id) {
             selected = "according_to_na",multiple = T
           ),
           tags$span(textOutput(outputId = ns("outlier_in_pos_1")), class = "text-wrap"),
+          hr_head(),
+          tags$span(textOutput(outputId = ns("outlier_in_neg_1")), class = "text-wrap"),
           hr_bar(),
-          tags$span(textOutput(outputId = ns("outlier_in_neg_1")), class = "text-wrap")
-        ),
-        accordion_panel(
-          title = "By myself",
+          h5("By myself"),
           selectInput(
             inputId = ns("outlier_in_pos"),
             label = "Outliers (positive)",
@@ -59,16 +57,13 @@ remove_outlier_ui <- function(id) {
             label = "Outliers (negative)",
             choices = c("none"),
             selected = "none",multiple = T
-          )
-        ),
-        accordion_panel(
-          title = "Remove outlier",
-          icon = bsicons::bs_icon("play-fill"),
+          ),
+          hr_bar(),
           actionButton(
             inputId = ns("mv_start"),
             label = "Start",icon = icon("play")
           ),
-        ),
+        )
         ),
 
       page_fluid(

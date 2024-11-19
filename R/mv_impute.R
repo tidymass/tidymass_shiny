@@ -95,7 +95,7 @@ mv_impute_ui <- function(id) {
             value = 0.0001
           ),
           actionButton(
-            inputId = ns("mv_start"),
+            inputId = ns("impute_start"),
             label = "Start",icon = icon("play")
           )
         )),
@@ -156,7 +156,113 @@ mv_impute_ui <- function(id) {
 mv_impute_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    p2_dataclean <- reactiveValues(data = NULL)
+    p2_impute_mv <- reactiveValues(data = NULL)
+
+    analy_para = reactive({
+      list(
+        method = input$impute_mv_method %>% as.character(),
+        k = input$impute_mv_k %>% as.numeric(),
+        rowmax = input$impute_mv_rowmax %>% as.numeric(),
+        colmax = input$impute_mv_colmax %>% as.numeric(),
+        maxp = input$impute_mv_maxp %>% as.numeric(),
+        rng.seed = input$impute_mv_rng.seed %>% as.numeric(),
+        maxiter = input$impute_mv_maxiter %>% as.numeric(),
+        ntree = input$impute_mv_ntree %>% as.numeric(),
+        decreasing = input$impute_mv_decreasing %>% as.character(),
+        npcs = input$impute_mv_npcs %>% as.numeric(),
+        maxsteps = input$impute_mv_maxsteps %>% as.numeric(),
+        threshold = input$impute_mv_threshold %>% as.numeric()
+      )
+    })
+    observeEvent(
+      input$impute_start,
+      {
+        if(is.null(prj_init$sample_info)) {return()}
+        if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "impute missing value"){
+          p2_impute_mv$object_neg.outlier = prj_init$object_negative.init
+          p2_impute_mv$object_pos.outlier = prj_init$object_positive.init
+        } else {
+          if(is.null(data_clean_rv$object_pos.outlier)) {return()}
+          if(is.null(data_clean_rv$object_neg.outlier)) {return()}
+          p2_impute_mv$object_neg.outlier = data_clean_rv$object_neg.outlier
+          p2_impute_mv$object_pos.outlier = data_clean_rv$object_pos.outlier
+        }
+
+        para = analy_para()
+
+        if(para$decreasing == "TRUE") {
+          p2_impute_mv$object_pos.impute <-
+            p2_impute_mv$object_pos.outlier %>%
+            impute_mv(method = para$method,
+                      rowmax = para$rowmax,k = para$k,colmax = para$colmax,maxp = para$maxp,rng.seed = para$rng.seed,
+                      maxiter = para$maxiter,ntree = para$ntree,decreasing = TRUE,
+                      nPcs = para$npcs,maxSteps = para$maxsteps,threshold = para$threshold)
+          p2_impute_mv$object_neg.impute <-
+            p2_impute_mv$object_neg.outlier %>%
+            impute_mv(method = para$method,
+                      rowmax = para$rowmax,k = para$k,colmax = para$colmax,maxp = para$maxp,rng.seed = para$rng.seed,
+                      maxiter = para$maxiter,ntree = para$ntree,decreasing = TRUE,
+                      nPcs = para$npcs,maxSteps = para$maxsteps,threshold = para$threshold)
+        } else {
+          p2_impute_mv$object_pos.impute <-
+            p2_impute_mv$object_pos.outlier %>%
+            impute_mv(method = para$method,
+                      rowmax = para$rowmax,k = para$k,colmax = para$colmax,maxp = para$maxp,rng.seed = para$rng.seed,
+                      maxiter = para$maxiter,ntree = para$ntree,decreasing = FALSE,
+                      nPcs = para$npcs,maxSteps = para$maxsteps,threshold = para$threshold)
+          p2_impute_mv$object_neg.impute <-
+            p2_impute_mv$object_neg.outlier %>%
+            impute_mv(method = para$method,
+                      rowmax = para$rowmax,k = para$k,colmax = para$colmax,maxp = para$maxp,rng.seed = para$rng.seed,
+                      maxiter = para$maxiter,ntree = para$ntree,decreasing = FALSE,
+                      nPcs = para$npcs,maxSteps = para$maxsteps,threshold = para$threshold)
+        }
+        #> acc tbl
+        temp_acc_mat.pos <- p2_impute_mv$object_pos.impute %>%
+          extract_expression_data() %>%
+          rownames_to_column("variable_id")
+        output$impute_tbl_pos = renderDataTable_formated(
+          actions = input$impute_start,
+          condition1 = p2_impute_mv$object_pos.impute,
+          filename.a = "3.6.4.ImputAccumulationMatrix.pos",
+          tbl = temp_acc_mat.pos
+        )
+
+
+        temp_acc_mat.neg <- p2_impute_mv$object_neg.impute %>%
+          extract_expression_data() %>%
+          rownames_to_column("variable_id")
+        output$impute_tbl_neg = renderDataTable_formated(
+          actions = input$impute_start,
+          condition1 = p2_impute_mv$object_neg.impute,
+          filename.a = "3.6.4.ImputAccumulationMatrix.neg",
+          tbl = temp_acc_mat.neg
+        )
+
+        data_clean_rv$object_pos.impute = p2_impute_mv$object_pos.impute
+        data_clean_rv$object_neg.impute = p2_impute_mv$object_neg.impute
+
+        save_massobj(
+          polarity = 'positive',
+          file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
+          stage = 'impute',
+          obj = p2_impute_mv$object_pos.impute)
+
+        save_massobj(
+          polarity = 'negative',
+          file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
+          stage = 'impute',
+          obj = p2_impute_mv$object_neg.impute)
+
+        #> information of mass datasets
+        output$obj_impute.pos = renderPrint({
+          print(p2_impute_mv$object_pos.impute)
+        })
+        output$obj_impute.pos = renderPrint({
+          print(p2_impute_mv$object_neg.impute)
+        })
+      }
+    )
 
 
   })
