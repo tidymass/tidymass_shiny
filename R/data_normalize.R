@@ -577,10 +577,10 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
 
 
         #> information of mass datasets
-        output$object_pos.norm = renderPrint({
+        output$obj_norm.pos = renderPrint({
           print(p2_norm$object_pos.norm)
         })
-        output$object_neg.norm = renderPrint({
+        output$obj_norm.neg = renderPrint({
           print(p2_norm$object_neg.norm)
         })
 
@@ -925,6 +925,133 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
 
       }
     )
+
+
+# download ----------------------------------------------------------------
+
+
+
+    ###> fig3 ==============
+    output$fig3_download = downloadHandler(
+      filename = function() {
+        paste0("03.rsd_plot_before_normalization.", download_para()$fig3_format)
+      },
+      content = function(file) {
+        # extract parameters
+        para <- plot3_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
+          para_d$fig3_width = para_d$fig3_width * 2
+          p1 <-  p2_norm$object_pos.impute %>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig3_rsd_cutoff,
+              color = para$fig3_color,
+              title = 'All of QC sample'
+            )
+          p2 <-  p2_norm$object_neg.impute %>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig3_rsd_cutoff,
+              color = para$fig3_color,
+              title = 'All of QC sample'
+            )
+          p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          p <- p2_norm$object_pos.impute %>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig3_rsd_cutoff,
+              color = para$fig3_color,
+              title = 'All of QC sample'
+            )
+        } else {
+          p <-  p2_norm$object_neg.impute %>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig3_rsd_cutoff,
+              color = para$fig3_color,
+              title = 'All of QC sample'
+            )
+        }
+
+        # save plot
+        ggsave(
+          filename = file,
+          plot = p,
+          width = para_d$fig3_width,
+          height = para_d$fig3_height,
+          device = para_d$fig3_format
+        )
+      }
+    )
+    ###> fig4 ==============
+    output$fig4_download = downloadHandler(
+      filename = function() {
+        paste0("04.rsd_plot_after_normalization.", download_para()$fig4_format)
+      },
+      content = function(file) {
+        # extract parameters
+        para <- plot3_para()
+        para_d <- download_para()
+
+        # draw condition
+        if (!is.null(p2_norm$object_pos.norm) & !is.null(p2_norm$object_neg.norm)) {
+          para_d$fig4_width = para_d$fig4_width * 2
+          p1 <-  p2_norm$object_pos.norm %>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig4_rsd_cutoff,
+              color = para$fig4_color,
+              title = 'All of QC sample'
+            )
+          p2 <-  p2_norm$object_neg.norm %>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig4_rsd_cutoff,
+              color = para$fig4_color,
+              title = 'All of QC sample'
+            )
+          p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
+        } else if (!is.null(p2_dataclean$object_pos)) {
+          p <- p2_norm$object_pos.norm%>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig4_rsd_cutoff,
+              color = para$fig4_color,
+              title = 'All of QC sample'
+            )
+        } else {
+          p <-  p2_norm$object_neg.norm %>%
+            activate_mass_dataset("sample_info") %>%
+            dplyr::filter(class == "QC") %>%
+            massqc::massqc_cumulative_rsd_plot(
+              rsd_cutoff = para$fig4_rsd_cutoff,
+              color = para$fig4_color,
+              title = 'All of QC sample'
+            )
+        }
+
+        # save plot
+        ggsave(
+          filename = file,
+          plot = p,
+          width = para_d$fig4_width,
+          height = para_d$fig4_height,
+          device = para_d$fig4_format
+        )
+      }
+    )
+
 
 
   })

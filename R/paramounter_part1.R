@@ -7,6 +7,7 @@
 #' @param smooth Chromatographic smoothness, default value is 0. For full scan data, use a positive value; for example, use smooth = 4 for a 4 Hz spectral rate.
 #' @param cutoff The ppm percentage for determining the cutoff line of mass accuracy distribution, default value is 0.95 (95%).
 #' @param thread thread num
+#' @param filenum how many files used for parameter optimize
 #' @importFrom future plan multisession multicore
 #' @importFrom furrr future_map_dfr
 #' @importFrom purrr map_dfr

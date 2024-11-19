@@ -1563,7 +1563,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
     ###> fig6 ==============
     output$fig6_download = downloadHandler(
       filename = function() {
-        paste0("06.rsd_plot.", download_para()$fig6_format)
+        paste0("06.sample_boxplot.", download_para()$fig6_format)
       },
       content = function(file) {
         # extract parameters

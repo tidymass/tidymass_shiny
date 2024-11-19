@@ -315,8 +315,20 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
           'running negative model ...',
           'All finish'
         )
-        if(file.exists(paste0(para_data_check$MS1_path,"/POS/QC/ppmCut.xlsx")) &
-           file.exists(paste0(para_data_check$MS1_path,"/POS/QC/ppmCut.xlsx"))
+        temp_qc_num.pos = para_data_check$QC_number.p |> length()
+        temp_qc_num.neg = para_data_check$QC_number.n |> length()
+        if(temp_qc_num.pos == 0 ) {
+          temp_dir_path.pos = paste0(para_data_check$MS1_path,"/POS/Subject/")
+        } else {
+          temp_dir_path.pos = paste0(para_data_check$MS1_path,"/POS/QC/")
+        }
+        if(temp_qc_num.neg == 0 ) {
+          temp_dir_path.neg = paste0(para_data_check$MS1_path,"/NEG/Subject/")
+        } else {
+          temp_dir_path.neg = paste0(para_data_check$MS1_path,"/NEG/QC/")
+        }
+        if(file.exists(paste0(temp_dir_path.pos,"ppmCut.xlsx")) &
+           file.exists(paste0(temp_dir_path.neg,"ppmCut.xlsx"))
            ){
 
           withProgress(message = 'Test ppm cutoff',value = 0,
@@ -324,9 +336,9 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                          for (i in 1:3) {
                            incProgress(1/3,detail = pro_optimize_step1[i])
                            if(i == 1) {
-                             data_para_opt$ppmCut.p = readxl::read_xlsx(paste0(para_data_check$MS1_path,"/POS/QC/ppmCut.xlsx")) %>% pull(ppmCut) %>% as.numeric()
+                             data_para_opt$ppmCut.p = readxl::read_xlsx(paste0(temp_dir_path.pos,"ppmCut.xlsx")) %>% pull(ppmCut) %>% as.numeric()
                            } else if(i == 2) {
-                             data_para_opt$ppmCut.n = readxl::read_xlsx(paste0(para_data_check$MS1_path,"/NEG/QC/ppmCut.xlsx")) %>% pull(ppmCut) %>% as.numeric()
+                             data_para_opt$ppmCut.n = readxl::read_xlsx(paste0(temp_dir_path.neg,"ppmCut.xlsx")) %>% pull(ppmCut) %>% as.numeric()
                            } else if (i == 3) {
                              print("already done, use previous saved ppmCut")
                            }
@@ -344,7 +356,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                            incProgress(1/3,detail = pro_optimize_step1[i])
                            if (i == 1) {
                              data_para_opt$step1.p = paramounter_part1(
-                               directory = paste0(para_data_check$MS1_path,"/POS/QC/"),
+                               directory = temp_dir_path.pos,
                                massSDrange = massSDrange,
                                smooth = smooth,
                                cutoff = cutoff,
@@ -353,7 +365,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                              )
                            } else if(i == 2) {
                              data_para_opt$step1.n = paramounter_part1(
-                               directory = paste0(para_data_check$MS1_path,"/NEG/QC/"),
+                               directory = temp_dir_path.neg,
                                massSDrange = massSDrange,
                                smooth = smooth,
                                cutoff = cutoff,
@@ -392,17 +404,29 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
           'running negative model ...',
           'All finish'
         )
-        if(file.exists(paste0(para_data_check$MS1_path,"/POS/QC/parameters.xlsx")) &
-           file.exists(paste0(para_data_check$MS1_path,"/POS/QC/parameters.xlsx"))
+        temp_qc_num.pos = para_data_check$QC_number.p |> length()
+        temp_qc_num.neg = para_data_check$QC_number.n |> length()
+        if(temp_qc_num.pos == 0 ) {
+          temp_dir_path.pos = paste0(para_data_check$MS1_path,"/POS/Subject/")
+        } else {
+          temp_dir_path.pos = paste0(para_data_check$MS1_path,"/POS/QC/")
+        }
+        if(temp_qc_num.neg == 0 ) {
+          temp_dir_path.neg = paste0(para_data_check$MS1_path,"/NEG/Subject/")
+        } else {
+          temp_dir_path.neg = paste0(para_data_check$MS1_path,"/NEG/QC/")
+        }
+        if(file.exists(paste0(temp_dir_path.pos,"parameters.xlsx")) &
+           file.exists(paste0(temp_dir_path.neg,"parameters.xlsx"))
         ) {
           withProgress(message = 'optimize parameter',value = 0,
                        expr = {
                          for (i in 1:3) {
                            incProgress(1/3,detail = pro_optimize_step2[i])
                            if(i == 1) {
-                             data_para_opt$step2.p = readxl::read_xlsx(paste0(para_data_check$MS1_path,"/POS/QC/parameters.xlsx"))
+                             data_para_opt$step2.p = readxl::read_xlsx(paste0(temp_dir_path.pos,"parameters.xlsx"))
                            } else if(i == 2) {
-                             data_para_opt$step2.n = readxl::read_xlsx(paste0(para_data_check$MS1_path,"/NEG/QC/parameters.xlsx"))
+                             data_para_opt$step2.n = readxl::read_xlsx(paste0(temp_dir_path.neg,"parameters.xlsx"))
                            } else if (i == 3) {
                              print("already done, use previous saved parameters")
                            }
@@ -428,7 +452,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                          incProgress(1/3,detail = pro_optimize_step2[i])
                          if (i == 1) {
                            data_para_opt$step2.p = paramounter_part2(
-                             directory = paste0(para_data_check$MS1_path,"/POS/QC/"),
+                             directory = temp_dir_path.pos,
                              massSDrange = massSDrange,
                              smooth = smooth,
                              cutoff = cutoff,
@@ -439,7 +463,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
 
                          } else if(i == 2) {
                            data_para_opt$step2.n = paramounter_part2(
-                             directory = paste0(para_data_check$MS1_path,"/NEG/QC/"),
+                             directory = temp_dir_path.neg,
                              massSDrange = massSDrange,
                              smooth = smooth,
                              cutoff = cutoff,
@@ -448,8 +472,8 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                              thread = input$thread.2 %>% as.numeric()
                            ) %>% dplyr::rename("Negative" = "Value")
                          } else if (i == 3) {
-                           writexl::write_xlsx(data_para_opt$step2.p,paste0(para_data_check$MS1_path,"/POS/QC/parameters.xlsx"))
-                           writexl::write_xlsx(data_para_opt$step2.n,paste0(para_data_check$MS1_path,"/NEG/QC/parameters.xlsx"))
+                           writexl::write_xlsx(data_para_opt$step2.p,paste0(temp_dir_path.pos,"parameters.xlsx"))
+                           writexl::write_xlsx(data_para_opt$step2.n,paste0(temp_dir_path.pos,"parameters.xlsx"))
                          }
                        }
                      })
