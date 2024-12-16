@@ -108,6 +108,7 @@ app_server <-
       data_anno = data_anno,
       data_export_rv = data_export_rv
     )
+    p2_af_filter <- reactiveValues(data = NULL)
 
     annotation_filter_server(
       id = "annotation_filter_id",
@@ -115,7 +116,7 @@ app_server <-
       prj_init = prj_init,
       data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv,
-      data_anno = data_anno,
+      p2_af_filter = p2_af_filter,
       data_export_rv = data_export_rv
     )
 

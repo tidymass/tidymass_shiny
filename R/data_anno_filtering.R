@@ -74,7 +74,7 @@ annotation_filter_ui <- function(id) {
             choices = c("Only annotated features","Only features with MS2 spectra","Both","Keep unknown features"),
             selected = "Both"
           ),
-          actionButton(inputId = ns(af_start),label = 'Start',icon = icon("play"))
+          actionButton(inputId = ns("af_start"),label = 'Start',icon = icon("play"))
         )
       ),
       page_fluid(
@@ -90,16 +90,6 @@ annotation_filter_ui <- function(id) {
             nav_panel("Negative", DT::dataTableOutput(
               outputId = ns("Annotation_filtering_neg")
             )),
-            nav_panel(
-              shiny::icon("circle-info"),
-              markdown("description of noise remove method.")
-            )
-          ),
-          navset_card_tab(
-            title = "Check compound annotation in other online database",
-            height = 400,
-            full_screen = TRUE,
-            nav_panel("links"),
             nav_panel(
               shiny::icon("circle-info"),
               markdown("description of noise remove method.")
@@ -126,7 +116,8 @@ annotation_filter_ui <- function(id) {
                   label = "show match details",
                   choices = c("TRUE","FALSE"),
                   selected = "TRUE"
-                )
+                ),
+                actionButton(inputId = ns("af_show_mirror_plot"),label = 'Show mirror plot',icon = icon("play"))
               ),
               accordion_panel(
                 title = 'Download',
@@ -149,14 +140,14 @@ annotation_filter_ui <- function(id) {
                       layout_columns(
                         col_widths = c(6,6),
                         dataTableOutput(ns('MS2_pos_tbl')),
-                        plotOutput(ns("MS2_pos"))
+                        uiOutput(ns("pos_match_mz"))
                       )
                       ),
             nav_panel("Negative",
                       layout_columns(
                         col_widths = c(6,6),
                         dataTableOutput(ns('MS2_neg_tbl')),
-                        plotOutput(ns("MS2_neg"))
+                        uiOutput(ns("neg_match_mz"))
                       )
             )
           ),
@@ -461,17 +452,17 @@ annotation_filter_server <-
             obj = data_clean_rv$object_neg.af)
 
           ##> status
-          output$object_pos.af = renderPrint({
+          output$obj_af.pos = renderPrint({
             print(data_clean_rv$object_pos.af)
           })
-          output$object_neg.af = renderPrint({
+          output$obj_af.neg = renderPrint({
             print(data_clean_rv$object_neg.af)
           })
         }
 
       )
 
-      observeEvent(input$af_pos_show_plot, {
+      observeEvent(input$af_show_mirror_plot, {
         tryCatch({
           if (is.null(p2_af_filter$object_pos_temp.af)) {
             return()
@@ -533,7 +524,7 @@ annotation_filter_server <-
       })
 
 
-      observeEvent(input$af_neg_show_plot, {
+      observeEvent(input$af_show_mirror_plot, {
         tryCatch({
           if (is.null(p2_af_filter$object_neg_temp.af)) {
             return()

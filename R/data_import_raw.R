@@ -474,7 +474,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                            ) %>% dplyr::rename("Negative" = "Value")
                          } else if (i == 3) {
                            writexl::write_xlsx(data_para_opt$step2.p,paste0(temp_dir_path.pos,"parameters.xlsx"))
-                           writexl::write_xlsx(data_para_opt$step2.n,paste0(temp_dir_path.pos,"parameters.xlsx"))
+                           writexl::write_xlsx(data_para_opt$step2.n,paste0(temp_dir_path.neg,"parameters.xlsx"))
                          }
                        }
                      })
@@ -521,8 +521,6 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                         input$mzdiff,input$binSize,input$bw,input$out_put_peak,input$column)
           )
         print('check point 2')
-
-
 
         if(para_choise == "yes") {
           data_import_rv$parameters =
@@ -671,7 +669,6 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
         })
       }
     )
-
   })
 }
 
