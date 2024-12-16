@@ -445,7 +445,8 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
         if(is.null(data_para_opt$ppmCut.n)) {
           data_para_opt$ppmCut.n = input$ppmCut.2 %>% as.numeric()
         }
-
+       print(temp_dir_path.pos)
+       print(temp_dir_path.neg)
         withProgress(message = 'optimize parameter',value = 0,
                      expr = {
                        for (i in 1:3) {
@@ -506,6 +507,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
         pro_step = c('running positive model ...',
                      'running negative model ...',
                      'All finish!')
+        print("check point 1")
 
         data_import_rv$parameters =
           data.frame(
@@ -518,6 +520,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                         input$pre_right,input$fill_peaks,input$fitgauss,input$integrate,
                         input$mzdiff,input$binSize,input$bw,input$out_put_peak,input$column)
           )
+        print('check point 2')
 
 
 
@@ -588,7 +591,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
             output_rt_correction_plot = data_import_rv$out_put_peak,
             min_fraction = data_import_rv$min_fraction,
             fill_peaks = data_import_rv$fill_peaks,
-            group_for_figure = "QC"
+     #       group_for_figure = "QC"
           )
         }
         withProgress(message = 'Peak picking', value = 0,

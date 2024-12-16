@@ -471,10 +471,10 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         sample_info_colnames <- colnames(prj_init$object_negative.init@sample_info)
       } else if (!is.null(prj_init$object_positive.init)) {
         sample_info_colnames <- colnames(prj_init$object_positive.init@sample_info)
-      } else if (!is.null(data_import_rv$object_neg.impute)) {
-        sample_info_colnames <- colnames(data_import_rv$object_neg.impute@sample_info)
-      } else if (!is.null(data_import_rv$object_pos.impute)) {
-        sample_info_colnames <- colnames(data_import_rv$object_pos.impute@sample_info)
+      } else if (!is.null(data_clean_rv$object_neg.impute)) {
+        sample_info_colnames <- colnames(data_clean_rv$object_neg.impute@sample_info)
+      } else if (!is.null(data_clean_rv$object_pos.impute)) {
+        sample_info_colnames <- colnames(data_clean_rv$object_pos.impute@sample_info)
       }
 
       # update

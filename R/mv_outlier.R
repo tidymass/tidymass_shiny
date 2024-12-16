@@ -354,9 +354,9 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           p2_dataclean$object_pos = prj_init$object_positive.init
         } else {
           if(is.null(data_import_rv$object_neg.mv)) {return()}
-          if(is.null(data_import_rv$object_neg.mv)) {return()}
+          if(is.null(data_import_rv$object_pos.mv)) {return()}
           p2_dataclean$object_neg = data_import_rv$object_neg.mv
-          p2_dataclean$object_pos = data_import_rv$object_neg.mv
+          p2_dataclean$object_pos = data_import_rv$object_pos.mv
         }
 
 
