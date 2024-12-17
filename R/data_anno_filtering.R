@@ -104,7 +104,7 @@ annotation_filter_ui <- function(id) {
               open = FALSE,
               accordion_panel(
                 title = 'Parameters',
-                materialSwitch(inputId = ns("plot_format"),label = "Interactive plot", status = "primary"),
+                materialSwitch(inputId = ns("af_plt_format"),label = "Interactive plot", status = "primary"),
                 radioButtons(
                   inputId = ns("show_mz"),
                   label = "show mz value on plot",
@@ -116,8 +116,8 @@ annotation_filter_ui <- function(id) {
                   label = "show match details",
                   choices = c("TRUE","FALSE"),
                   selected = "TRUE"
-                ),
-                actionButton(inputId = ns("af_show_mirror_plot"),label = 'Show mirror plot',icon = icon("play"))
+                )
+
               ),
               accordion_panel(
                 title = 'Download',
@@ -137,6 +137,7 @@ annotation_filter_ui <- function(id) {
               )
             ),
             nav_panel("Positive",
+                      actionButton(inputId = ns("af_show_mirror_plot.pos"),label = 'Show mirror plot',icon = icon("play"),width = '25%'),
                       layout_columns(
                         col_widths = c(6,6),
                         dataTableOutput(ns('MS2_pos_tbl')),
@@ -144,6 +145,7 @@ annotation_filter_ui <- function(id) {
                       )
                       ),
             nav_panel("Negative",
+                      actionButton(inputId = ns("af_show_mirror_plot.neg"),label = 'Show mirror plot',icon = icon("play"),width = '25%'),
                       layout_columns(
                         col_widths = c(6,6),
                         dataTableOutput(ns('MS2_neg_tbl')),
@@ -462,7 +464,7 @@ annotation_filter_server <-
 
       )
 
-      observeEvent(input$af_show_mirror_plot, {
+      observeEvent(input$af_show_mirror_plot.pos, {
         tryCatch({
           if (is.null(p2_af_filter$object_pos_temp.af)) {
             return()
@@ -472,20 +474,21 @@ annotation_filter_server <-
           }
 
           # plot pos
-          show_mz = input$show_mz
-          if (show_mz == "TRUE") { show_mz = TRUE } else { show_mz = FALSE }
-          show_detail = input$show_detail
-          if (show_detail == "TRUE") { show_detail = TRUE } else { show_detail = FALSE }
+          show_mz = input$show_mz %>% as.logical()
+          show_detail = input$show_detail %>% as.logical()
 
           # get index
-          af_pos_row_idx = input$af_pos_ms2_tbl_rows_selected
+          af_pos_row_idx = input$MS2_pos_tbl_rows_selected
           # extract info
           af_pos_row = p2_af_filter$temp_af_pos_tbl[af_pos_row_idx, ]
+          print(af_pos_row)
           p2_af_filter$pos_vari_id = af_pos_row[[1]]
           p2_af_filter$pos_db_name = af_pos_row[[4]]
 
           temp_idx.pos = match(p2_af_filter$pos_db_name, p2_af_filter$db.name)
           temp_db.pos = p2_af_filter$dblist[[temp_idx.pos]]
+          print(temp_idx.pos)
+          print(temp_db.pos)
 
           # plot
           p2_af_filter$temp_ms2_match.pos = ms2_plot_mass_dataset_mz(
@@ -496,6 +499,7 @@ annotation_filter_server <-
             show_mz = show_mz,
             show_detail = show_detail
           )
+          print(p2_af_filter$temp_ms2_match.pos[[1]])
 
           # vis
           output$pos_match_mz <- renderUI({
@@ -524,7 +528,7 @@ annotation_filter_server <-
       })
 
 
-      observeEvent(input$af_show_mirror_plot, {
+      observeEvent(input$af_show_mirror_plot.neg, {
         tryCatch({
           if (is.null(p2_af_filter$object_neg_temp.af)) {
             return()
@@ -539,7 +543,7 @@ annotation_filter_server <-
           show_detail = input$show_detail
           if (show_detail == "TRUE") { show_detail = TRUE } else { show_detail = FALSE }
 
-          af_neg_row_idx = input$af_neg_ms2_tbl_rows_selected
+          af_neg_row_idx = input$MS2_neg_tbl_rows_selected
           af_neg_row = p2_af_filter$temp_af_neg_tbl[af_neg_row_idx, ]
           p2_af_filter$neg_vari_id = af_neg_row[[1]]
           p2_af_filter$neg_db_name = af_neg_row[[4]]

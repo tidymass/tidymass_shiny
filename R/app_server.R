@@ -108,8 +108,8 @@ app_server <-
       data_anno = data_anno,
       data_export_rv = data_export_rv
     )
-    p2_af_filter <- reactiveValues(data = NULL)
 
+    p2_af_filter <- reactiveValues(data = NULL)
     annotation_filter_server(
       id = "annotation_filter_id",
       volumes = volumes,
