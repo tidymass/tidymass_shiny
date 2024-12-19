@@ -193,6 +193,7 @@ feature_annotation_ui <- function(id) {
 #' @importFrom dplyr select left_join
 #' @importFrom massdataset activate_mass_dataset
 #' @importFrom plotly renderPlotly plotlyOutput
+#' @import plantmdb
 #' @param id module of server
 #' @param volumes shinyFiles volumes
 #' @param prj_init use project init variables.
@@ -329,17 +330,18 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
         print(data_anno$object_pos.norm)
 
         ## buildin database
+
         data_anno$buildin_db <-
           list(
-            MoNA = plantmdb::mona_database0.0.4,
-            Massbank = plantmdb::massbank_database0.0.4,
-            ReSpect = plantmdb::respect_database0.0.1,
-            PlaSMA = plantmdb::plasma_database0.0.1,
-            Orbitrap = plantmdb::orbitrap_database0.0.3,
-            KEGG = plantmdb::kegg_plant_database0.0.1,
-            KNApSAcK = plantmdb::knapsack_agri_database0.0.1,
-            Ath_Cyc = plantmdb::ath_plantcyc.database0.0.1,
-            MetaboBASE = plantmdb::metabobase_database0.0.1
+            MoNA = mona_database0.0.4,
+            Massbank = massbank_database0.0.4,
+            ReSpect = respect_database0.0.1,
+            PlaSMA = plasma_database0.0.1,
+            Orbitrap = orbitrap_database0.0.3,
+            KEGG = kegg_plant_database0.0.1,
+            KNApSAcK = knapsack_agri_database0.0.1,
+            Ath_Cyc = ath_plantcyc.database0.0.1,
+            MetaboBASE = metabobase_database0.0.1
 
           )
         ##

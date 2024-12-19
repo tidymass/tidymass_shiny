@@ -57,6 +57,7 @@ golem_add_external_resources <- function() {
     "www",
     app_sys("app/www")
   )
+  # use_external_css_file("style.css")
 
   tags$head(
     favicon(),
@@ -66,5 +67,6 @@ golem_add_external_resources <- function() {
     )
     # Add here other external resources
     # for example, you can add shinyalert::useShinyalert()
+
   )
 }

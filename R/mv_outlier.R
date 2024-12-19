@@ -323,12 +323,16 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
 
       if (!is.null(prj_init$object_negative.init)) {
         sample_info_colnames <- colnames(prj_init$object_negative.init@sample_info)
+        temp_sample_id <- prj_init$object_negative.init@sample_info %>% pull("sample_id")
       } else if (!is.null(prj_init$object_positive.init)) {
         sample_info_colnames <- colnames(prj_init$object_positive.init@sample_info)
+        temp_sample_id <- prj_init$object_positive.init@sample_info %>% pull("sample_id")
       } else if (!is.null(data_import_rv$object_neg.mv)) {
         sample_info_colnames <- colnames(data_import_rv$object_neg.mv@sample_info)
+        temp_sample_id <- data_import_rv$object_neg.mv@sample_info %>% pull("sample_id")
       } else if (!is.null(data_import_rv$object_pos.mv)) {
         sample_info_colnames <- colnames(data_import_rv$object_pos.mv@sample_info)
+        temp_sample_id <- data_import_rv$object_pos.mv@sample_info %>% pull("sample_id")
       }
 
       # update
@@ -337,6 +341,8 @@ remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         updateSelectInput(session, "order_by_smv", choices = sample_info_colnames, selected = "injection.order")
         updateSelectInput(session, "fig2_color_by", choices = sample_info_colnames, selected = "group")
         updateSelectInput(session, "fig2_color_by_3d", choices = sample_info_colnames, selected = "group")
+        updateSelectInput(session, "outlier_in_pos", choices = temp_sample_id, selected = "none")
+        updateSelectInput(session, "outlier_in_neg", choices = temp_sample_id, selected = "none")
       }
 
     })
