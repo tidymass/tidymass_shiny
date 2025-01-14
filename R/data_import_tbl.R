@@ -149,7 +149,6 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv,data_expor
       input$action1.1,
       {
         if(is.null(input$expmat)){return()}
-        if(is.null(input$MS2_table)){return()}
 
         #> variable information
         para_tbl_check$RT_tbl = as.character(input$RT_tbl)
