@@ -3,18 +3,21 @@
 #' interactive pca plot.
 #' @return A plotly object
 #' @param object tidymass-class object
+#' @param title plot title
 #' @param color_by which column (sample_info) is used to color samples
 #' @param x_axis Principal component for x axis, defalut is PC1
 #' @param y_axis Principal component for y axis, defalut is PC2
 #' @param z_axis Principal component for z axis, defalut is PC3
 #' @importFrom plotly plot_ly add_trace layout
 #' @importFrom dplyr mutate select pull
+#' @importFrom purrr map_chr
 #' @export
 #'
 
 massqc_pca_3d <-
   function(
     object,
+    title = "3D PCA",
     color_by,
     x_axis = "PC1",
     y_axis = "PC2",
@@ -36,8 +39,8 @@ massqc_pca_3d <-
     }
     sample_info <- object@sample_info
     sample_info <- sample_info %>%
-      mutate(hover_text = map_chr(1:n(), function(i) {
-        paste(map_chr(colnames(sample_info), function(col) {
+      mutate(hover_text = purrr::map_chr(1:n(), function(i) {
+        paste(purrr::map_chr(colnames(sample_info), function(col) {
           paste(col, ":", sample_info[i, col], sep = "")
         }), collapse = "<br>")
       }))
@@ -81,7 +84,7 @@ massqc_pca_3d <-
         hovertext = sample_info$hover_text
       ) %>%
       plotly::layout(
-        title = list(text = "3D PCA"),
+        title = list(text = title),
         legend = list(title = list(text = color_by)),
         scene = list(
           xaxis = list(title = temp_x_title),

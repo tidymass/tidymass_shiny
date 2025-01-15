@@ -30,72 +30,70 @@ data_import_raw_ui <- function(id) {
         accordion_panel(
           title = "Peak picking parameters",
           icon = bsicons::bs_icon("gear"),
-          h3("MS1 import Parameters",style = "color:#darkgreen"),
-          hr_main(),
           textInput(
             inputId = ns('ppm'),label = "ppm",value = 15,
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('p_min'),label = 'peakwidth min',value = 5
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('p_max'),label = 'peakwidth max',value = 30
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('snthresh'),label = 'snthresh',value = 10
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('pre_left'),label = 'prefilter peaks',value = 3
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('pre_right'),label = 'prefilter intensity',value = 500
           ),
-          hr_head(),
+
           selectInput(
             inputId = ns('fitgauss'),label = 'fitgauss',choices = c("TRUE","FALSE"),selected = "FALSE",multiple = F
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('integrate'),label = 'integrate',value = 2
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('noise'),label = 'noise',value = 500
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('mzdiff'),label = 'mzdiff',value = 0.01
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('threads'),label = 'threads',value = 6
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('binSize'),label = 'binSize',value = 0.025
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('bw'),label = 'bw',value = 5
           ),
-          hr_head(),
+
           textInput(
             inputId = ns('min_fraction'),label = 'min_fraction',value = 0.5
           ),
-          hr_head(),
+
           selectInput(
             inputId = ns('out_put_peak'),label = 'figure output',choices = c("TRUE","FALSE"),selected = "TRUE",multiple = F
           ),
-          hr_head(),
+
           selectInput(
             inputId = ns('fill_peaks'),label = 'fill_peaks',choices = c("TRUE","FALSE"),selected = "FALSE",multiple = F
           ),
-          hr_head(),
+
           selectInput(
             inputId = ns('column'),label = 'column',choices = c("rp","hilic"),selected = "rp",multiple = F
           )
@@ -104,6 +102,8 @@ data_import_raw_ui <- function(id) {
       page_fluid(
         nav_panel(
           title = "File check",
+          tags$h3("Check input MS files",style = 'color: black'),
+          hr_head(),
           icon = bsicons::bs_icon("inbox"),
           actionButton(ns('action1'),'1. Check input file',icon = icon("computer-mouse"),width = "15%"),
           htmlOutput(ns("file_check1")),
@@ -117,11 +117,12 @@ data_import_raw_ui <- function(id) {
               DT::dataTableOutput(ns("tbl_ms1"))
             )
           ),
-          tags$h3("Optimize peak picking parameters",style = 'color: #008080'),
+          tags$h3("Optimize peak picking parameters (option)",style = 'color: black'),
+          hr_head(),
           navset_card_tab(
             height = 700,
             full_screen = TRUE,
-            title = "optimize peak picking parameters (option)",
+            title = "optimize peak picking parameters",
             nav_panel(
             title =    "Step1",
               card_header("Choose ppmCut"),
@@ -132,8 +133,8 @@ data_import_raw_ui <- function(id) {
                   textInput(inputId = ns("cutoff.1"),label = "cutoff",value = 0.95),
                   textInput(inputId = ns("thread.1"),label = "thread",value = 5),
                   radioButtons(inputId = ns("filenum.1"),label = "filenum",choices = c(3,5,"all"),selected = 3),
-                  actionButton(ns('action3'),'Start',icon = icon("computer-mouse")),
                 ),
+                actionButton(ns('action3'),'Start',icon = icon("computer-mouse")),
                 plotOutput(outputId = ns("ppmCut_plt"))
               )
             ),
@@ -148,13 +149,15 @@ data_import_raw_ui <- function(id) {
                       textInput(inputId = ns("thread.2"),label = "thread",value = 5),
                       textInput(inputId = ns("ppmCut.2"),label = "ppmCut",value = 7),
                       radioButtons(inputId = ns("filenum.2"),label = "filenum",choices = c(3,5,"all"),selected = 3),
-                      actionButton(ns('action4'),'Start',icon = icon("computer-mouse")),
                     ),
+                    actionButton(ns('action4'),'Start',icon = icon("computer-mouse")),
                     DT::dataTableOutput(ns("parameters_opt")),
                     radioButtons(inputId = ns("para_choise"),label = "use optimized parameters",choices = c("yes","no"),selected = "yes")
                   )
             )
           ),
+          tags$h3("Start peak picking",style = 'color: black'),
+          hr_head(),
           actionButton(ns('action2'),'2. Star peak picking',icon = icon("computer-mouse"),width = "15%"),
           navset_card_tab(
             height = 350,
@@ -496,7 +499,9 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
       input$para_choise %>% as.character()
     })
 
-    #>peak picking
+
+
+    #>peak picking =========================================
     observeEvent(
       input$action2,
       {
@@ -507,7 +512,7 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
         pro_step = c('running positive model ...',
                      'running negative model ...',
                      'All finish!')
-        print("check point 1")
+         print("check point 1")
 
         data_import_rv$parameters =
           data.frame(
@@ -520,9 +525,11 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
                         input$pre_right,input$fill_peaks,input$fitgauss,input$integrate,
                         input$mzdiff,input$binSize,input$bw,input$out_put_peak,input$column)
           )
-        print('check point 2')
 
-        if(para_choise == "yes") {
+         print('check point 2')
+
+
+        if(para_choise == "yes" & !is.null(data_para_opt$out_tbl)) {
           data_import_rv$parameters =
           data_import_rv$parameters %>%
             dplyr::left_join(data_para_opt$out_tbl,by = "para") %>%
@@ -543,13 +550,14 @@ data_import_raw_server <- function(id,volumes,prj_init,data_import_rv,data_expor
               )
             )
         }
+        print("Check point 3")
         print(data_import_rv$parameters)
 
 
         #> function
         process_data_fun = function(path,polarity,parameters){
-          if(ncol(parameters) == 3) {
-            n = 3
+          if(ncol(parameters) == 2) {
+            n = 2
           } else if(ncol(parameters) == 5) {
             if(polarity == "positive") {n = 4} else if(polarity == "negative") {n = 5}
           }

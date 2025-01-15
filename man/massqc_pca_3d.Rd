@@ -4,10 +4,19 @@
 \alias{massqc_pca_3d}
 \title{3d pca plot}
 \usage{
-massqc_pca_3d(object, color_by, x_axis = "PC1", y_axis = "PC2", z_axis = "PC3")
+massqc_pca_3d(
+  object,
+  title = "3D PCA",
+  color_by,
+  x_axis = "PC1",
+  y_axis = "PC2",
+  z_axis = "PC3"
+)
 }
 \arguments{
 \item{object}{tidymass-class object}
+
+\item{title}{plot title}
 
 \item{color_by}{which column (sample_info) is used to color samples}
 

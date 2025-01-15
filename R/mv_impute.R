@@ -258,7 +258,7 @@ mv_impute_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,da
         output$obj_impute.pos = renderPrint({
           print(p2_impute_mv$object_pos.impute)
         })
-        output$obj_impute.pos = renderPrint({
+        output$obj_impute.neg = renderPrint({
           print(p2_impute_mv$object_neg.impute)
         })
       }

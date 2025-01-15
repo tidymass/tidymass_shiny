@@ -101,7 +101,7 @@ project_init_ui <- function(id) {
           title = "Setting working directory",
           icon = bsicons::bs_icon("power"),
           actionButton(inputId = ns('action_init'),'Initialize project',icon = icon("play"), style = "width: 200px;"),
-          tags$h3("Summary of input file",style = 'color: #008080'),
+          tags$h3("Summary of input file",style = 'color: black'),
           hr_head(),
           htmlOutput(outputId = ns("file_check_init")),
           card(
@@ -112,7 +112,7 @@ project_init_ui <- function(id) {
             ),
             DT::dataTableOutput(ns("tbl_sample_info"))
           ),
-          tags$h3("Resuming task information",style = 'color: #008080'),
+          tags$h3("Resuming task information",style = 'color: black'),
           hr_head(),
           layout_column_wrap(
             width = 1/2,

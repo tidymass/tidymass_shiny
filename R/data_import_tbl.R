@@ -50,7 +50,7 @@ data_import_tbl_ui <- function(id) {
           title = "File check",
           icon = bsicons::bs_icon("inbox"),
           actionButton(ns('action1.1'),'Input file summary',icon = icon("computer-mouse"),width = "15%"),
-          tags$h3("Summary of input file",style = 'color: #008080'),
+          tags$h3("Summary of input file",style = 'color: black'),
           htmlOutput(ns("file_check2")),
           navset_card_tab(
             height = 350,
@@ -68,7 +68,7 @@ data_import_tbl_ui <- function(id) {
             )
           ),
           actionButton(ns('action2.1'),'Generate massdataset object',icon = icon("computer-mouse"),width = "25%"),
-          tags$h3("Output file path",style = 'color: #008080'),
+          tags$h3("Output file path",style = 'color: black'),
           htmlOutput(ns("obj_mass_res_path")),
           navset_card_tab(
             height = 350,
@@ -279,7 +279,6 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv,data_expor
       input$action2.1,
       {
         if(is.null(input$expmat)){return()}
-        if(is.null(input$MS2_table)){return()}
         pro_step_tbl = c(
           'Create mass_dataset class:\nPositive model ...',
           'Create mass_dataset class:\nNegative model ...',
