@@ -66,7 +66,7 @@ project_init_ui <- function(id) {
           icon = bsicons::bs_icon("repeat"),
           selectInput_div(
             inputId = ns("init_steps"),label = "Choose steps",
-            choices = c("Remove noisey feature","Remove outlier","impute missing value","Normalization","Annotation","Annotation filtering","Data integrate","DAM and rest"),
+            choices = c("Remove noisey feature","Remove outlier","impute missing value","Normalization","Annotation","Annotation filtering","Merge data","DAM and rest"),
             selected = NULL,multiple = F,
             title = "Choose steps"
           ),

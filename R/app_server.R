@@ -119,14 +119,23 @@ app_server <-
       p2_af_filter = p2_af_filter,
       data_export_rv = data_export_rv
     )
-
-    feature_class_server(
-      id = "feature_class_ui",
+    merge_data_server(
+      id = "merge_data_id",
       volumes = volumes,
       prj_init = prj_init,
       data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv,
-      data_anno = data_anno,
+      p2_af_filter = p2_af_filter,
       data_export_rv = data_export_rv
     )
+    dam_server(
+      id = "dam_id",
+      volumes = volumes,
+      prj_init = prj_init,
+      data_import_rv = data_import_rv,
+      data_clean_rv = data_clean_rv,
+      p2_af_filter = p2_af_filter,
+      data_export_rv = data_export_rv
+    )
+
   }
