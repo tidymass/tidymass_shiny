@@ -89,17 +89,17 @@ dam_ui <- function(id) {
             ),min = 0,max = 1,step = 0.01,value = 1
           ),
           textInput(
-            inputId = ns("FDR"),
+            inputId = ns("VIP"),
             label = tooltip(
               trigger = list(
-                "FDR",
+                "VIP",
                 bsicons::bs_icon("info-circle")
               ),
-              "The cutoff based on Adjuested P-value"
+              "The cutoff based on VIP of PLS-DA or OPLS-DA"
             ),value = 1
           ),
-          actionButton(inputId = ns("DAM_start"),label = 'Start',icon = icon("play"))
-        )
+          actionButton(inputId = ns("DAM_start"),label = "Start",icon = icon("play"))
+          )
       ),
       page_fluid(
         layout_column_wrap(
@@ -181,10 +181,22 @@ dam_ui <- function(id) {
                 accordion_panel(
                   title = 'Parameters',
                   textInput(
+                    ns('fig2_xlim_min'),"x-axis range min", -4
+                  ),
+                  textInput(
+                    ns('fig2_xlim_max'),"x-axis range max", 4
+                  ),
+                  textInput(
                     ns('fig2_fc_column_name'),"fc_column_name","fc"
                   ),
                   selectInput(
                     ns('fig2_log2_fc'),"log2_fc",choices = c("TRUE","FALSE"),"FALSE"
+                  ),
+                  textInput(
+                    ns('fig2_fc_up_cutoff'),"fold change up cutoff",2
+                  ),
+                  textInput(
+                    ns('fig2_fc_down_cutoff'),"fold change down cutoff",0.5
                   ),
                   textInput(
                     ns('fig2_p_value_column_name'),"p_value_column_name","p_value_adjust"
@@ -425,31 +437,38 @@ dam_server <-
 
           control_sample_id =
             p2_af_filter$object_merge %>%
-            activate_mass_dataset(what = "sample_info") %>%
-            filter(sym(dam_para$col_index) == dam_para$left) %>%
-            pull(sample_id)
+            extract_sample_info() %>%
+            dplyr::rename("tags" = dam_para$col_index) %>%
+            dplyr::filter(tags == dam_para$left) %>%
+            dplyr::pull(sample_id)
           print(control_sample_id)
 
           case_sample_id =
             p2_af_filter$object_merge %>%
-            activate_mass_dataset(what = "sample_info") %>%
-            filter(sym(dam_para$col_index) == dam_para$right) %>%
-            pull(sample_id)
+            extract_sample_info() %>%
+            dplyr::rename("tags" = dam_para$col_index) %>%
+            dplyr::filter(tags == dam_para$right) %>%
+            dplyr::pull(sample_id)
           print(case_sample_id)
+          object <-
+            p2_af_filter$object_merge %>%
+            activate_mass_dataset('sample_info') %>%
+            dplyr::filter(sample_id %in% c(control_sample_id,case_sample_id))
 
           object <-
-            mutate_fc(object = p2_af_filter$object_merge,
+            mutate_fc(object = object,
                       control_sample_id = control_sample_id,
                       case_sample_id = case_sample_id,
                       mean_median = "mean")
           object <-
             mutate_p_value(
-              object = p2_af_filter$object_merge,
+              object = object,
               control_sample_id = control_sample_id,
               case_sample_id = case_sample_id,
               method = "t.test",
               p_adjust_methods = "BH"
             )
+          object %>% extract_variable_info()
           ###> fig1 PCA =============
           output$fig1_pca.pos <- renderUI({
             plot_type <- input$fig1_data_clean_plt_format
@@ -515,8 +534,8 @@ dam_server <-
                 p_value_column_name = para$fig2_p_value_column_name,
                 labs_x = para$fig2_labs_x,
                 labs_y = para$fig2_labs_y,
-                fc_up_cutoff = dam_para$log2fc,
-                fc_down_cutoff = -dam_para$log2fc,
+                # fc_up_cutoff = dam_para$log2fc,
+                # fc_down_cutoff = -dam_para$log2fc,
                 p_value_cutoff = dam_para$pvalue,
                 line_color = para$fig2_line_color,
                 up_color = para$fig2_up_color,
@@ -543,8 +562,8 @@ dam_server <-
                 p_value_column_name = para$fig2_p_value_column_name,
                 labs_x = para$fig2_labs_x,
                 labs_y = para$fig2_labs_y,
-                fc_up_cutoff = dam_para$log2fc,
-                fc_down_cutoff = -dam_para$log2fc,
+                # fc_up_cutoff = dam_para$log2fc,
+                # fc_down_cutoff = -(dam_para$log2fc),
                 p_value_cutoff = dam_para$pvalue,
                 line_color = para$fig2_line_color,
                 up_color = para$fig2_up_color,
