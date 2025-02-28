@@ -1,4 +1,4 @@
-#' Merge data and export
+#' DAM analysis
 #'
 #' @param request Internal parameter for `{shiny}`.
 #'     DO NOT REMOVE.
@@ -22,6 +22,11 @@ dam_ui <- function(id) {
         accordion_panel(
           title = "Compare group",
           icon = bsicons::bs_icon("stars"),
+          radioButtons(
+            inputId = ns("anno_level"),
+            label = "Remove unknown metabolites",
+            choices = c("TRUE","FALSE"),selected = TRUE
+          ),
           actionButton(
             inputId = ns("activarte_compare_group"),
             label = tooltip(
@@ -181,25 +186,22 @@ dam_ui <- function(id) {
                 accordion_panel(
                   title = 'Parameters',
                   textInput(
-                    ns('fig2_xlim_min'),"x-axis range min", -4
+                    ns('fig2_xlim_min'),"x-axis range min", -9999
                   ),
                   textInput(
-                    ns('fig2_xlim_max'),"x-axis range max", 4
+                    ns('fig2_xlim_max'),"x-axis range max", 9999
                   ),
                   textInput(
                     ns('fig2_fc_column_name'),"fc_column_name","fc"
                   ),
                   selectInput(
-                    ns('fig2_log2_fc'),"log2_fc",choices = c("TRUE","FALSE"),"FALSE"
+                    ns('fig2_log2_fc'),"log2_fc",choices = c("TRUE","FALSE"),"TRUE"
                   ),
-                  textInput(
-                    ns('fig2_fc_up_cutoff'),"fold change up cutoff",2
-                  ),
-                  textInput(
-                    ns('fig2_fc_down_cutoff'),"fold change down cutoff",0.5
-                  ),
-                  textInput(
-                    ns('fig2_p_value_column_name'),"p_value_column_name","p_value_adjust"
+                  radioButtons(
+                    inputId = ns('fig2_p_value_column_name'),
+                    label = "p_value_column_name",
+                    choices = c("p_value_adjust","pvalue"),
+                    selected = "pvalue"
                   ),
                   textInput(
                     ns('fig2_labs_x'),"labs_x","log2(Fold change)"
@@ -232,10 +234,14 @@ dam_ui <- function(id) {
                     inputId = ns('fig2_line_type'),label = 'line_type', 1
                   ),
                   selectInput(
+                    inputId = ns('fig2_add_text'),label = 'add_text', c("TRUE", "FALSE"),"FALSE",multiple = F
+                  ),
+                  selectInput(
                     inputId = ns('fig2_text_for'),label = 'text_for', c("marker", "UP", "DOWM"),c("marker", "UP", "DOWM"),multiple = T
                   ),
-                  textInput(
-                    inputId = ns('fig2_text_from'),label = 'text_from', "variable_id"
+                  radioButtons(
+                    inputId = ns('fig2_text_from'),label = 'text_from',
+                    choices = c("variable_id","Compound.name")
                   ),
                   materialSwitch(inputId = ns("fig2_data_clean_plt_format"),label = "Interactive plot", status = "primary")
                 ),
@@ -312,6 +318,7 @@ dam_server <-
 
       dam_para = reactive({
         list(
+          anno_level = input$anno_level %>% as.logical(),
           col_index = input$col_index %>% as.character(),
           left = input$left %>% as.character(),
           right = input$right %>% as.character(),
@@ -337,6 +344,8 @@ dam_server <-
       })
       plot2_para = reactive({
         list(
+          fig2_xlim_min = input$fig2_xlim_min %>% as.numeric(),
+          fig2_xlim_max = input$fig2_xlim_max %>% as.numeric(),
           fig2_fc_column_name = input$fig2_fc_column_name %>% as.character(),
           fig2_log2_fc = input$fig2_log2_fc %>% as.logical(),
           fig2_p_value_column_name = input$fig2_p_value_column_name %>% as.character(),
@@ -350,6 +359,7 @@ dam_server <-
           fig2_point_alpha = input$fig2_point_alpha %>% as.numeric(),
           fig2_point_size_scale = input$fig2_point_size_scale %>% as.character(),
           fig2_line_type = input$fig2_line_type %>% as.numeric(),
+          fig2_add_text = input$fig2_add_text %>% as.logical(),
           fig2_text_for = input$fig2_text_for %>% as.character(),
           fig2_text_from = input$fig2_text_from %>% as.character()
         )
@@ -432,6 +442,17 @@ dam_server <-
           if(is.null(p2_af_filter$temp_col_idx)){return()}
           ##> import parameters
           dam_para = dam_para()
+          if(isTRUE(dam_para$anno_level)) {
+            p2_af_filter$object_merge =
+              p2_af_filter$object_merge %>%
+              activate_mass_dataset(what = "annotation_table") %>%
+              filter(!is.na(Level)) %>%
+              filter(Level == 1 | Level == 2) %>%
+              group_by(Compound.name) %>%
+              dplyr::filter(Level == min(Level)) %>%
+              dplyr::filter(SS == max(SS)) %>%
+              dplyr::slice_head(n = 1)
+          }
 
           ## Calculate the fold changes.
 
@@ -469,6 +490,30 @@ dam_server <-
               p_adjust_methods = "BH"
             )
           object %>% extract_variable_info()
+
+          # DAM analysis ------------------------------------------------------------
+          DAM_tbl =
+            object %>% extract_variable_info() %>%
+            dplyr::select(variable_id,Compound.name,fc,p_value,p_value_adjust,SS,Total.score,Database,Level) %>%
+            group_by(variable_id) %>% slice_head(n = 1) %>%
+            dplyr::arrange(p_value,fc,Compound.name)
+          DAM_tbl_filtered = DAM_tbl %>%
+            dplyr::filter(abs(log2(fc)) >= dam_para$log2fc) %>%
+            dplyr::filter(p_value <= dam_para$pvalue) %>%
+            dplyr::filter(p_value_adjust <= dam_para$FDR)
+
+          output$All_compounds = renderDataTable_formated(
+
+            actions = input$DAM_start,
+            condition1 = DAM_tbl,filename.a = paste0(dam_para$left,"vs",dam_para$right,"_summary.xls"),
+            tbl = DAM_tbl
+          )
+
+          output$DAMs_tbl = renderDataTable_formated(
+            actions = input$DAM_start,
+            condition1 = DAM_tbl_filtered,filename.a = paste0(dam_para$left,"vs",dam_para$right,"_summary.xls"),
+            tbl = DAM_tbl_filtered
+          )
           ###> fig1 PCA =============
           output$fig1_pca.pos <- renderUI({
             plot_type <- input$fig1_data_clean_plt_format
@@ -513,7 +558,7 @@ dam_server <-
                 z_axis = para$fig1_z_axis
               )
           })
-          ###> fig2 Correlation =============
+          ###> fig2 Voc =============
 
           output$fig2_corr_plt.pos <- renderUI({
             plot_type <- input$fig2_data_clean_plt_format
@@ -525,8 +570,10 @@ dam_server <-
           })
           output$plot_corr_plt.pos <- renderPlot({
             para = plot2_para()
+            dam_para = dam_para()
             if(is.null(input$DAM_start)){return()}
             if(is.null(object)){return()}
+            temp_voc_p =
             object %>%
               massstat::volcano_plot(
                 fc_column_name = para$fig2_fc_column_name,
@@ -534,8 +581,8 @@ dam_server <-
                 p_value_column_name = para$fig2_p_value_column_name,
                 labs_x = para$fig2_labs_x,
                 labs_y = para$fig2_labs_y,
-                # fc_up_cutoff = dam_para$log2fc,
-                # fc_down_cutoff = -dam_para$log2fc,
+                fc_up_cutoff = 2^(dam_para$log2fc),
+                fc_down_cutoff = 2^-(dam_para$log2fc),
                 p_value_cutoff = dam_para$pvalue,
                 line_color = para$fig2_line_color,
                 up_color = para$fig2_up_color,
@@ -545,25 +592,32 @@ dam_server <-
                 point_alpha = para$fig2_point_alpha,
                 point_size_scale = para$fig2_point_size_scale,
                 line_type = para$fig2_line_type,
-                add_text = FALSE,
+                add_text = para$fig2_add_text,
                 text_for = para$fig2_text_for,
                 text_from = para$fig2_text_from
               )
+            if(para$fig2_xlim_max < 1000 & para$fig2_xlim_min > -1000) {
+              p = temp_voc_p + xlim(para$fig2_xlim_min,para$fig2_xlim_max)
+            } else {
+              p = temp_voc_p
+            }
+            p
           })
           output$plotly_corr_plt.pos <- renderPlotly({
             para = plot2_para()
+            dam_para = dam_para()
             if(is.null(input$DAM_start)){return()}
             if(is.null(object)){return()}
-
-            object %>%
+            temp_voc_p =
+              object %>%
               massstat::volcano_plot(
                 fc_column_name = para$fig2_fc_column_name,
                 log2_fc = para$fig2_log2_fc,
                 p_value_column_name = para$fig2_p_value_column_name,
                 labs_x = para$fig2_labs_x,
                 labs_y = para$fig2_labs_y,
-                # fc_up_cutoff = dam_para$log2fc,
-                # fc_down_cutoff = -(dam_para$log2fc),
+                fc_up_cutoff = 2^(dam_para$log2fc),
+                fc_down_cutoff = 2^-(dam_para$log2fc),
                 p_value_cutoff = dam_para$pvalue,
                 line_color = para$fig2_line_color,
                 up_color = para$fig2_up_color,
@@ -573,10 +627,16 @@ dam_server <-
                 point_alpha = para$fig2_point_alpha,
                 point_size_scale = para$fig2_point_size_scale,
                 line_type = para$fig2_line_type,
-                add_text = FALSE,
+                add_text = para$fig2_add_text,
                 text_for = para$fig2_text_for,
                 text_from = para$fig2_text_from
-              )%>% plotly::ggplotly()
+              )
+            if(para$fig2_xlim_max < 1000 & para$fig2_xlim_min > -1000) {
+              p = temp_voc_p + xlim(para$fig2_xlim_min,para$fig2_xlim_max)
+            } else {
+              p = temp_voc_p
+            }
+            p %>% plotly::ggplotly()
           })
         }
       )
