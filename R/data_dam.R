@@ -491,6 +491,8 @@ dam_server <-
             )
           object %>% extract_variable_info()
 
+
+
           # DAM analysis ------------------------------------------------------------
           DAM_tbl =
             object %>% extract_variable_info() %>%
@@ -501,6 +503,16 @@ dam_server <-
             dplyr::filter(abs(log2(fc)) >= dam_para$log2fc) %>%
             dplyr::filter(p_value <= dam_para$pvalue) %>%
             dplyr::filter(p_value_adjust <= dam_para$FDR)
+          data_clean_rv$object_dam <-
+            object %>%
+            activate_mass_dataset('variable_info') %>%
+            dplyr::group_by(variable_id) %>% slice_head(n = 1) %>%
+            dplyr::filter(abs(log2(fc)) >= dam_para$log2fc) %>%
+            dplyr::filter(p_value <= dam_para$pvalue) %>%
+            dplyr::filter(p_value_adjust <= dam_para$FDR)
+
+
+
 
           output$All_compounds = renderDataTable_formated(
 
@@ -514,6 +526,7 @@ dam_server <-
             condition1 = DAM_tbl_filtered,filename.a = paste0(dam_para$left,"vs",dam_para$right,"_summary.xls"),
             tbl = DAM_tbl_filtered
           )
+
           ###> fig1 PCA =============
           output$fig1_pca.pos <- renderUI({
             plot_type <- input$fig1_data_clean_plt_format

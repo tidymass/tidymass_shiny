@@ -39,7 +39,7 @@ enrichment_ui <- function(id) {
             buttonType = "default",
             title = "load pathway database (option) ",
             label = 'load database file ',
-            class = NULL,
+            class = NULL,, multiple = FALSE,
             icon = bsicons::bs_icon("folder")
           )
         ),
@@ -81,44 +81,148 @@ enrichment_ui <- function(id) {
           )
         ),
           actionButton(inputId = ns('enrich_start'),label = "Start enrichment",icon = icon("play")),
-        )
-      ),
+        ),
       page_fluid(
-        nav_panel(title = "Feature annotation",
-                  navset_card_tab(
-                    title = "Enrichment table",
-                    height = 400,
-                    full_screen = TRUE,
-                    nav_panel(
-                      "Enrichment Table",
-                      DT::dataTableOutput(outputId = ns("Annotation_pos"))
+
+        layout_column_wrap(
+          width = 1/2,
+          height = 350,
+          navset_card_tab(
+            height = 350,
+            full_screen = TRUE,
+            title = "Enrich barplot",
+            sidebar = accordion(
+              open = FALSE,
+              accordion_panel(
+                title = 'Parameters',
+                selectInput(
+                  inputId = ns('fig1_x_axis'), label = 'x axis by', choices = c("p_value_adjust", "p_value"),selected = 'p_value_adjust',multiple = F
+                ),
+                sliderInput(
+                  inputId = ns('fig1_cutoff'),label = 'cutoff',min = 0,max = 1,value = 0.05,step = 0.01
+                ),
+                textInput(
+                  inputId = ns('fig1_top'),label = tooltip(
+                    trigger = list(
+                      "Top",
+                      bsicons::bs_icon("info-circle")
                     ),
-                    nav_panel(
-                      shiny::icon("circle-info"),
-                      markdown("description of noise remove method.")
-                    )
+                    "Show top N pathways"
+                  ),value = 10
+                ),
+                textInput(
+                  inputId = ns('fig1_axis.text.x.width'),label = tooltip(
+                    trigger = list(
+                      "axis.text.x.width",
+                      bsicons::bs_icon("info-circle")
+                    ),
+                    "Figure width"
+                  ),value = 15
+                ),
+              ),
+              textInput(
+                inputId = ns('fig1_axis.text.y.width'),label = tooltip(
+                  trigger = list(
+                    "axis.text.y.width",
+                    bsicons::bs_icon("info-circle")
                   ),
-                  navset_card_tab(
-                    title = "Status",
-                    height = 400,
-                    full_screen = TRUE,
-                    nav_panel(
-                      "Positive",
-                      verbatimTextOutput(ns("obj_anno.pos"))
+                  "Figure height"
+                ),value = 15
+              ),
+              materialSwitch(inputId = ns("fig1_data_clean_plt_format"),label = "Interactive plot", status = "primary")
+            ),
+            accordion_panel(
+                title = 'Download',
+                icon = bs_icon('download'),
+                textInput(
+                  inputId = ns("fig1_height"),label = "Height",value = 7
+                ),
+                textInput(
+                  inputId = ns("fig1_width"),label = "width",value = 7
+                ),
+                selectInput(
+                  inputId = ns("fig1_format"),label = "format",
+                  choices = c("jpg","pdf","png","tiff"),
+                  selected = "pdf",selectize = F
+                ),
+                downloadButton(outputId = ns("fig1_download"),label = "Download",icon = icon("download"))
+              )
+            ),
+            nav_panel(
+              "Barplot",
+              card_title("Barplot"),
+              uiOutput(ns("fig1_barplot"),fill = T)
+            )
+          ),
+          navset_card_tab(
+            height = 350,
+            full_screen = TRUE,
+            title = "Enrich scatter plot",
+            sidebar =
+              accordion(
+                open = FALSE,
+                accordion_panel(
+                  title = 'Parameters',
+                  selectInput(
+                    ns('fig2_x_axis'),"x_axis",choices = c("mapped_percentage", "mapped_number"),"mapped_percentage"
+                  ),
+                  selectInput(
+                    ns('fig2_y_axis'),"y_axis",choices = c("p_value_adjust", "p_value"),"p_value_adjust"
+                  ),
+                  selectInput(
+                    ns('fig2_point_size'),"point_size",choices = c("mapped_percentage", "all_number"),"mapped_percentage"
+                  ),
+                  textInput(
+                    inputId = ns('fig2_x_axis_cutoff'),
+                    label = "x_axis_cutoff",
+                    value = 0
+                  ),
+                  sliderInput(
+                    inputId = ns('fig2_y_axis_cutoff'),
+                    label = "y_axis_cutoff",min = 0,max = 1,
+                    value = 0.05,step = 0.01
                     ),
-                    nav_panel(
-                      "Negative",
-                      verbatimTextOutput(ns("obj_anno.neg"))
-                    )
-                  )
+                  radioButtons(
+                    inputId = ns('fig2_label'),
+                    label = "label",
+                    choices = c("TRUE","FALSE"),selected = "TRUE"
+                  ),
+                  textInput(
+                    ns('fig2_label_size'),"label_size",4
+                  ),
+                  materialSwitch(inputId = ns("fig2_data_clean_plt_format"),label = "Interactive plot", status = "primary")
+                ),
+                accordion_panel(
+                  title = 'Download',
+                  icon = bs_icon('download'),
+                  textInput(
+                    inputId = ns("fig2_height"),label = "Height",value = 7
+                  ),
+                  textInput(
+                    inputId = ns("fig2_width"),label = "width",value = 7
+                  ),
+                  selectInput(
+                    inputId = ns("fig2_format"),label = "format",
+                    choices = c("jpg","pdf","png","tiff"),
+                    selected = "pdf",selectize = F
+                  ),
+                  downloadButton(outputId = ns("fig2_download"),label = "Download",icon = icon("download"))
+                )
+              ),
+            nav_panel(
+              "Scatter plot",
+              card_title("Scatter Plot"),
+              uiOutput(ns("fig2_corr_plt.pos"),fill = T)
+            )
+          )
         )
+
       )
-    )
-  )
+
 }
 
 
-#' Data normalization and integration
+#' Enrichment analysis
 #' The application server-side
 #'
 #' @param input,output,session Internal parameters for {shiny}.
@@ -136,356 +240,176 @@ enrichment_ui <- function(id) {
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
 #' @param data_export_rv reactivevalues mass_dataset export
-#' @param data_anno reactivevalues data annotation
+#' @param data_enrich reactivevalues data annotation
 #' @noRd
 
 
-enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_anno,data_export_rv) {
+enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_enrich,data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     p2_dataclean <- reactiveValues(data = NULL)
-    observe({
-      shinyDirChoose(input = input,id = "MS2", roots =  volumes, session = session)
-      if(!is.null(input$MS2)){
-        # browser()
-        ms2_folder_selected<-parseDirPath(roots = volumes, input$MS2)
-        output$MS2_path <- renderText(ms2_folder_selected)
-      }})
-    ##> parameters ms2
-    para_ms2 =  reactive({
+    #> load positive object
+    enrich_para = reactive({
       list(
-        column = as.character(input$column),
-        ms1.ms2.match.rt.tol = as.numeric(input$ms1.ms2.match.rt.tol),
-        ms1.ms2.match.mz.tol = as.numeric(input$ms1.ms2.match.mz.tol)
+        hsa_db_type = input$hsa_db_type %>% as.character(),
+        p_adjust_method = input$p_adjust_method %>% as.character(),
+        threads = input$threads %>% as.numeric(),
+        enrich_method = input$enrich_method %>% as.character()
       )
+    })
+    plot1_para = reactive({
+      list(
+        fig1_x_axis = input$fig1_x_axis %>% as.character(),
+        fig1_cutoff = input$fig1_cutoff %>% as.numeric(),
+        fig1_top = input$fig1_top %>% as.numeric(),
+        fig1_axis.text.x.width = input$fig1_axis.text.x.width %>% as.numeric(),
+        fig1_axis.text.y.width = input$fig1_axis.text.y.width %>% as.numeric()
+      )
+    })
+    plot2_para = reactive({
+      list(
+        fig2_x_axis = input$fig2_x_axis %>% as.numeric(),
+        fig2_y_axis = input$fig2_y_axis %>% as.numeric(),
+        fig2_point_size = input$fig2_point_size %>% as.numeric(),
+        fig2_x_axis_cutoff = input$fig2_x_axis_cutoff %>% as.numeric(),
+        fig2_y_axis_cutoff = input$fig2_y_axis_cutoff %>% as.numeric(),
+        fig2_label = input$fig2_label %>% as.logical(),
+        fig2_label_size = input$fig2_label_size %>% as.numeric()
+      )
+    })
+    ##> download parameters ================
+    download_para = reactive({
+      list(
+
+        ##> fig1
+        fig1_width = as.numeric(input$fig1_width),
+        fig1_height = as.numeric(input$fig1_height),
+        fig1_format = as.character(input$fig1_format),
+        ##> fig2
+        fig2_width = as.numeric(input$fig2_width),
+        fig2_height = as.numeric(input$fig2_height),
+        fig2_format = as.character(input$fig2_format)
+      )
+    })
+
+    observeEvent(input$hsa_db_type, {
+      if (input$hsa_db_type == "Customized (any species)") {
+        update_accordion(
+          session,
+          id = "database_accordion",
+          open = c("select_type_panel", "upload_panel")
+        )
+      } else {
+        update_accordion(
+          session,
+          id = "database_accordion",
+          open = "select_type_panel"
+        )
+      }
     })
 
     ##> step1 add ms2
     observeEvent(
-      input$add_ms2,
+      input$enrich_start,
       {
-        if(is.null(input$MS2)){return()}
-        if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "Annotation"){
-          data_anno$object_neg.norm= prj_init$object_negative.init
-          data_anno$object_pos.norm = prj_init$object_positive.init
+        if(prj_init$steps == "DAM and rest") {
+          if (!is.null(prj_init$object_negative.init)) {
+            data_enrich$object_dam = prj_init$object_negative.init
+          } else if (!is.null(prj_init$object_positive.init)) {
+            data_enrich$object_dam = prj_init$object_positive.init
+          } else {
+            return()
+          }
         } else {
-          if(is.null(data_clean_rv$object_neg.norm)){return()}
-          if(is.null(data_clean_rv$object_pos.norm)){return()}
-          data_anno$object_neg.norm = data_clean_rv$object_neg.norm
-          data_anno$object_pos.norm = data_clean_rv$object_pos.norm
+          if (!is.null(data_clean_rv$object_dam)) {
+            data_enrich$object_dam = data_clean_rv$object_dam
+          } else {
+            return()
+          }
         }
-        para = para_ms2()
-        data_anno$ms2_folder_selected <- parseDirPath(volumes, input$MS2)
-        data_anno$MS2_path <- data_anno$ms2_folder_selected |> as.character()
-        steps = c(
-          'running positive model',
-          'running negative model',
-          'All finish'
-        )
-        withProgress(message = 'Add MS2', value = 0,
-                     expr = {
-                       for (i in 1:3) {
-                         incProgress(1/3,detail = steps[i])
-                         if(i == 1) {
-                           data_anno$object_pos.norm <-
-                             mutate_ms2(
-                               object = data_anno$object_pos.norm,
-                               polarity = 'positive',
-                               column = para$column,
-                               ms1.ms2.match.rt.tol = para$ms1.ms2.match.rt.tol,
-                               ms1.ms2.match.mz.tol = para$ms1.ms2.match.mz.tol,
-                               path = paste0(data_anno$MS2_path,"/POS/")
-                             )
-                           save_massobj(
-                             polarity = 'positive',
-                             file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-                             stage = 'norm',obj = data_anno$object_pos.norm)
+        para = enrich_para()
+        ## > extract DAMs
+        diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
+        if(para$hsa_db_type == "KEGG (hsa)") {
+          data("kegg_hsa_pathway", package = "metpath")
+          pathway_class =
+            metpath::pathway_class(kegg_hsa_pathway)
+          remain_idx =
+            pathway_class %>%
+            unlist() %>%
+            stringr::str_detect("Disease") %>%
+            `!`() %>%
+            which()
+          pathway_database =
+            kegg_hsa_pathway[remain_idx]
+          kegg_id <-
+            diff_metabolites$KEGG.ID
+          kegg_id <-
+            kegg_id[!is.na(kegg_id)]
+          result <-
+            enrich_kegg(query_id = kegg_id,
+                        query_type = "compound",
+                        id_type = "KEGG",
+                        pathway_database = pathway_database,
+                        p_cutoff = 0.05,
+                        p_adjust_method = "BH",
+                        threads = 3)
+        } else if(para$hsa_db_type == "HMDA (hsa)") {
 
-                         } else if(i ==2) {
-                           data_anno$object_neg.norm <-
-                             mutate_ms2(
-                               object = data_anno$object_neg.norm,
-                               polarity = 'negative',
-                               column = para$column,
-                               ms1.ms2.match.rt.tol = para$ms1.ms2.match.rt.tol,
-                               ms1.ms2.match.mz.tol = para$ms1.ms2.match.mz.tol,
-                               path = paste0(data_anno$MS2_path,"/NEG/")
-                             )
-                           save_massobj(
-                             polarity = 'negative',
-                             file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
-                             stage = 'norm',obj = data_anno$object_neg.norm)
-                         }
+        } else if(para$hsa_db_type == "Wikipedia (hsa)") {
 
-                       }
-                     })
+        } else if(para$hsa_db_type == "Customized (any species)") {
+
+        } else {
+          return()
+        }
+
+        ## > bar plot
+        ###> fig1 PCA =============
+        output$fig1_barplot <- renderUI({
+          plot_type <- input$fig1_data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_barplot.pos"))
+          } else {
+            plotOutput(outputId = ns("plot_barplot.pos"))
+          }
+        })
+        output$plot_barplot.pos <- renderPlot({
+          para = plot1_para()
+          if(is.null(input$enrich_start)){return()}
+          if(is.null(object)){return()}
+
+          temp_obj %>%
+            metid::enrich_bar_plot(
+              object = data_enrich$object_dam,
+              x_axis = para$fig1_x_axis,
+              cutoff = para$fig1_cutoff,
+              top = para$fig1_top,
+              axis.text.x.width = para$axis.text.x.width,
+              axis.text.y.width = para$axis.text.y.width
+            )
+        })
+        output$plotly_barplot.pos <- renderPlotly({
+          para = plot1_para()
+          if(is.null(input$enrich_start)){return()}
+          if(is.null(object)){return()}
+          temp_barplot =
+          temp_obj %>%
+            metid::enrich_bar_plot(
+              object = data_enrich$object_dam,
+              x_axis = para$fig1_x_axis,
+              cutoff = para$fig1_cutoff,
+              top = para$fig1_top,
+              axis.text.x.width = para$axis.text.x.width,
+              axis.text.y.width = para$axis.text.y.width
+            )
+          temp_barplot %>% plotly::ggplotly()
+        })
 
       }
     )
-    ##> Annotation parameters
-    para_anno = reactive({
-      list(
-        ms1.match.ppm = as.numeric(input$anno_ms1.match.ppm),
-        ms2.match.ppm = as.numeric(input$anno_ms2.match.ppm),
-        rt.match.tol = as.numeric(input$anno_rt.match.tol),
-        candidate.num = as.numeric(input$anno_candidate.num),
-        column = as.character(input$anno_column),
-        threads= as.numeric(input$anno_threads),
-        norm_db = as.character(input$norm_db),
-        mz.ppm.thr = as.numeric(input$anno_mz.ppm.thr),
-        ms2.match.tol = as.numeric(input$anno_ms2.match.tol),
-        fraction.weight = as.numeric(input$anno_fraction.weight),
-        dp.forward.weight = as.numeric(input$anno_dp.forward.weight),
-        dp.reverse.weight = as.numeric(input$anno_dp.reverse.weight),
-        remove_fragment_intensity_cutoff = as.numeric(input$anno_remove_fragment_intensity_cutoff),
-        ce = as.character(input$anno_ce),
-        rt.match.weight = as.numeric(input$anno_rt.match.weight),
-        ms2.match.weight = as.numeric(input$anno_ms2.match.weight),
-        ms1.match.weight = as.numeric(input$anno_ms1.match.weight),
-        total.score.tol= as.numeric(input$anno_total.score.tol)
-      )
-    })
-    ##> run_anno
-    observeEvent(
-      input$anno_start,
-      {
-        if(is.null(data_anno$object_neg.norm) | is.null(data_anno$object_neg.norm)) {
-          if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "Annotation"){
-            data_anno$object_neg.norm= prj_init$object_negative.init
-            data_anno$object_pos.norm = prj_init$object_positive.init
-          } else {
-            if(is.null(data_clean_rv$object_neg.norm)){return()}
-            if(is.null(data_clean_rv$object_pos.norm)){return()}
-            data_anno$object_neg.norm = data_clean_rv$object_neg.norm
-            data_anno$object_pos.norm = data_clean_rv$object_pos.norm
-          }
-        }
 
-        # check ms2
-        if (length(data_anno$object_pos.norm@ms2_data) == 0 || length(data_anno$object_neg.norm@ms2_data) == 0) {
-          showNotification(
-            "MS2 data was not detected. Annotations will be based on MS1 data only.",
-            type = "warning"
-          )
-        }
-
-        para = para_anno()
-        print(para)
-        print(data_anno$object_neg.norm)
-        print(data_anno$object_pos.norm)
-
-        ## buildin database
-
-        data_anno$buildin_db <-
-          list(
-            MoNA = mona_database0.0.4,
-            Massbank = massbank_database0.0.4,
-            ReSpect = respect_database0.0.1,
-            PlaSMA = plasma_database0.0.1,
-            Orbitrap = orbitrap_database0.0.3,
-            KEGG = kegg_plant_database0.0.1,
-            KNApSAcK = knapsack_agri_database0.0.1,
-            Ath_Cyc = ath_plantcyc.database0.0.1,
-            MetaboBASE = metabobase_database0.0.1
-
-          )
-        ##
-        data_anno$buildin_name = para$norm_db %>% as.character()
-
-        if(length(data_anno$buildin_name) == 0) {
-          data_anno$buildin_db = NULL
-        } else {
-          temp_anno_idx = match(data_anno$buildin_name,names(data_anno$buildin_db))
-          data_anno$buildin_db = data_anno$buildin_db[temp_anno_idx]
-        }
-
-        ## Customized ms database
-        data_anno$norm_customized_db <- parseDirPath(volumes, input$norm_customized_db)
-        data_anno$cuz_db_path <- data_anno$norm_customized_db %>% as.character()
-        temp_file_name = dir(data_anno$cuz_db_path,"*.rda")
-
-        if(length(temp_file_name) == 0) {
-          data_anno$db = data_anno$buildin_db
-        } else {
-          data_anno$cuz_db = list()
-          for (i in 1:length(temp_file_name)) {
-            xx = load(file = paste0(data_anno$cuz_db_path,"/",temp_file_name[[i]]))
-            data_anno$cuz_db[[i]] = get(xx)
-          }
-          data_anno$cuz_name = str_remove(string = temp_file_name,pattern = "\\.rda")
-
-          names(data_anno$cuz_db) = data_anno$cuz_name
-
-          if(is.null(data_anno$buildin_db)){
-            data_anno$db = data_anno$cuz_db
-          } else {
-            data_anno$db <- c(data_anno$buildin_db,data_anno$cuz_db)
-          }
-        }
-        dir.create(path = paste0(prj_init$wd,"/Result/Database/"),showWarnings = F,recursive = T)
-        temp_db <- data_anno$db
-        data_clean_rv$db <- data_anno$db
-        save(temp_db,file =  paste0(prj_init$wd,"/Result/Database/auto_saved.dblist"))
-
-        #> annotation
-        if(length(data_anno$db) == 0) {
-          output$anno_check1_pos = renderUI({
-            isolate(HTML(paste0(
-              '<font color = red>"No database were selected!"<b></font></b>',
-            )))
-          })
-        } else {
-          tags = names(data_anno$db)
-          ##> compound annotation
-          pro_steps_anno = c(paste0("Database ",tags," in progress..."),"Finish!")
-
-          anno_steps = length(pro_steps_anno)
-          withProgress(message = 'Compound annoation', value = 0,
-                       expr = {
-                         for (i in 1:(anno_steps)) {
-                           incProgress(1/anno_steps,detail = pro_steps_anno[i])
-                           if(i == 1) {
-                             data_anno$object_neg.anno = annotate_metabolites_mass_dataset(
-                               object = data_anno$object_neg.norm,
-                               polarity = "negative",
-                               database = data_anno$db[[i]] ,
-                               ms1.match.ppm = para$ms1.match.ppm,
-                               ms2.match.ppm = para$ms2.match.ppm,
-                               rt.match.tol = para$rt.match.tol,
-                               candidate.num = para$candidate.num,
-                               column = para$column,
-                               threads = para$threads,
-                               mz.ppm.thr = para$mz.ppm.thr,
-                               ms2.match.tol = para$ms2.match.tol,
-                               fraction.weight = para$fraction.weight,
-                               dp.forward.weight = para$dp.forward.weight,
-                               dp.reverse.weight = para$dp.reverse.weight,
-                               remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
-                               ce = para$ce,
-                               ms1.match.weight = para$ms1.match.weight,
-                               rt.match.weight = para$rt.match.weight,
-                               ms2.match.weight = para$ms2.match.weight,
-                               total.score.tol = para$total.score.tol
-                             )
-                             data_anno$object_pos.anno = annotate_metabolites_mass_dataset(
-                               object = data_anno$object_pos.norm,
-                               polarity = "positive",
-                               database = data_anno$db[[i]] ,
-                               ms1.match.ppm = para$ms1.match.ppm,
-                               ms2.match.ppm = para$ms2.match.ppm,
-                               rt.match.tol = para$rt.match.tol,
-                               candidate.num = para$candidate.num,
-                               column = para$column,
-                               threads = para$threads,
-                               mz.ppm.thr = para$mz.ppm.thr,
-                               ms2.match.tol = para$ms2.match.tol,
-                               fraction.weight = para$fraction.weight,
-                               dp.forward.weight = para$dp.forward.weight,
-                               dp.reverse.weight = para$dp.reverse.weight,
-                               remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
-                               ce = para$ce,
-                               ms1.match.weight = para$ms1.match.weight,
-                               rt.match.weight = para$rt.match.weight,
-                               ms2.match.weight = para$ms2.match.weight,
-                               total.score.tol = para$total.score.tol
-                             )
-                           } else if(i > 1 & i < anno_steps) {
-                             data_anno$object_neg.anno = annotate_metabolites_mass_dataset(
-                               object = data_anno$object_neg.anno,polarity = "negative",
-                               database = data_anno$db[[i]] ,
-                               ms1.match.ppm = para$ms1.match.ppm,
-                               ms2.match.ppm = para$ms2.match.ppm,
-                               rt.match.tol = para$rt.match.tol,
-                               candidate.num = para$candidate.num,
-                               column = para$column,
-                               threads = para$threads,
-                               mz.ppm.thr = para$mz.ppm.thr,
-                               ms2.match.tol = para$ms2.match.tol,
-                               fraction.weight = para$fraction.weight,
-                               dp.forward.weight = para$dp.forward.weight,
-                               dp.reverse.weight = para$dp.reverse.weight,
-                               remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
-                               ce = para$ce,
-                               ms1.match.weight = para$ms1.match.weight,
-                               rt.match.weight = para$rt.match.weight,
-                               ms2.match.weight = para$ms2.match.weight,
-                               total.score.tol = para$total.score.tol
-                             )
-                             data_anno$object_pos.anno = annotate_metabolites_mass_dataset(
-                               object = data_anno$object_pos.anno,polarity = "positive",
-                               database = data_anno$db[[i]] ,
-                               ms1.match.ppm = para$ms1.match.ppm,
-                               ms2.match.ppm = para$ms2.match.ppm,
-                               rt.match.tol = para$rt.match.tol,
-                               candidate.num = para$candidate.num,
-                               column = para$column,
-                               threads = para$threads,
-                               mz.ppm.thr = para$mz.ppm.thr,
-                               ms2.match.tol = para$ms2.match.tol,
-                               fraction.weight = para$fraction.weight,
-                               dp.forward.weight = para$dp.forward.weight,
-                               dp.reverse.weight = para$dp.reverse.weight,
-                               remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
-                               ce = para$ce,
-                               ms1.match.weight = para$ms1.match.weight,
-                               rt.match.weight = para$rt.match.weight,
-                               ms2.match.weight = para$ms2.match.weight,
-                               total.score.tol = para$total.score.tol
-                             )
-                           } else if(i == anno_steps) {
-                             Sys.sleep(2)
-                           }
-                         }
-                       }
-
-          )
-          data_clean_rv$object_pos.anno = data_anno$object_pos.anno
-          data_clean_rv$object_neg.anno = data_anno$object_neg.anno
-          save_massobj(
-            polarity = 'positive',
-            file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-            stage = 'anno',
-            obj = data_anno$object_pos.anno)
-
-          save_massobj(
-            polarity = 'negative',
-            file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
-            stage = 'anno',
-            obj = data_anno$object_neg.anno)
-
-
-          #> information of mass datasets
-          output$obj_anno.pos = renderPrint({
-            print(data_anno$object_pos.anno)
-          })
-          output$obj_anno.neg = renderPrint({
-            print(data_anno$object_neg.anno)
-          })
-
-          #> data table
-          #>
-          output$Annotation_pos = renderDataTable_formated(
-            actions = input$anno_start,
-            condition1 = data_anno$object_pos.anno,filename.a = "3.6.6.annotation_pos",
-            tbl = data_anno$object_pos.anno %>% extract_annotation_table()
-          )
-
-          output$Annotation_neg = renderDataTable_formated(
-            actions = input$anno_start,
-            condition1 = data_anno$object_neg.anno,filename.a = "3.6.6.annotation_neg",
-            tbl = data_anno$object_neg.anno %>% extract_annotation_table()
-          )
-
-          #> Summary
-          temp_db_name = paste(tags,collapse = " | ")
-          output$anno_check1_pos = renderUI({
-            isolate(HTML(paste0(
-              '<font color = blue> <b>Selected database: </b> </font> <font color=red>',temp_db_name,'</font> ')))
-          })
-
-        }
-
-      })
   }
   )}
+
 

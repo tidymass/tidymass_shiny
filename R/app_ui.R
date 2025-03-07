@@ -39,7 +39,8 @@ app_ui <- function(request) {
       ),
       nav_menu(
         title = 'Statistical analysis', icon = bs_icon('person-vcard'),
-        dam_ui("dam_id")
+        dam_ui("dam_id"),
+        enrichment_ui("enrichment_id")
       ),
       # nav_menu(
       #   title = 'Tidymass shiny toolkits', icon = bs_icon('person-vcard'),
