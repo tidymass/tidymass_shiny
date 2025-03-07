@@ -200,8 +200,8 @@ dam_ui <- function(id) {
                   radioButtons(
                     inputId = ns('fig2_p_value_column_name'),
                     label = "p_value_column_name",
-                    choices = c("p_value_adjust","pvalue"),
-                    selected = "pvalue"
+                    choices = c("p_value_adjust","p_value"),
+                    selected = "p_value"
                   ),
                   textInput(
                     ns('fig2_labs_x'),"labs_x","log2(Fold change)"
