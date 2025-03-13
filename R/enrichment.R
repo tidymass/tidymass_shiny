@@ -15,7 +15,8 @@ enrichment_ui <- function(id) {
   ns <- NS(id)
   nav_panel(
     title = 'Enrichment',
-    icon = bs_icon("envelope-open-heart"),
+    icon = bs_icon("balloon"),
+    layout_sidebar(
       sidebar = accordion(
         id = ns("database_accordion"),
         open = ns("select_type_panel"),
@@ -78,19 +79,30 @@ enrichment_ui <- function(id) {
             label = "p_value cutoff",
             min = 0,max = 1,value = 0.05,
             step = 0.01
-          )
-        ),
-          actionButton(inputId = ns('enrich_start'),label = "Start enrichment",icon = icon("play")),
+          ),
+          actionButton(inputId = ns('enrich_start'),label = "Start enrichment",icon = icon("play"))
+        )
         ),
       page_fluid(
-
+        card(
+          card_header(
+            "Enrichment table"
+          ),
+          height = 400,
+          full_screen = TRUE,
+          layout_columns(
+            col_widths = c(6,6),
+            dataTableOutput(ns('enrich_tbl')),
+            dataTableOutput(ns("Compound_detail"))
+          )
+        ),
         layout_column_wrap(
           width = 1/2,
-          height = 350,
+          height = 400,
           navset_card_tab(
-            height = 350,
-            full_screen = TRUE,
-            title = "Enrich barplot",
+            height = 400,
+            full_screen = T,
+            title = "Barplot",
             sidebar = accordion(
               open = FALSE,
               accordion_panel(
@@ -119,34 +131,33 @@ enrichment_ui <- function(id) {
                     "Figure width"
                   ),value = 15
                 ),
+                textInput(
+                  inputId = ns('fig1_axis.text.y.width'),label = tooltip(
+                    trigger = list(
+                      "axis.text.y.width",
+                      bsicons::bs_icon("info-circle")
+                    ),
+                    "Figure height"
+                  ),value = 15
+                ),
+                materialSwitch(inputId = ns("fig1_data_clean_plt_format"),label = "Interactive plot", status = "primary")
+              ),
+            accordion_panel(
+              title = 'Download',
+              icon = bs_icon('download'),
+              textInput(
+                inputId = ns("fig1_height"),label = "Height",value = 7
               ),
               textInput(
-                inputId = ns('fig1_axis.text.y.width'),label = tooltip(
-                  trigger = list(
-                    "axis.text.y.width",
-                    bsicons::bs_icon("info-circle")
-                  ),
-                  "Figure height"
-                ),value = 15
+                inputId = ns("fig1_width"),label = "width",value = 7
               ),
-              materialSwitch(inputId = ns("fig1_data_clean_plt_format"),label = "Interactive plot", status = "primary")
-            ),
-            accordion_panel(
-                title = 'Download',
-                icon = bs_icon('download'),
-                textInput(
-                  inputId = ns("fig1_height"),label = "Height",value = 7
-                ),
-                textInput(
-                  inputId = ns("fig1_width"),label = "width",value = 7
-                ),
-                selectInput(
-                  inputId = ns("fig1_format"),label = "format",
-                  choices = c("jpg","pdf","png","tiff"),
-                  selected = "pdf",selectize = F
-                ),
-                downloadButton(outputId = ns("fig1_download"),label = "Download",icon = icon("download"))
-              )
+              selectInput(
+                inputId = ns("fig1_format"),label = "format",
+                choices = c("jpg","pdf","png","tiff"),
+                selected = "pdf",selectize = F
+              ),
+              downloadButton(outputId = ns("fig1_download"),label = "Download",icon = icon("download"))
+            )
             ),
             nav_panel(
               "Barplot",
@@ -155,69 +166,71 @@ enrichment_ui <- function(id) {
             )
           ),
           navset_card_tab(
-            height = 350,
+            height = 400,
             full_screen = TRUE,
-            title = "Enrich scatter plot",
-            sidebar =
-              accordion(
-                open = FALSE,
-                accordion_panel(
-                  title = 'Parameters',
-                  selectInput(
-                    ns('fig2_x_axis'),"x_axis",choices = c("mapped_percentage", "mapped_number"),"mapped_percentage"
-                  ),
-                  selectInput(
-                    ns('fig2_y_axis'),"y_axis",choices = c("p_value_adjust", "p_value"),"p_value_adjust"
-                  ),
-                  selectInput(
-                    ns('fig2_point_size'),"point_size",choices = c("mapped_percentage", "all_number"),"mapped_percentage"
-                  ),
-                  textInput(
-                    inputId = ns('fig2_x_axis_cutoff'),
-                    label = "x_axis_cutoff",
-                    value = 0
-                  ),
-                  sliderInput(
-                    inputId = ns('fig2_y_axis_cutoff'),
-                    label = "y_axis_cutoff",min = 0,max = 1,
-                    value = 0.05,step = 0.01
-                    ),
-                  radioButtons(
-                    inputId = ns('fig2_label'),
-                    label = "label",
-                    choices = c("TRUE","FALSE"),selected = "TRUE"
-                  ),
-                  textInput(
-                    ns('fig2_label_size'),"label_size",4
-                  ),
-                  materialSwitch(inputId = ns("fig2_data_clean_plt_format"),label = "Interactive plot", status = "primary")
+            title = 'Enrich scatter plot',
+            sidebar = accordion(
+              open = FALSE,
+              accordion_panel(
+                title = 'Parameters',
+                selectInput(
+                  ns('fig2_x_axis'),"x_axis",choices = c("mapped_percentage", "mapped_number"),"mapped_percentage"
                 ),
-                accordion_panel(
-                  title = 'Download',
-                  icon = bs_icon('download'),
-                  textInput(
-                    inputId = ns("fig2_height"),label = "Height",value = 7
-                  ),
-                  textInput(
-                    inputId = ns("fig2_width"),label = "width",value = 7
-                  ),
-                  selectInput(
-                    inputId = ns("fig2_format"),label = "format",
-                    choices = c("jpg","pdf","png","tiff"),
-                    selected = "pdf",selectize = F
-                  ),
-                  downloadButton(outputId = ns("fig2_download"),label = "Download",icon = icon("download"))
-                )
+                selectInput(
+                  ns('fig2_y_axis'),"y_axis",choices = c("p_value_adjust", "p_value"),"p_value_adjust"
+                ),
+                selectInput(
+                  ns('fig2_point_size'),"point_size",choices = c("mapped_percentage", "all_number"),"mapped_percentage"
+                ),
+                textInput(
+                  inputId = ns('fig2_x_axis_cutoff'),
+                  label = "x_axis_cutoff",
+                  value = 0
+                ),
+                sliderInput(
+                  inputId = ns('fig2_y_axis_cutoff'),
+                  label = "y_axis_cutoff",min = 0,max = 1,
+                  value = 0.05,step = 0.01
+                ),
+                radioButtons(
+                  inputId = ns('fig2_label'),
+                  label = "label",
+                  choices = c("TRUE","FALSE"),selected = "TRUE"
+                ),
+                textInput(
+                  ns('fig2_label_size'),"label_size",4
+                ),
+                materialSwitch(inputId = ns("fig2_data_clean_plt_format"),label = "Interactive plot", status = "primary")
               ),
+              accordion_panel(
+                title = 'Download',
+                icon = bs_icon('download'),
+                textInput(
+                  inputId = ns("fig2_height"),label = "Height",value = 7
+                ),
+                textInput(
+                  inputId = ns("fig2_width"),label = "width",value = 7
+                ),
+                selectInput(
+                  inputId = ns("fig2_format"),label = "format",
+                  choices = c("jpg","pdf","png","tiff"),
+                  selected = "pdf",selectize = F
+                ),
+                downloadButton(outputId = ns("fig2_download"),label = "Download",icon = icon("download"))
+              )
+            ),
             nav_panel(
               "Scatter plot",
               card_title("Scatter Plot"),
               uiOutput(ns("fig2_corr_plt.pos"),fill = T)
             )
+
           )
         )
+      )
 
       )
+    )
 
 }
 
@@ -292,21 +305,7 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
       )
     })
 
-    observeEvent(input$hsa_db_type, {
-      if (input$hsa_db_type == "Customized (any species)") {
-        update_accordion(
-          session,
-          id = "database_accordion",
-          open = c("select_type_panel", "upload_panel")
-        )
-      } else {
-        update_accordion(
-          session,
-          id = "database_accordion",
-          open = "select_type_panel"
-        )
-      }
-    })
+
 
     ##> step1 add ms2
     observeEvent(
