@@ -489,7 +489,7 @@ dam_server <-
               method = "t.test",
               p_adjust_methods = "BH"
             )
-          object %>% extract_variable_info()
+
 
 
 

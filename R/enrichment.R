@@ -327,41 +327,103 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
           }
         }
         para = enrich_para()
-        ## > extract DAMs
-        diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
-        if(para$hsa_db_type == "KEGG (hsa)") {
-          data("kegg_hsa_pathway", package = "metpath")
-          pathway_class =
-            metpath::pathway_class(kegg_hsa_pathway)
-          remain_idx =
-            pathway_class %>%
-            unlist() %>%
-            stringr::str_detect("Disease") %>%
-            `!`() %>%
-            which()
-          pathway_database =
-            kegg_hsa_pathway[remain_idx]
-          kegg_id <-
-            diff_metabolites$KEGG.ID
-          kegg_id <-
-            kegg_id[!is.na(kegg_id)]
-          result <-
-            enrich_kegg(query_id = kegg_id,
-                        query_type = "compound",
-                        id_type = "KEGG",
-                        pathway_database = pathway_database,
-                        p_cutoff = 0.05,
-                        p_adjust_method = "BH",
-                        threads = 3)
-        } else if(para$hsa_db_type == "HMDA (hsa)") {
+        pro_enrichment_step1 = c(
+          'running enrichment analysis ...',
+          'All finish'
+        )
+        withProgress(
+          message = 'Run enrichment analysis',value = 0,
+          expr = {
+            for (i in 1:2) {
+              incProgress(1/2,detail = pro_enrichment_step1[i])
+              if(i == 1) {
+                ## > extract DAMs
+                diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
+                if(para$hsa_db_type == "KEGG (hsa)") {
+                  data("kegg_hsa_pathway", package = "metpath")
 
-        } else if(para$hsa_db_type == "Wikipedia (hsa)") {
+                  pathway_database = kegg_hsa_pathway
+                  kegg_id <-
+                    diff_metabolites$KEGG.ID
+                  kegg_id <-
+                    kegg_id[!is.na(kegg_id)]
+                  res = enrich_pathways(query_id = kegg_id,query_type = "compound",
+                                  id_type = "KEGG",
+                                  pathway_database = pathway_database,
+                                  p_cutoff = 0.05,
+                                  p_adjust_method = para$p_adjust_method,
+                                  method = para$enrich_method,
+                                  threads = 3)
 
-        } else if(para$hsa_db_type == "Customized (any species)") {
+                  # res = tryCatch({
+                  #   temp_res = enrich_pathways(query_id = kegg_id,
+                  #                              query_type = "compound",
+                  #                              id_type = "KEGG",
+                  #                              pathway_database = pathway_database,
+                  #                              p_cutoff = 0.05,
+                  #                              p_adjust_method = para$p_adjust_method,
+                  #                              method = para$enrich_method,
+                  #                              threads = 3)
+                  #   return(temp_res)
+                  #   print("finish")
+                  #
+                  # }, error = function(e) {
+                  #   showNotification(
+                  #     paste("Error:",e$message),
+                  #     type = "error",
+                  #     duration = NULL
+                  #   )
+                  #   return(NULL)
+                  # })
 
-        } else {
-          return()
+
+                } else if(para$hsa_db_type == "HMDA (hsa)") {
+
+                } else if(para$hsa_db_type == "Wikipedia (hsa)") {
+
+                } else if(para$hsa_db_type == "Customized (any species)") {
+
+                } else {
+                  return()
+                }
+              } else if (i == 2) {
+                print("Finish")
+              }
+            }
+          }
+        )
+
+
+        data_enrich$enrich_tbl = res@result %>% as.data.frame() %>%
+          dplyr::filter(p_value < 0.05)
+        if (nrow(data_enrich$enrich_tbl) == 0) {
+          showNotification("No significant enriched pathway", type = "warning")
+          return()  # 阻止后续代码执行
         }
+
+        output$enrich_tbl = renderDataTable_formated(
+          actions = input$enrich_start,
+          condition1 = data_enrich$enrich_tbl,filename.a = "Enrichment_result.xlsx",
+          tbl = data_enrich$enrich_tbl
+        )
+
+        enrich_row_idx = input$enrich_tbl_rows_selected
+        enrich_row = data_enrich$enrich_tbl[enrich_row_idx, ] %>%
+          pull(mapped_id) %>% stringr::str_split(pattern = "\\;",n = Inf) %>% unlist()
+        temp_pathway = data_enrich$enrich_tbl[enrich_row_idx, ] %>%
+          pull(pathway_name)
+        select_idx = diff_metabolites %>%
+          dplyr::filter(KEGG.ID %in% enrich_row) %>%
+          dplyr::select(variable_id,mz,rt,Compound.name,fc,p_value,p_value_adjust) %>%
+          left_join(object_dam %>% extract_expression_data() %>%
+                      rownames_to_column('variable_id'),by = "variable_id" )
+        output$Compound_detail = renderDataTable_formated(
+          actions = input$enrich_start,
+          condition1 = data_enrich$Compound_detail,filename.a = paste0(temp_pathway,"DAMs_detail.xls"),
+          tbl = data_enrich$Compound_detail
+        )
+
+
 
         ## > bar plot
         ###> fig1 PCA =============
