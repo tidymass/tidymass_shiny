@@ -14,7 +14,7 @@ app_ui <- function(request) {
 
     # Your application UI logic
     page_navbar(
-      theme = bs_theme(bootswatch = "lumen"),
+      theme = bs_theme(bootswatch = "cerulean"),
       title = "TidyMass",
       project_init_ui("project_init_id"),
       nav_menu(

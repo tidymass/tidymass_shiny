@@ -242,3 +242,48 @@ export_data_for_shiny <- function(object,format,file_path,file_name) {
   }
 
 }
+
+#' validate mass_dataset file
+#'
+#'
+#' @return A character
+#' @param path object file path
+#' @param expcted_polarity expected polarity of uploaded object.
+#' @param object_label name of uploaded object
+#' @importFrom stringr str_detect
+#' @export
+#'
+validate_file <- function(path, expected_polarity,object_label) {
+  tryCatch({
+    # Validation
+    if (is.null(path)) {
+      return(list(success = FALSE, message = "Path is null"))
+    }
+    if (!stringr::str_detect(path, "\\.rda$")) {
+      return(list(success = FALSE, message = paste("Wrong file format:", object_label)))
+    }
+
+    # Load object
+    obj_name <- load(path)
+    obj <- get(obj_name)
+
+    # Check object class
+    if (!inherits(obj, "mass_dataset")) {
+      return(list(success = FALSE, message = paste("Wrong object class:", object_label)))
+    }
+
+    # Check polarity
+    polarity <- tryCatch(
+      obj@process_info$process_data@parameter$polarity,
+      error = function(e) NA_character_
+    )
+    if (is.na(polarity) || polarity != expected_polarity) {
+      return(list(success = FALSE, message = paste0("Wrong polarity: ", object_label, "\nExpected: ", expected_polarity,
+                                                    "\nTested: ", ifelse(is.na(polarity), "NA", polarity))))
+    }
+
+    list(success = TRUE, message = NULL)
+  }, error = function(e) {
+    list(success = FALSE, message = paste("Wrong file uploaded:", object_label))
+  })
+}

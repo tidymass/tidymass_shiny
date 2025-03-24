@@ -9,6 +9,7 @@ run_tidymass_shiny(
   options = list(),
   enableBookmarking = NULL,
   uiPattern = "/",
+  maxRequestSize = 100,
   ...
 )
 }
