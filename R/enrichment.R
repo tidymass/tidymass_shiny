@@ -91,8 +91,9 @@ enrichment_ui <- function(id) {
           height = 400,
           full_screen = TRUE,
           layout_columns(
-            col_widths = c(6,6),
+            col_widths = c(5,2,5),
             dataTableOutput(ns('enrich_tbl')),
+            actionButton(inputId = ns("show_detail"),"Compound information"),
             dataTableOutput(ns("Compound_detail"))
           )
         ),
@@ -222,7 +223,7 @@ enrichment_ui <- function(id) {
             nav_panel(
               "Scatter plot",
               card_title("Scatter Plot"),
-              uiOutput(ns("fig2_corr_plt.pos"),fill = T)
+              uiOutput(ns("fig2_scatter_plt"),fill = T)
             )
 
           )
@@ -281,9 +282,9 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
     })
     plot2_para = reactive({
       list(
-        fig2_x_axis = input$fig2_x_axis %>% as.numeric(),
-        fig2_y_axis = input$fig2_y_axis %>% as.numeric(),
-        fig2_point_size = input$fig2_point_size %>% as.numeric(),
+        fig2_x_axis = input$fig2_x_axis %>% as.character(),
+        fig2_y_axis = input$fig2_y_axis %>% as.character(),
+        fig2_point_size = input$fig2_point_size %>% as.character(),
         fig2_x_axis_cutoff = input$fig2_x_axis_cutoff %>% as.numeric(),
         fig2_y_axis_cutoff = input$fig2_y_axis_cutoff %>% as.numeric(),
         fig2_label = input$fig2_label %>% as.logical(),
@@ -311,21 +312,24 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
     observeEvent(
       input$enrich_start,
       {
-        if(prj_init$steps == "DAM and rest") {
-          if (!is.null(prj_init$object_negative.init)) {
-            data_enrich$object_dam = prj_init$object_negative.init
-          } else if (!is.null(prj_init$object_positive.init)) {
-            data_enrich$object_dam = prj_init$object_positive.init
-          } else {
-            return()
-          }
+        if (!is.null(data_clean_rv$object_dam)) {
+          data_enrich$object_dam = data_clean_rv$object_dam
         } else {
-          if (!is.null(data_clean_rv$object_dam)) {
-            data_enrich$object_dam = data_clean_rv$object_dam
+          if (prj_init$steps == "DAM and rest") {
+            if (!is.null(prj_init$object_negative.init)) {
+              data_enrich$object_dam = prj_init$object_negative.init
+            } else if (!is.null(prj_init$object_positive.init)) {
+              data_enrich$object_dam = prj_init$object_positive.init
+            } else {
+              return()
+            }
           } else {
             return()
           }
         }
+        ## > extract DAMs
+
+
         para = enrich_para()
         pro_enrichment_step1 = c(
           'running enrichment analysis ...',
@@ -337,11 +341,10 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
             for (i in 1:2) {
               incProgress(1/2,detail = pro_enrichment_step1[i])
               if(i == 1) {
-                ## > extract DAMs
-                diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
+
                 if(para$hsa_db_type == "KEGG (hsa)") {
                   data("kegg_hsa_pathway", package = "metpath")
-
+                  diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
                   pathway_database = kegg_hsa_pathway
                   kegg_id <-
                     diff_metabolites$KEGG.ID
@@ -354,28 +357,6 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
                                   p_adjust_method = para$p_adjust_method,
                                   method = para$enrich_method,
                                   threads = 3)
-
-                  # res = tryCatch({
-                  #   temp_res = enrich_pathways(query_id = kegg_id,
-                  #                              query_type = "compound",
-                  #                              id_type = "KEGG",
-                  #                              pathway_database = pathway_database,
-                  #                              p_cutoff = 0.05,
-                  #                              p_adjust_method = para$p_adjust_method,
-                  #                              method = para$enrich_method,
-                  #                              threads = 3)
-                  #   return(temp_res)
-                  #   print("finish")
-                  #
-                  # }, error = function(e) {
-                  #   showNotification(
-                  #     paste("Error:",e$message),
-                  #     type = "error",
-                  #     duration = NULL
-                  #   )
-                  #   return(NULL)
-                  # })
-
 
                 } else if(para$hsa_db_type == "HMDA (hsa)") {
 
@@ -407,26 +388,8 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
           tbl = data_enrich$enrich_tbl
         )
 
-        enrich_row_idx = input$enrich_tbl_rows_selected
-        enrich_row = data_enrich$enrich_tbl[enrich_row_idx, ] %>%
-          pull(mapped_id) %>% stringr::str_split(pattern = "\\;",n = Inf) %>% unlist()
-        temp_pathway = data_enrich$enrich_tbl[enrich_row_idx, ] %>%
-          pull(pathway_name)
-        select_idx = diff_metabolites %>%
-          dplyr::filter(KEGG.ID %in% enrich_row) %>%
-          dplyr::select(variable_id,mz,rt,Compound.name,fc,p_value,p_value_adjust) %>%
-          left_join(object_dam %>% extract_expression_data() %>%
-                      rownames_to_column('variable_id'),by = "variable_id" )
-        output$Compound_detail = renderDataTable_formated(
-          actions = input$enrich_start,
-          condition1 = data_enrich$Compound_detail,filename.a = paste0(temp_pathway,"DAMs_detail.xls"),
-          tbl = data_enrich$Compound_detail
-        )
-
-
-
         ## > bar plot
-        ###> fig1 PCA =============
+        ###> fig1 barpolt =============
         output$fig1_barplot <- renderUI({
           plot_type <- input$fig1_data_clean_plt_format
           if (plot_type) {
@@ -435,39 +398,108 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
             plotOutput(outputId = ns("plot_barplot.pos"))
           }
         })
+
+
         output$plot_barplot.pos <- renderPlot({
           para = plot1_para()
           if(is.null(input$enrich_start)){return()}
-          if(is.null(object)){return()}
-
-          temp_obj %>%
-            metid::enrich_bar_plot(
-              object = data_enrich$object_dam,
+          if(is.null(res)){return()}
+          metpath::enrich_bar_plot(
+              object = res,
               x_axis = para$fig1_x_axis,
               cutoff = para$fig1_cutoff,
               top = para$fig1_top,
-              axis.text.x.width = para$axis.text.x.width,
-              axis.text.y.width = para$axis.text.y.width
+              axis.text.x.width = para$fig1_axis.text.x.width,
+              axis.text.y.width = para$fig1_axis.text.y.width
             )
         })
         output$plotly_barplot.pos <- renderPlotly({
           para = plot1_para()
           if(is.null(input$enrich_start)){return()}
-          if(is.null(object)){return()}
+          if(is.null(res)){return()}
           temp_barplot =
-          temp_obj %>%
-            metid::enrich_bar_plot(
-              object = data_enrich$object_dam,
+            metpath::enrich_bar_plot(
+              object = res,
               x_axis = para$fig1_x_axis,
               cutoff = para$fig1_cutoff,
               top = para$fig1_top,
-              axis.text.x.width = para$axis.text.x.width,
-              axis.text.y.width = para$axis.text.y.width
+              axis.text.x.width = para$fig1_axis.text.x.width,
+              axis.text.y.width = para$fig1_axis.text.y.width
             )
           temp_barplot %>% plotly::ggplotly()
         })
 
+        ## > bar plot
+        ###> fig2 scatter plot =============
+        output$fig2_scatter_plt <- renderUI({
+          plot_type <- input$fig2_data_clean_plt_format
+          if (plot_type) {
+            plotlyOutput(outputId = ns("plotly_scatter_plt"))
+          } else {
+            plotOutput(outputId = ns("scatter_plt"))
+          }
+        })
+
+
+
+        output$scatter_plt <- renderPlot({
+          para = plot2_para()
+          if(is.null(input$enrich_start)){return()}
+          if(is.null(res)){return()}
+          metpath::enrich_scatter_plot(
+            object = res,
+            x_axis = para$fig2_x_axis,
+            y_axis = para$fig2_y_axis,
+            point_size = para$fig2_point_size,
+            x_axis_cutoff = para$fig2_x_axis_cutoff,
+            y_axis_cutoff = para$fig2_y_axis_cutoff,
+            label = para$fig2_label,
+            label_size = para$fig2_label_size
+          )
+        })
+        output$plotly_scatter_plt <- renderPlotly({
+          para = plot2_para()
+          if(is.null(input$enrich_start)){return()}
+          if(is.null(res)){return()}
+          temp_scatter_plot =
+            metpath::enrich_scatter_plot(
+              object = res,
+              x_axis = para$fig2_x_axis,
+              y_axis = para$fig2_y_axis,
+              point_size = para$fig2_point_size,
+              x_axis_cutoff = para$fig2_x_axis_cutoff,
+              y_axis_cutoff = para$fig2_y_axis_cutoff,
+              label = para$fig2_label,
+              label_size = para$fig2_label_size
+            )
+          temp_scatter_plot %>% plotly::ggplotly()
+        })
+
       }
+    )
+
+    observeEvent(input$show_detail,{
+
+      enrich_row_idx = input$enrich_tbl_rows_selected
+      print(enrich_row_idx)
+      enrich_row = data_enrich$enrich_tbl[enrich_row_idx, ] %>%
+        pull(mapped_id) %>% stringr::str_split(pattern = "\\;",n = Inf) %>% unlist()
+      print(enrich_row)
+      temp_pathway = data_enrich$enrich_tbl[enrich_row_idx, ] %>%
+        pull(pathway_name)
+      print(temp_pathway)
+      select_idx = diff_metabolites %>%
+        dplyr::filter(KEGG.ID %in% enrich_row) %>%
+        dplyr::select(variable_id,mz,rt,Compound.name,fc,p_value,p_value_adjust) %>%
+        left_join(data_enrich$object_dam %>% extract_expression_data() %>%
+                    rownames_to_column('variable_id'),by = "variable_id" )
+      print(select_idx)
+      output$Compound_detail = renderDataTable_formated(
+        actions = input$show_detail,
+        filename.a = paste0(temp_pathway,"DAMs_detail.xls"),
+        tbl = select_idx
+      )
+    }
     )
 
   }

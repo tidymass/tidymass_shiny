@@ -42,12 +42,12 @@ app_ui <- function(request) {
         dam_ui("dam_id"),
         enrichment_ui("enrichment_id")
       ),
-      # nav_menu(
-      #   title = 'Tidymass shiny toolkits', icon = bs_icon('person-vcard'),
-      #   cz_mdb_construction_ui("cz_mdb_construction_construction_id"),
-      #   compound_classification_ui("compound_classification_id"),
-      #   pathway_db_construction_ui("pathway_db_construction_id")
-      # ),
+      nav_menu(
+        title = 'Tidymass shiny toolkits', icon = bs_icon('person-vcard'),
+        fpa_ui("Feature-based_Pathway_Analysis_id")
+        # cz_mdb_construction_ui("cz_mdb_construction_construction_id"),
+        # pathway_db_construction_ui("pathway_db_construction_id")
+      ),
       # flexible tools
       footer = flexible_tools_ui("flexible_tools")
       )

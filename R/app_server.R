@@ -147,5 +147,9 @@ app_server <-
       data_enrich = data_enrich,
       data_export_rv = data_export_rv
     )
+    fpa_server(
+      id = "Feature-based_Pathway_Analysis_id",
+      volumes = volumes
+    )
 
   }
