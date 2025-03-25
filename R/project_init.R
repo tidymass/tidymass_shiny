@@ -302,9 +302,11 @@ project_init_server <- function(id,volumes,prj_init) {
           )
         } else {
           shinyalert::shinyalert(
-            "Attention.",
-            "No valid mass_dataset files detected; starting from raw data.",
-            type = "info"
+            title = "Project initialization successful.",
+            text = paste0("Switch to Data Import panel to continue data uploading."),
+            html = TRUE,
+            type = "success",
+            animation = "pop"
           )
         }
 

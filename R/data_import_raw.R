@@ -216,29 +216,7 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
         output$MS1_path <- renderText(ms1_folder_selected)
       }
     })
-    # File check UI
-    output$file_check1 = renderUI({
-      isolate(HTML(
-        paste0(
-          '<div class="info-block">',
-          '  <div>',
-          '    <span class="info-label">The number of QC files:</span>',
-          '    <span class="info-value">',
-          '      Positive model: <font color="red">(', ')</font>',
-          '      Negative model: <font color="red">(', ')</font>',
-          '    </span>',
-          '  </div>',
-          '  <div>',
-          '    <span class="info-label">The number of Subject files:</span>',
-          '    <span class="info-value">',
-          '      Positive model: <font color="red">(',')</font>',
-          '      Negative model: <font color="red">(',')</font>',
-          '    </span>',
-          '  </div>',
-          '</div>'
-        )
-      ))
-    })
+
     para_data_check <- reactiveValues(data = NULL)
 
     # Main file processing observer
@@ -344,54 +322,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
                        type = "warning")
           }
         }
-
-        # Update file check display
-        output$file_check1 <- renderUI({
-          HTML(
-            paste0(
-              '<div class="info-block">',
-              '  <div>',
-              '    <span class="info-label">The number of QC files:</span>',
-              '    <span class="info-value">',
-              '      Positive model: <font color="red">(', length(para_data_check$QC_number.p), ')</font>',
-              '      Negative model: <font color="red">(', length(para_data_check$QC_number.n), ')</font>',
-              '    </span>',
-              '  </div>',
-              '  <div>',
-              '    <span class="info-label">The number of Subject files:</span>',
-              '    <span class="info-value">',
-              '      Positive model: <font color="red">(', length(para_data_check$S_number.p), ')</font>',
-              '      Negative model: <font color="red">(', length(para_data_check$S_number.n), ')</font>',
-              '    </span>',
-              '  </div>',
-              '</div>'
-            )
-          )
-        })
-
-        # Prepare and display file table
-        temp_tbl_ms1 <- data.frame(
-          FileName = c(para_data_check$QC_number.n,
-                       para_data_check$QC_number.p,
-                       para_data_check$S_number.n,
-                       para_data_check$S_number.p),
-          Type = rep(c('QC_neg', 'QC_pos', 'Subject_neg', 'Subject_pos'),
-                     c(length(para_data_check$QC_number.n),
-                       length(para_data_check$QC_number.p),
-                       length(para_data_check$S_number.n),
-                       length(para_data_check$S_number.p)))
-        )
-
-        output$tbl_ms1 <- renderDataTable_formated(
-          actions = input$action1,
-          condition1 = para_data_check$QC_number.n,
-          condition2 = para_data_check$QC_number.p,
-          condition3 = para_data_check$S_number.n,
-          condition4 = para_data_check$S_number.p,
-          tbl = temp_tbl_ms1,
-          filename.a = "3.3.rawDataImport_summary_of_ms1_file"
-        )
-
       }, error = function(e) {
         shinyalert("Error", paste("File validation failed:", e$message), type = "error")
       })
@@ -594,26 +524,31 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
             pos_result_path <- file.path(para_data_check$MS1_path, "POS/Result/object")
             if (file.exists(pos_result_path)) {
               load(pos_result_path)
-              data_import_rv$object_pos <- object
-              save(data_import_rv$object_pos,
+              print(object)
+              data_import_rv$object_pos_raw <- object
+              object_pos_raw <- object
+              print(object_pos_raw)
+              save(object_pos_raw,
                    file = file.path(mass_dataset_dir, "object_pos_raw.rda"))
             }
           }
 
           # Handle NEG results
           if (dir_neg) {
+            data_import_rv$object_neg_raw <- NULL
             neg_result_path <- file.path(para_data_check$MS1_path, "NEG/Result/object")
             if (file.exists(neg_result_path)) {
               load(neg_result_path)
-              data_import_rv$object_neg <- object
-              save(data_import_rv$object_neg,
+              data_import_rv$object_neg_raw <- object
+              object_neg_raw <- object
+              save(object_neg_raw,
                    file = file.path(mass_dataset_dir, "object_neg_raw.rda"))
             }
           }
         })
 
         # Update UI feedback
-        output$file_check2 <- renderUI({
+        output$file_check1 <- renderUI({
           success_msg <- "Processing completed successfully!"
           if (dir_pos && dir_neg) {
             success_msg <- paste(success_msg, "Both modes processed.")
@@ -629,48 +564,16 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
             '</div>'
           ))
         })
-
-        # Enable export button
-        shinyjs::enable("action_export")
-
+        output$obj_mass_check.pos = renderPrint({
+          if(is.null(data_import_rv$object_pos_raw)){return()}
+          print(data_import_rv$object_pos_raw)
+        })
+        output$obj_mass_check.neg = renderPrint({
+          if(is.null(data_import_rv$object_neg_raw)){return()}
+          print(data_import_rv$object_neg_raw )
+        })
       }, error = function(e) {
         shinyalert("Error", paste("Data processing failed:", e$message), type = "error")
-      })
-    })
-
-    ## Data export ----------------------------------------------------------------
-    observeEvent(input$action_export, {
-      tryCatch({
-        req(data_import_rv$object_pos || data_import_rv$object_neg)
-
-        # Create export directory
-        export_dir <- file.path(prj_init$wd, "mass_dataset")
-        dir.create(export_dir, showWarnings = FALSE, recursive = TRUE)
-
-        # Export POS data
-        if (!is.null(data_import_rv$object_pos)) {
-          saveRDS(data_import_rv$object_pos,
-                  file = file.path(export_dir, "processed_object_pos.rds"))
-        }
-
-        # Export NEG data
-        if (!is.null(data_import_rv$object_neg)) {
-          saveRDS(data_import_rv$object_neg,
-                  file = file.path(export_dir, "processed_object_neg.rds"))
-        }
-
-        # Update export reactive values
-        data_export_rv$export_dir <- export_dir
-        data_export_rv$pos_available <- !is.null(data_import_rv$object_pos)
-        data_export_rv$neg_available <- !is.null(data_import_rv$object_neg)
-
-        # Show completion alert
-        shinyalert("Success",
-                   paste("Data exported successfully to:", export_dir),
-                   type = "success")
-
-      }, error = function(e) {
-        shinyalert("Error", paste("Export failed:", e$message), type = "error")
       })
     })
 

@@ -48,8 +48,8 @@ app_ui <- function(request) {
         # cz_mdb_construction_ui("cz_mdb_construction_construction_id"),
         # pathway_db_construction_ui("pathway_db_construction_id")
       ),
-      # flexible tools
-      footer = flexible_tools_ui("flexible_tools")
+      # # flexible tools
+      # footer = flexible_tools_ui("flexible_tools")
       )
       )
 
