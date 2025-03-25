@@ -287,3 +287,56 @@ validate_file <- function(path, expected_polarity,object_label) {
     list(success = FALSE, message = paste("Wrong file uploaded:", object_label))
   })
 }
+
+
+#' validate sample files
+#'
+#'
+#' @return A character
+#' @param mode object file path
+#' @param QC_num.p QC file number in positive model
+#' @param S_num.p Subject file number in positive model
+#' @param QC_num.n QC file number in negative model
+#' @param S_num.n Subject file number in negative model
+#' @param sample_info_temp sample information
+#' @return Return a logical value indicating whether the input file matches the sample ID in the sample information.
+#' @importFrom stringr str_detect
+#' @importFrom shinyalert shinyalert
+#' @export
+#'
+# File correspondence validation
+validate_sample_files <- function(
+  mode = "POS",
+  QC_num.p,
+  S_num.p,
+  QC_num.n,
+  S_num.n,
+  sample_info_temp
+  ) {
+  qc_files <- if (mode == "POS") QC_num.p else QC_num.n
+  subj_files <- if (mode == "POS")  S_num.p else S_num.n
+  all_files <- c(qc_files, subj_files)
+
+  # Remove file extensions
+  clean_files <- gsub("\\.mzXML$", "", all_files, ignore.case = TRUE)
+
+  # Check row count match
+  if (nrow(sample_info_temp) != length(all_files)) {
+    shinyalert("Error",
+               paste("Sample info row count (", nrow(sample_info_temp),
+                     ") doesn't match", mode, "files count (", length(all_files), ")"),
+               type = "error")
+    return(FALSE)
+  }
+
+  # Check ID consistency
+  mismatch_ids <- setdiff(sample_info_temp$sample_id, clean_files)
+  if (length(mismatch_ids) > 0) {
+    shinyalert("Error",
+               HTML(paste("Sample ID mismatch in", mode, "mode:<br>",
+                          paste(mismatch_ids, collapse = "<br>"))),
+               type = "error")
+    return(FALSE)
+  }
+  return(TRUE)
+}

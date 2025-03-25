@@ -280,13 +280,13 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
           subj_pos_path <- file.path(para_data_check$MS1_path, "POS", "Subject")
 
           if (dir.exists(qc_pos_path)) {
-            para_data_check$QC_number.p <- list.files(qc_pos_path)
+            para_data_check$QC_number.p <- list.files(qc_pos_path,pattern = ".mzXML$")
           } else {
             shinyalert("Information", "No QC directory found in POS mode", type = "info")
           }
 
           if (dir.exists(subj_pos_path)) {
-            para_data_check$S_number.p <- list.files(subj_pos_path)
+            para_data_check$S_number.p <- list.files(subj_pos_path,pattern = ".mzXML$")
           } else {
             shinyalert("Information", "No Subject directory found in POS mode", type = "info")
           }
@@ -298,52 +298,34 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
           subj_neg_path <- file.path(para_data_check$MS1_path, "NEG", "Subject")
 
           if (dir.exists(qc_neg_path)) {
-            para_data_check$QC_number.n <- list.files(qc_neg_path)
+            para_data_check$QC_number.n <- list.files(qc_neg_path,pattern = ".mzXML$")
           } else {
             shinyalert("Information", "No QC directory found in NEG mode", type = "info")
           }
 
           if (dir.exists(subj_neg_path)) {
-            para_data_check$S_number.n <- list.files(subj_neg_path)
+            para_data_check$S_number.n <- list.files(subj_neg_path,pattern = ".mzXML$")
           } else {
             shinyalert("Information", "No Subject directory found in NEG mode", type = "info")
           }
         }
 
-        # File correspondence validation
-        validate_sample_files <- function(mode) {
-          qc_files <- if (mode == "POS") para_data_check$QC_number.p else para_data_check$QC_number.n
-          subj_files <- if (mode == "POS") para_data_check$S_number.p else para_data_check$S_number.n
-          all_files <- c(qc_files, subj_files)
-
-          # Remove file extensions
-          clean_files <- gsub("\\.mzXML$", "", all_files, ignore.case = TRUE)
-
-          # Check row count match
-          if (nrow(prj_init$sample_info) != length(all_files)) {
-            shinyalert("Error",
-                       paste("Sample info row count (", nrow(prj_init$sample_info),
-                             ") doesn't match", mode, "files count (", length(all_files), ")"),
-                       type = "error")
-            return(FALSE)
-          }
-
-          # Check ID consistency
-          mismatch_ids <- setdiff(prj_init$sample_info$sample_id, clean_files)
-          if (length(mismatch_ids) > 0) {
-            shinyalert("Error",
-                       HTML(paste("Sample ID mismatch in", mode, "mode:<br>",
-                                  paste(mismatch_ids, collapse = "<br>"))),
-                       type = "error")
-            return(FALSE)
-          }
-          return(TRUE)
-        }
-
         # Validate files for existing modes
         validation_passed <- TRUE
-        if (dir_pos) validation_passed <- validation_passed && validate_sample_files("POS")
-        if (dir_neg) validation_passed <- validation_passed && validate_sample_files("NEG")
+        if (dir_pos) validation_passed <- validation_passed && validate_sample_files(
+          mode = "POS",
+          QC_num.p = para_data_check$QC_number.p,
+          S_num.p = para_data_check$S_number.p,
+          QC_num.n = para_data_check$QC_number.n,
+          S_num.n = para_data_check$S_number.n,
+          sample_info_temp = prj_init$sample_info)
+        if (dir_neg) validation_passed <- validation_passed && validate_sample_files(
+          mode = "NEG",
+          QC_num.p = para_data_check$QC_number.p,
+          S_num.p = para_data_check$S_number.p,
+          QC_num.n = para_data_check$QC_number.n,
+          S_num.n = para_data_check$S_number.n,
+          sample_info_temp = prj_init$sample_info)
         if (!validation_passed) return()
 
         # File correspondence check when both modes exist
@@ -430,9 +412,9 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
         if (dir_pos) {
           temp_qc_num.pos <- length(para_data_check$QC_number.p)
           temp_dir_path.pos <- if (temp_qc_num.pos == 0) {
-            file.path(para_data_check$MS1_path, "POS", "Subject")
+            file.path(para_data_check$MS1_path, "POS", "Subject/")
           } else {
-            file.path(para_data_check$MS1_path, "POS", "QC")
+            file.path(para_data_check$MS1_path, "POS", "QC/")
           }
 
           if (file.exists(file.path(temp_dir_path.pos, "ppmCut.xlsx"))) {
@@ -467,9 +449,9 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
         if (dir_neg) {
           temp_qc_num.neg <- length(para_data_check$QC_number.n)
           temp_dir_path.neg <- if (temp_qc_num.neg == 0) {
-            file.path(para_data_check$MS1_path, "NEG", "Subject")
+            file.path(para_data_check$MS1_path, "NEG", "Subject/")
           } else {
-            file.path(para_data_check$MS1_path, "NEG", "QC")
+            file.path(para_data_check$MS1_path, "NEG", "QC/")
           }
 
           if (file.exists(file.path(temp_dir_path.neg, "ppmCut.xlsx"))) {
@@ -662,7 +644,7 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
         req(data_import_rv$object_pos || data_import_rv$object_neg)
 
         # Create export directory
-        export_dir <- file.path(prj_init$wd, "export")
+        export_dir <- file.path(prj_init$wd, "mass_dataset")
         dir.create(export_dir, showWarnings = FALSE, recursive = TRUE)
 
         # Export POS data
