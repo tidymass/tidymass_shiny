@@ -25,7 +25,9 @@ data_import_raw_ui <- function(id) {
                          title = "The MS1 file folder:",
                          buttonType = "default", class = NULL,
                          icon = bs_icon("folder"), multiple = FALSE),
-          tags$span(textOutput(outputId = ns("MS1_path")), class = "text-wrap")
+          tags$span(textOutput(outputId = ns("MS1_path")), class = "text-wrap"),
+          hr_head(),
+          actionButton(inputId = ns("action1"),label = "check input file",icon = icon("computer-mouse"))
          ),
         accordion_panel(
           title = "Peak picking parameters",
@@ -102,21 +104,6 @@ data_import_raw_ui <- function(id) {
       page_fluid(
         nav_panel(
           title = "File check",
-          tags$h3("Check input MS files",style = 'color: black'),
-          hr_head(),
-          icon = bsicons::bs_icon("inbox"),
-          actionButton(ns('action1'),'1. Check input file',icon = icon("computer-mouse"),width = "15%"),
-          htmlOutput(ns("file_check1")),
-          navset_card_tab(
-            height = 350,
-            full_screen = TRUE,
-            title = "Input file list",
-            nav_panel(
-              "MS1",
-              card_title(".mzxml file list (MS1)"),
-              DT::dataTableOutput(ns("tbl_ms1"))
-            )
-          ),
           tags$h3("Optimize peak picking parameters (option)",style = 'color: black'),
           hr_head(),
           navset_card_tab(
@@ -150,8 +137,6 @@ data_import_raw_ui <- function(id) {
                       textInput(inputId = ns("ppmCut.2"),label = "ppmCut",value = 7),
                       radioButtons(inputId = ns("filenum.2"),label = "filenum",choices = c(3,5,"all"),selected = 3),
                     ),
-                    actionButton(ns('action4'),'Start',icon = icon("computer-mouse")),
-                    DT::dataTableOutput(ns("parameters_opt")),
                     radioButtons(inputId = ns("para_choise"),label = "use optimized parameters",choices = c("yes","no"),selected = "yes")
                   )
             )
@@ -202,10 +187,9 @@ data_import_raw_ui <- function(id) {
 #' @param id module of server
 #' @param volumes shinyFiles volumes
 #' @param prj_init use project init variables.
-#' @param data_import_rv reactivevalues mass_dataset out
 #' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
-data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_export_rv) {
+data_import_raw_server <- function(id, volumes, prj_init,  data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     ## 3.3 Import from raw data ----------------------------------------------------
@@ -218,6 +202,8 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
     })
 
     para_data_check <- reactiveValues(data = NULL)
+
+# input file check --------------------------------------------------------
 
     # Main file processing observer
     observeEvent(input$action1, {
@@ -241,9 +227,9 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
 
         # Mode detection alerts
         if (dir_pos && !dir_neg) {
-          shinyalert("Information", "Only positive mode data detected", type = "info")
+          shinyalert("Success", "Only positive mode data detected", type = "success")
         } else if (!dir_pos && dir_neg) {
-          shinyalert("Information", "Only negative mode data detected", type = "info")
+          shinyalert("Success", "Only negative mode data detected", type = "success")
         }
 
         # Initialize file lists
@@ -321,6 +307,12 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
                        "Mismatch in Subject file counts between POS and NEG modes",
                        type = "warning")
           }
+          # all file check
+          if (length(para_data_check$S_number.p) == length(para_data_check$S_number.n) && length(para_data_check$S_number.p) == length(para_data_check$S_number.n)) {
+            shinyalert("Success",
+                       "Both ion model detected, and all sample matched with sample information table",
+                       type = "success")
+          }
         }
       }, error = function(e) {
         shinyalert("Error", paste("File validation failed:", e$message), type = "error")
@@ -329,6 +321,15 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
 
     ## Parameter optimization ------------------------------------------------------
     data_para_opt <- reactiveValues(data = NULL)
+    para_opt1 = reactive({
+      list(
+        massSDrange = as.numeric(input$massSDrange.1),
+        smooth = as.numeric(input$smooth.1),
+        cutoff = as.numeric(input$cutoff.1),
+        filenum = as.numeric(input$filenum.1),
+        thread = as.numeric(input$thread.1)
+      )
+    })
 
     observeEvent(input$action3, {
       tryCatch({
@@ -347,69 +348,154 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
             file.path(para_data_check$MS1_path, "POS", "QC/")
           }
 
-          if (file.exists(file.path(temp_dir_path.pos, "ppmCut.xlsx"))) {
-            data_para_opt$ppmCut.p <- readxl::read_xlsx(file.path(temp_dir_path.pos, "ppmCut.xlsx")) %>%
-              dplyr::pull(ppmCut) %>% as.numeric()
-          } else {
-            withProgress(message = 'Testing POS ppm cutoff', value = 0, {
-              massSDrange <- as.numeric(input$massSDrange.1)
-              smooth <- as.numeric(input$smooth.1)
-              cutoff <- as.numeric(input$cutoff.1)
-              filenum <- as.numeric(input$filenum.1)
-
-              data_para_opt$step1.p <- paramounter_part1(
-                directory = temp_dir_path.pos,
-                massSDrange = massSDrange,
-                smooth = smooth,
-                cutoff = cutoff,
-                filenum = filenum,
-                thread = as.numeric(input$thread.1)
-              )
-
-              data_para_opt$ppmCut.p <- data_para_opt$step1.p$ppmCut
-              writexl::write_xlsx(
-                data.frame(ion = "positive", ppmCut = data_para_opt$ppmCut.p),
-                file.path(temp_dir_path.pos, "ppmCut.xlsx")
-              )
-            })
-          }
+          para_opt_steps = c("find best ppmcut off","find best peak picking prarmeter","Finish")
+          withProgress(message = 'Test positive model', value = 0,
+                       expr = {
+                         for (i in 1:3) {
+                           incProgress(1/3,detail = para_opt_steps[i])
+                           if (i == 1) {
+                             if (file.exists(file.path(temp_dir_path.pos, "ppmCut.xlsx"))) {
+                               data_para_opt$ppmCut.p <- readxl::read_xlsx(file.path(temp_dir_path.pos, "ppmCut.xlsx")) %>%
+                                 dplyr::pull(ppmCut) %>% as.numeric()
+                             } else {
+                               para_1 = para_opt1()
+                               data_para_opt$step1.p <- tryCatch(
+                                 expr = {
+                                   paramounter_part1(
+                                     directory = temp_dir_path.pos,
+                                     massSDrange = para_1$massSDrange,
+                                     smooth = para_1$smooth,
+                                     cutoff = para_1$cutoff,
+                                     filenum = para_1$filenum,
+                                     thread = para_1$thread
+                                   )
+                                 },
+                                 error = function(e) {
+                                   shinyalert::shinyalert(
+                                     title = "Error:",
+                                     text = paste("Message:", e$message),
+                                     type = "error"
+                                   )
+                                   return(NULL)
+                                 })
+                               if(is.null(data_para_opt$step1.p)) {return()} else {
+                                 data_para_opt$ppmCut.p <- data_para_opt$step1.p$ppmCut
+                                 writexl::write_xlsx(x = data.frame(ion = "positive", ppmCut = data_para_opt$ppmCut.p),
+                                                     path = file.path(temp_dir_path.pos, "ppmCut.xlsx"))
+                               }
+                             }
+                           } else if(i == 2){
+                             if (file.exists(file.path(temp_dir_path.pos, "parameters.xlsx"))) {
+                               data_para_opt$ppmCut.p <- readxl::read_xlsx(file.path(temp_dir_path.pos, "parameters.xlsx"))
+                             } else {
+                               para_1 = para_opt1()
+                               data_para_opt$step2.p <- tryCatch(
+                                 expr = {
+                                   paramounter_part2(
+                                     directory = temp_dir_path.pos,
+                                     massSDrange = para_1$massSDrange,
+                                     smooth = para_1$smooth,
+                                     cutoff = para_1$cutoff,
+                                     filenum = para_1$filenum,
+                                     ppmCut =  data_para_opt$ppmCut.p %>% as.numeric(),
+                                     thread = para_1$thread
+                                   ) %>% dplyr::rename("Positive" = "Value")
+                                 },
+                                 error = function(e) {
+                                   shinyalert::shinyalert(
+                                     title = "Error:",
+                                     text = paste("Message:", e$message),
+                                     type = "error"
+                                   )
+                                   return(NULL)
+                                 })
+                             }
+                             writexl::write_xlsx(data_para_opt$step2.p,paste0(temp_dir_path.pos,"parameters.xlsx"))
+                           } else if (i == 3) {
+                             shinyalert("Success", paste("Positive model parameters optimized finish:"), type = "success")
+                           }
+                         }
+                       })
         }
 
         # NEG mode processing
+
         if (dir_neg) {
           temp_qc_num.neg <- length(para_data_check$QC_number.n)
           temp_dir_path.neg <- if (temp_qc_num.neg == 0) {
-            file.path(para_data_check$MS1_path, "NEG", "Subject/")
+            file.path(para_data_check$MS1_path, "neg", "Subject/")
           } else {
-            file.path(para_data_check$MS1_path, "NEG", "QC/")
+            file.path(para_data_check$MS1_path, "neg", "QC/")
           }
 
-          if (file.exists(file.path(temp_dir_path.neg, "ppmCut.xlsx"))) {
-            data_para_opt$ppmCut.n <- readxl::read_xlsx(file.path(temp_dir_path.neg, "ppmCut.xlsx")) %>%
-              dplyr::pull(ppmCut) %>% as.numeric()
-          } else {
-            withProgress(message = 'Testing NEG ppm cutoff', value = 0, {
-              massSDrange <- as.numeric(input$massSDrange.1)
-              smooth <- as.numeric(input$smooth.1)
-              cutoff <- as.numeric(input$cutoff.1)
-              filenum <- as.numeric(input$filenum.1)
-
-              data_para_opt$step1.n <- paramounter_part1(
-                directory = temp_dir_path.neg,
-                massSDrange = massSDrange,
-                smooth = smooth,
-                cutoff = cutoff,
-                filenum = filenum,
-                thread = as.numeric(input$thread.1)
-              )
-
-              data_para_opt$ppmCut.n <- data_para_opt$step1.n$ppmCut
-              writexl::write_xlsx(
-                data.frame(ion = "negative", ppmCut = data_para_opt$ppmCut.n),
-                file.path(temp_dir_path.neg, "ppmCut.xlsx")
-              )
-            })
-          }
+          para_opt_steps = c("find best ppmcut off","find best peak picking prarmeter","Finish")
+          withProgress(message = 'Test negative model', value = 0,
+                       expr = {
+                         for (i in 1:3) {
+                           incProgress(1/3,detail = para_opt_steps[i])
+                           if (i == 1) {
+                             if (file.exists(file.path(temp_dir_path.neg, "ppmCut.xlsx"))) {
+                               data_para_opt$ppmCut.n <- readxl::read_xlsx(file.path(temp_dir_path.neg, "ppmCut.xlsx")) %>%
+                                 dplyr::pull(ppmCut) %>% as.numeric()
+                             } else {
+                               para_1 = para_opt1()
+                               data_para_opt$step1.n <- tryCatch(
+                                 expr = {
+                                   paramounter_part1(
+                                     directory = temp_dir_path.neg,
+                                     massSDrange = para_1$massSDrange,
+                                     smooth = para_1$smooth,
+                                     cutoff = para_1$cutoff,
+                                     filenum = para_1$filenum,
+                                     thread = para_1$thread
+                                   )
+                                 },
+                                 error = function(e) {
+                                   shinyalert::shinyalert(
+                                     title = "Error:",
+                                     text = paste("Message:", e$message),
+                                     type = "error"
+                                   )
+                                   return(NULL)
+                                 })
+                               if(is.null(data_para_opt$step1.n)) {return()} else {
+                                 data_para_opt$ppmCut.n <- data_para_opt$step1.n$ppmCut
+                                 writexl::write_xlsx(x = data.frame(ion = "negative", ppmCut = data_para_opt$ppmCut.n),
+                                                     path = file.path(temp_dir_path.neg, "ppmCut.xlsx"))
+                               }
+                             }
+                           } else if(i == 2){
+                             if (file.exists(file.path(temp_dir_path.neg, "parameters.xlsx"))) {
+                               data_para_opt$ppmCut.n <- readxl::read_xlsx(file.path(temp_dir_path.neg, "parameters.xlsx"))
+                             } else {
+                               para_1 = para_opt1()
+                               data_para_opt$step2.n <- tryCatch(
+                                 expr = {
+                                   paramounter_part2(
+                                     directory = temp_dir_path.neg,
+                                     massSDrange = para_1$massSDrange,
+                                     smooth = para_1$smooth,
+                                     cutoff = para_1$cutoff,
+                                     filenum = para_1$filenum,
+                                     ppmCut =  data_para_opt$ppmCut.n %>% as.numeric(),
+                                     thread = para_1$thread
+                                   ) %>% dplyr::rename("negative" = "Value")
+                                 },
+                                 error = function(e) {
+                                   shinyalert::shinyalert(
+                                     title = "Error:",
+                                     text = paste("Message:", e$message),
+                                     type = "error"
+                                   )
+                                   return(NULL)
+                                 })
+                             }
+                             writexl::write_xlsx(data_para_opt$step2.n,paste0(temp_dir_path.neg,"parameters.xlsx"))
+                           } else if (i == 3) {
+                             shinyalert("Success", paste("negative model parameters optimized finish:"), type = "success")
+                           }
+                         }
+                       })
         }
 
         # Plot generation
@@ -424,9 +510,31 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
           if (length(plt_list) > 0) patchwork::wrap_plots(plt_list)
         })
 
+        if(dir_pos && !is.null(data_para_opt$step2.p)) {
+          data_para_opt$out_tbl = data_para_opt$step2.p
+        }
+        if(dir_neg && !is.null(data_para_opt$step2.n)) {
+          data_para_opt$out_tbl = data_para_opt$step2.n
+        }
+        if(dir_neg && !is.null(data_para_opt$step2.n) && dir_pos && !is.null(data_para_opt$step2.p)) {
+          data_para_opt$out_tbl = left_join(data_para_opt$step2.p,data_para_opt$step2.n)
+        }
+
+
+        # output parameters
+        output$parameters_opt = renderDataTable_formated(
+          actions = input$action3,
+          filename.a = "optimized_parameters",
+          tbl = data_para_opt$out_tbl
+        )
+
       }, error = function(e) {
         shinyalert("Error", paste("Parameter optimization failed:", e$message), type = "error")
       })
+    })
+
+    para_choise = reactive({
+      input$para_choise %>% as.character()
     })
 
     ## Data processing ------------------------------------------------------------
@@ -434,12 +542,13 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
       tryCatch({
         req(input$MS1)
         req(para_data_check$MS1_path)
+        para_choise = para_choise()
 
         dir_pos <- dir.exists(file.path(para_data_check$MS1_path, "POS"))
         dir_neg <- dir.exists(file.path(para_data_check$MS1_path, "NEG"))
 
         # Parameter preparation
-        data_import_rv$parameters <- data.frame(
+        para_data_check$parameters <- data.frame(
           para = c("ppm","threads","snthresh","noise",
                    "min_fraction","p_min","p_max","pre_left",
                    "pre_right","fill_peaks","fitgauss","integrate",
@@ -449,6 +558,28 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
                       input$pre_right, input$fill_peaks, input$fitgauss, input$integrate,
                       input$mzdiff, input$binSize, input$bw, input$out_put_peak, input$column)
         )
+
+        if(para_choise == "yes" & !is.null(data_para_opt$out_tbl)) {
+          para_data_check$parameters =
+            para_data_check$parameters %>%
+            dplyr::left_join(data_para_opt$out_tbl,by = "para") %>%
+            dplyr::select(para,desc,default,Positive,Negative) %>%
+            mutate(
+              default = as.character(default),
+              Positive = as.character(Positive),
+              Negative = as.character(Negative),
+            ) %>%
+            dplyr::mutate(
+              Positive = case_when(
+                is.na(Positive) ~ default,
+                TRUE ~ Positive
+              ),
+              Negative = case_when(
+                is.na(Negative) ~ default,
+                TRUE ~ Negative
+              )
+            )
+        }
 
         # Process data function
         process_data_fun <- function(path, polarity, parameters) {
@@ -497,7 +628,7 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
             process_data_fun(
               path = file.path(para_data_check$MS1_path, "POS"),
               polarity = "positive",
-              parameters = data_import_rv$parameters
+              parameters = para_data_check$parameters
             )
           }
 
@@ -508,7 +639,7 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
             process_data_fun(
               path = file.path(para_data_check$MS1_path, "NEG"),
               polarity = "negative",
-              parameters = data_import_rv$parameters
+              parameters = para_data_check$parameters
             )
           }
 
@@ -525,7 +656,7 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
             if (file.exists(pos_result_path)) {
               load(pos_result_path)
               print(object)
-              data_import_rv$object_pos_raw <- object
+              para_data_check$object_pos_raw <- object
               object_pos_raw <- object
               print(object_pos_raw)
               save(object_pos_raw,
@@ -535,11 +666,11 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
 
           # Handle NEG results
           if (dir_neg) {
-            data_import_rv$object_neg_raw <- NULL
+            para_data_check$object_neg_raw <- NULL
             neg_result_path <- file.path(para_data_check$MS1_path, "NEG/Result/object")
             if (file.exists(neg_result_path)) {
               load(neg_result_path)
-              data_import_rv$object_neg_raw <- object
+              para_data_check$object_neg_raw <- object
               object_neg_raw <- object
               save(object_neg_raw,
                    file = file.path(mass_dataset_dir, "object_neg_raw.rda"))
@@ -565,12 +696,12 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
           ))
         })
         output$obj_mass_check.pos = renderPrint({
-          if(is.null(data_import_rv$object_pos_raw)){return()}
-          print(data_import_rv$object_pos_raw)
+          if(is.null(para_data_check$object_pos_raw)){return()}
+          print(para_data_check$object_pos_raw)
         })
         output$obj_mass_check.neg = renderPrint({
-          if(is.null(data_import_rv$object_neg_raw)){return()}
-          print(data_import_rv$object_neg_raw )
+          if(is.null(para_data_check$object_neg_raw)){return()}
+          print(para_data_check$object_neg_raw )
         })
       }, error = function(e) {
         shinyalert("Error", paste("Data processing failed:", e$message), type = "error")

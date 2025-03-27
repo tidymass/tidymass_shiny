@@ -32,7 +32,6 @@ app_server <-
       id = "data_import_raw_id",
       volumes = volumes,
       prj_init = prj_init,
-      data_import_rv = data_import_rv,
       data_export_rv = data_export_rv
     )
     ##> from peak picking table
