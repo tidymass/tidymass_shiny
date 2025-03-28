@@ -38,7 +38,7 @@ find_noise_multiple = function(object,tag = "class",qc_na_freq = 0.2,S_na_freq =
     object %>%
     activate_mass_dataset("sample_info") %>%
     dplyr::left_join(temp_sample_info %>%
-                dplyr::select(sample_id,key),by = "sample_id")
+                       dplyr::select(sample_id,key),by = "sample_id")
   #> na_freq
   for (i in 1:length(temp_keys)) {
     temp_id = object %>%
@@ -72,5 +72,4 @@ find_noise_multiple = function(object,tag = "class",qc_na_freq = 0.2,S_na_freq =
   return(out)
 
 }
-
 

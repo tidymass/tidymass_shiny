@@ -567,7 +567,7 @@ data_overview_ui <- function(id) {
 #' @param prj_init use project init variables.
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_export_rv reactivevalues mass_dataset export
-#' @noRd
+
 
 
 data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_rv) {
@@ -696,53 +696,173 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
     })
 
     ##> reactive of sample info
+    ##> Dynamic Update of Sample/Variable Info Selectors ============================
     observe({
+      #' Reactive observer to dynamically update selectInput choices based on
+      #' available data sources. Prioritizes user-uploaded raw data over initialized
+      #' project data.
+
+      # Initialize containers for column names
       sample_info_colnames <- NULL
       variable_info_colnames <- NULL
 
-      if (!is.null(prj_init$object_negative.init)) {
-        sample_info_colnames <- colnames(prj_init$object_negative.init@sample_info)
-        variable_info_colnames <- colnames(prj_init$object_negative.init@variable_info)
-      } else if (!is.null(prj_init$object_positive.init)) {
-        sample_info_colnames <- colnames(prj_init$object_positive.init@sample_info)
-        variable_info_colnames <- colnames(prj_init$object_positive.init@variable_info)
-      } else if (!is.null(data_import_rv$object_neg)) {
-        sample_info_colnames <- colnames(data_import_rv$object_neg@sample_info)
-        variable_info_colnames <- colnames(data_import_rv$object_neg@variable_info)
-      } else if (!is.null(data_import_rv$object_pos)) {
-        sample_info_colnames <- colnames(data_import_rv$object_pos@sample_info)
-        variable_info_colnames <- colnames(data_import_rv$object_pos@variable_info)
+      # Define data source priority (newest first):
+      # 1. Raw uploaded POS data
+      # 2. Raw uploaded NEG data
+      # 3. Initialized POS project data
+      # 4. Initialized NEG project data
+      data_sources <- list(
+        pos_raw = data_import_rv$object_pos_raw,
+        neg_raw = data_import_rv$object_neg_raw,
+        pos_init = prj_init$object_positive.init,
+        neg_init = prj_init$object_negative.init
+      )
+
+      # Find first valid data object with complete metadata
+      valid_obj <- NULL
+      for (src_name in names(data_sources)) {
+        obj <- data_sources[[src_name]]
+
+        # Validate object structure
+        if (!is.null(obj) &&
+            inherits(obj, "mass_dataset") &&  # Verify class structure
+            !is.null(obj@sample_info) &&
+            ncol(obj@sample_info) > 0 &&
+            !is.null(obj@variable_info) &&
+            ncol(obj@variable_info) > 0) {
+
+          valid_obj <- obj
+          message("Using data source: ", src_name)
+          break
+        }
       }
 
-      # update
-      if (!is.null(sample_info_colnames)) {
-        updateSelectInput(session, "color_by_smv", choices = sample_info_colnames, selected = "group")
-        updateSelectInput(session, "order_by_smv", choices = sample_info_colnames, selected = "injection.order")
-        updateSelectInput(session, "fig6_color_by", choices = sample_info_colnames, selected = "batch")
-        updateSelectInput(session, "fig6_fill_by", choices = sample_info_colnames, selected = "class")
-        updateSelectInput(session, "fig6_order_by", choices = sample_info_colnames, selected = "injection.order")
-        updateSelectInput(session, "fig7_color_by", choices = sample_info_colnames, selected = "group")
-        updateSelectInput(session, "fig7_color_by_3d", choices = sample_info_colnames, selected = "group")
-        updateSelectInput(session, "fig8_order_by", choices = sample_info_colnames, selected = "class")
-      }
-      if (!is.null(variable_info_colnames)) {
-        updateSelectInput(session, "color_by_vmv", choices = variable_info_colnames, selected = "mz")
-        updateSelectInput(session, "order_by_vmv", choices = variable_info_colnames, selected = "rt")
+      # Extract column names from valid object
+      if (!is.null(valid_obj)) {
+        sample_info_colnames <- colnames(valid_obj@sample_info)
+        variable_info_colnames <- colnames(valid_obj@variable_info)
+
+        # Debug output (disable in production)
+        # cat("Sample columns detected:", paste(sample_info_colnames, collapse = ", "), "\n")
+        # cat("Variable columns detected:", paste(variable_info_colnames, collapse = ", "), "\n")
       }
 
+      # Safely update UI components
+      tryCatch({
+        # Update sample-related selectors
+        if (!is.null(sample_info_colnames)) {
+          # Prevent reactive chain updates during UI changes
+          freezeReactiveValue(input, "color_by_smv")
+          freezeReactiveValue(input, "order_by_smv")
+          freezeReactiveValue(input, "fig6_color_by")
+          freezeReactiveValue(input, "fig6_fill_by")
+          freezeReactiveValue(input, "fig6_order_by")
+          freezeReactiveValue(input, "fig7_color_by")
+          freezeReactiveValue(input, "fig7_color_by_3d")
+          freezeReactiveValue(input, "fig8_order_by")
+
+          # Update selectInputs with fallback selections
+          updateSelectInput(session, "color_by_smv",
+                            choices = sample_info_colnames,
+                            selected = safe_selection("group", sample_info_colnames))
+          updateSelectInput(session, "order_by_smv",
+                            choices = sample_info_colnames,
+                            selected = safe_selection("injection.order", sample_info_colnames))
+          updateSelectInput(session, "fig6_color_by",
+                            choices = sample_info_colnames,
+                            selected = safe_selection("batch", sample_info_colnames))
+          updateSelectInput(session, "fig6_fill_by",
+                            choices = sample_info_colnames,
+                            selected = safe_selection("class", sample_info_colnames))
+          updateSelectInput(session, "fig6_order_by",
+                            choices = sample_info_colnames,
+                            selected = safe_selection("injection.order", sample_info_colnames))
+          updateSelectInput(session, "fig7_color_by",
+                            choices = sample_info_colnames,
+                            selected = safe_selection("group", sample_info_colnames))
+          updateSelectInput(session, "fig7_color_by_3d",
+                            choices = sample_info_colnames,
+                            selected = safe_selection("group", sample_info_colnames))
+          updateSelectInput(session, "fig8_order_by",
+                            choices = sample_info_colnames,
+                            selected = safe_selection("class", sample_info_colnames))
+        }
+
+        # Update variable-related selectors
+        if (!is.null(variable_info_colnames)) {
+          freezeReactiveValue(input, "color_by_vmv")
+          freezeReactiveValue(input, "order_by_vmv")
+
+          updateSelectInput(session, "color_by_vmv",
+                            choices = variable_info_colnames,
+                            selected = safe_selection("mz", variable_info_colnames))
+          updateSelectInput(session, "order_by_vmv",
+                            choices = variable_info_colnames,
+                            selected = safe_selection("rt", variable_info_colnames))
+        }
+      }, error = function(e) {
+        message("UI update failed: ", e$message)
+      })
     })
+
+    # Helper function for safe selection
+    safe_selection <- function(preferred, available_choices) {
+      #' Ensures default selections exist in available choices
+      #' @param preferred Preferred default value
+      #' @param available_choices Character vector of available options
+
+      if (preferred %in% available_choices) {
+        preferred
+      } else if (length(available_choices) > 0) {
+        available_choices[1]
+      } else {
+        NULL
+      }
+    }
+
 
     ##> draw plot ==================
     observeEvent(
       input$data_clean_start,
       {
         #> Init object pos and neg
-        if(!is.null(data_import_rv$object_pos)) {
-          p2_dataclean$object_pos = data_import_rv$object_pos
-          p2_dataclean$object_neg = data_import_rv$object_neg
+        p2_dataclean$object_pos = data_import_rv$object_pos_raw
+        p2_dataclean$object_neg = data_import_rv$object_neg_raw
+
+        ##> add alert
+        if (!is.null(p2_dataclean$object_pos)) {
+          if (!is.null(p2_dataclean$object_neg)) {
+            # Both modes detected
+            shinyalert::shinyalert(
+              title = "Data Mode Detected",
+              text = "Both POS and NEG data detected. Proceeding with dual-mode analysis.",
+              type = "info"
+            )
+          } else {
+            # Only POS detected
+            shinyalert::shinyalert(
+              title = "Data Mode Detected",
+              text = "Only POS data detected. Proceeding with POS analysis.",
+              type = "info"
+            )
+          }
+        } else if (!is.null(p2_dataclean$object_neg)) {
+          # Only NEG detected
+          shinyalert::shinyalert(
+            title = "Data Mode Detected",
+            text = "Only NEG data detected. Proceeding with NEG analysis.",
+            type = "info"
+          )
         } else {
+          # No data detected
+          shinyalert::shinyalert(
+            title = "Warning!",
+            text = "No valid data detected. Please check your data upload.",
+            type = "error"
+          )
           return()
         }
+
         ###> fig1 peak distribution ========
         output$peak_dis_plot.pos <- renderUI({
           plot_type <- input$fig1_data_clean_plt_format
@@ -1231,7 +1351,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
         output$plot_corr_plt.neg <- renderPlot({
           para = plot8_para()
           if(is.null(input$data_clean_start)){return()}
-          if(is.null(p2_dataclean$object_pos)){return()}
+          if(is.null(p2_dataclean$object_neg)){return()}
           if(para$fig8_class_by == 'All') {
             temp_obj.neg <- p2_dataclean$object_neg
           } else {

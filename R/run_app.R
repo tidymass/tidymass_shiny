@@ -16,6 +16,8 @@ run_tidymass_shiny <- function(
     ...
 ) {
   options(shiny.maxRequestSize = maxRequestSize * 1024^2)
+  require(tidyverse)
+  require(tidymass)
   golem::with_golem_options(
     app = shinyApp(
       ui = app_ui,

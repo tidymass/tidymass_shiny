@@ -28,7 +28,7 @@ data_import_raw_ui <- function(id) {
           tags$span(textOutput(outputId = ns("MS1_path")), class = "text-wrap"),
           hr_head(),
           actionButton(inputId = ns("action1"),label = "check input file",icon = icon("computer-mouse"))
-         ),
+        ),
         accordion_panel(
           title = "Peak picking parameters",
           icon = bsicons::bs_icon("gear"),
@@ -151,44 +151,83 @@ data_import_raw_ui <- function(id) {
           tags$h3("Start peak picking",style = 'color: black'),
           hr_head(),
           actionButton(ns('action2'),'2. Star peak picking',icon = icon("computer-mouse"),width = "15%"),
-          navset_card_tab(
-            height = 350,
-            full_screen = TRUE,
-            title = "Status",
-            nav_panel(
-              "Positive",
-              card_title("Positive model"),
-              verbatimTextOutput(ns("obj_mass_check.pos"))
+          layout_column_wrap(
+            width = 1/2,
+            height = 500,
+            navset_card_tab(
+              full_screen = TRUE,
+              title = "Status",
+              nav_panel(
+                "Positive",
+                card_title("Positive model"),
+                verbatimTextOutput(ns("obj_mass_check.pos"))
+              ),
+              nav_panel(
+                "Negative",
+                card_title("Negative model"),
+                verbatimTextOutput(ns("obj_mass_check.neg"))
+              )
             ),
-            nav_panel(
-              "Negative",
-              card_title("Negative model"),
-              verbatimTextOutput(ns("obj_mass_check.neg"))
+            card(
+              full_screen = TRUE,
+              title = "Optimized parameters",
+              card_title("Optimized parameters"),
+              dataTableOutput(ns("parameters_final"))
             )
+
           )
         )
       )
     )
-    )
+  )
 }
 
-#' import from raw data of server
-#' The application server-side
-#'
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @importFrom shinyjs toggle runjs useShinyjs
 #' @importFrom shinyFiles shinyDirChoose parseDirPath parseFilePaths
+#' @importFrom shinyalert shinyalert
 #' @importFrom massprocesser process_data
-#' @importFrom massdataset mutate_ms2
-#' @import patchwork
-#' @param id module of server
-#' @param volumes shinyFiles volumes
-#' @param prj_init use project init variables.
-#' @param data_export_rv reactivevalues mass_dataset export
+#' @importFrom massdataset activate_mass_dataset mutate_ms2
+#' @importFrom dplyr pull filter mutate across select rename left_join coalesce cur_column
+#' @importFrom tidyselect any_of ends_with all_of
+#' @importFrom readxl read_xlsx
+#' @importFrom writexl write_xlsx
+#' @importFrom ggplot2 ggplot ggtitle theme element_text element_rect annotate theme_void
+#' @importFrom patchwork wrap_plots plot_annotation
+#' @importFrom magrittr %>%
+#' @importFrom utils head str
+#' @importFrom stats setNames
+#' @importFrom methods new
+#' @importFrom rlang .data
+#'
+#' @param id module ID
+#' @param volumes shinyFiles volumes configuration
+#' @param prj_init Project initialization object containing:
+#' \itemize{
+#'   \item sample_info - Sample information table
+#'   \item wd - Working directory path
+#' }
+#' @param data_import_rv Reactive values for imported data containing:
+#' \itemize{
+#'   \item object_pos_raw - Raw positive mode mass_dataset object
+#'   \item object_neg_raw - Raw negative mode mass_dataset object
+#' }
+#' @param data_export_rv Reactive values for exported data
+#'
+#' @description Server module handling raw mass spectrometry data import and processing workflow.
+#' Includes functionality for:
+#' \itemize{
+#'   \item Directory structure validation
+#'   \item Parameter optimization
+#'   \item Peak picking processing
+#'   \�item Quality control checks
+#' }
+#'
 #' @noRd
-data_import_raw_server <- function(id, volumes, prj_init,  data_export_rv) {
+
+data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     ## 3.3 Import from raw data ----------------------------------------------------
@@ -202,7 +241,7 @@ data_import_raw_server <- function(id, volumes, prj_init,  data_export_rv) {
 
     para_data_check <- reactiveValues(data = NULL)
 
-# input file check --------------------------------------------------------
+    # input file check --------------------------------------------------------
 
     # Main file processing observer
     observeEvent(input$action1, {
@@ -492,7 +531,7 @@ data_import_raw_server <- function(id, volumes, prj_init,  data_export_rv) {
                                      filenum = para_2$filenum,
                                      ppmCut =  data_para_opt$ppmCut.n %>% as.numeric(),
                                      thread = para_2$thread
-                                   ) %>% dplyr::rename("negative" = "Value")
+                                   ) %>% dplyr::rename("Negative" = "Value")
                                  },
                                  error = function(e) {
                                    shinyalert::shinyalert(
@@ -698,8 +737,6 @@ data_import_raw_server <- function(id, volumes, prj_init,  data_export_rv) {
             )
           }
 
-
-
           # Save results
           current_step <- current_step + 1
           incProgress(current_step/total_steps, detail = steps[current_step])
@@ -713,9 +750,12 @@ data_import_raw_server <- function(id, volumes, prj_init,  data_export_rv) {
             if (file.exists(pos_result_path)) {
               load(pos_result_path)
               print(object)
-              para_data_check$object_pos_raw <- object
-              object_pos_raw <- object
-              print(object_pos_raw)
+              para_data_check$object_pos_raw <- object %>%
+                activate_mass_dataset("sample_info") %>%
+                dplyr::select(sample_id) %>% left_join(prj_init$sample_info,by = "sample_id")
+              object_pos_raw <- para_data_check$object_pos_raw
+              data_import_rv$object_pos_raw <- object_pos_raw
+
               save(object_pos_raw,
                    file = file.path(mass_dataset_dir, "object_pos_raw.rda"))
             }
@@ -728,8 +768,11 @@ data_import_raw_server <- function(id, volumes, prj_init,  data_export_rv) {
             neg_result_path <- file.path(para_data_check$MS1_path, "NEG/Result/object")
             if (file.exists(neg_result_path)) {
               load(neg_result_path)
-              para_data_check$object_neg_raw <- object
-              object_neg_raw <- object
+              para_data_check$object_neg_raw <- object %>%
+                activate_mass_dataset("sample_info") %>%
+                dplyr::select(sample_id) %>% left_join(prj_init$sample_info,by = "sample_id")
+              object_neg_raw <- para_data_check$object_neg_raw
+              data_import_rv$object_neg_raw <- object_neg_raw
               save(object_neg_raw,
                    file = file.path(mass_dataset_dir, "object_neg_raw.rda"))
             }
@@ -762,11 +805,20 @@ data_import_raw_server <- function(id, volumes, prj_init,  data_export_rv) {
           if(is.null(para_data_check$object_neg_raw)){return()}
           print(para_data_check$object_neg_raw )
         })
+        if(!is.null(para_data_check$parameters)){
+          dir.create(file.path(prj_init$wd,"Peak_picking_parameter_optimize/"),showWarnings = F,recursive = T)
+          writexl::write_xlsx(para_data_check$parameters,file.path(prj_init$wd,"Peak_picking_parameter_optimize/para_opt.xlsx"))
+        }
+        output$parameters_final = renderDataTable_formated(
+          actions = input$action2,
+          condition1 = para_data_check$parameters,
+          tbl = para_data_check$parameters,filename.a = "parameters"
+        )
       }, error = function(e) {
         shinyalert("Error", paste("Data processing failed:", e$message), type = "error")
       })
     })
 
   })
-  }
+}
 
