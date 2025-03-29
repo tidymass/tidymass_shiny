@@ -6,7 +6,7 @@
 #' @param tag Remove noise based on column names of `sample_info` in object
 #' @param qc_na_freq missing value ratio of QC sample
 #' @param S_na_freq missing value ratio of tag groups
-#' @importFrom massdataset extract_sample_info activate_mass_dataset mutate_variable_na_freq extract_variable_info
+#' @importFrom massdataset extract_sample_info activate_mass_dataset mutate_variable_na_freq extract_variable_info check_mass_dataset_class
 #' @importFrom magrittr %>%
 #' @importFrom dplyr rename mutate case_when filter across left_join anti_join pull if_any starts_with
 #' @importFrom purrr map
@@ -16,6 +16,12 @@
 #' @export
 #'
 find_noise_multiple = function(object,tag = "class",qc_na_freq = 0.2,S_na_freq = 0.5) {
+  if (!inherits(object, "mass_dataset")) {
+    stop("Input object must be a 'mass_dataset' class object.\n",
+         "Please check the class of your input with class(object).")
+    return(invisible())
+  }
+
   if("key" %in% colnames(object@sample_info)){object <- object %>% activate_mass_dataset('sample_info') %>% dplyr::select(-key)}
   if(tag == "class") {
     temp_sample_info = object %>%

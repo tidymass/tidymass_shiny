@@ -280,8 +280,6 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
             shinyalert("POS Error", paste("POS processing failed:", e$message), type = "error")
           })
 
-
-
           p2_dataclean$object_pos_mv <- processed_pos$object_mv
           output$vari_info_pos <- renderDataTable_formated(
             actions = input$mv_start,condition1 = processed_pos$noisy_tbl,
@@ -312,7 +310,11 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
          p2_dataclean$object_neg  =  data_import_rv$object_neg_raw
        }
 
-        print(p2_dataclean$object_neg)
+      if (!inherits(p2_dataclean$object_neg, "mass_dataset")) {
+          stop("Input object must be a 'mass_dataset' class object.\n",
+               "Please check the class of your input with class(object).")
+          return(invisible())
+      }
 
         processed_neg <- find_noise_multiple(
           object = p2_dataclean$object_neg,
