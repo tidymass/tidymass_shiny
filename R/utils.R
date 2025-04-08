@@ -340,3 +340,27 @@ validate_sample_files <- function(
   }
   return(TRUE)
 }
+
+
+#
+#' Create empty plot with message
+#'
+#'
+#' @return A ggplot object
+#' @param print_messages messages show in plot
+#' @return Return a logical value indicating whether the input file matches the sample ID in the sample information.
+#' @importFrom ggplot2 annotate theme_void theme element_rect element_blank ggplot
+#' @export
+#'
+#'
+gg_message_plot = function(print_messages){
+  p = ggplot() +
+    annotate("text", x = 0.5, y = 0.5,
+             label = print_messages,
+             size = 12, color = "#7f8c8d") +
+    theme_void() +
+    theme(plot.background = element_rect(fill = "#f5f6fa", color = NA),
+          panel.border = element_blank())
+  return(p)
+}
+

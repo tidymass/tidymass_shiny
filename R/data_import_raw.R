@@ -741,9 +741,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
           current_step <- current_step + 1
           incProgress(current_step/total_steps, detail = steps[current_step])
 
-          mass_dataset_dir <- file.path(prj_init$wd, "mass_dataset")
-          dir.create(mass_dataset_dir, showWarnings = FALSE, recursive = TRUE)
-
           # Handle POS results
           if (dir_pos) {
             pos_result_path <- file.path(para_data_check$MS1_path, "POS/Result/object")
@@ -757,9 +754,9 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
               data_import_rv$object_pos_raw <- object_pos_raw
 
               save(object_pos_raw,
-                   file = file.path(mass_dataset_dir, "object_pos_raw.rda"))
+                   file = file.path(prj_init$mass_dataset_dir, "01.object_pos_raw.rda"))
             }
-            shinyalert("Success",paste0("Positive peak picking finish, the mass_dataset file saved at:\n",file.path(mass_dataset_dir, "object_pos_raw.rda")), type = "success")
+            shinyalert("Success",paste0("Positive peak picking finish, the mass_dataset file saved at:\n",file.path(prj_init$mass_dataset_dir, "object_pos_raw.rda")), type = "success")
           }
 
           # Handle NEG results
@@ -774,9 +771,9 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
               object_neg_raw <- para_data_check$object_neg_raw
               data_import_rv$object_neg_raw <- object_neg_raw
               save(object_neg_raw,
-                   file = file.path(mass_dataset_dir, "object_neg_raw.rda"))
+                   file = file.path(prj_init$mass_dataset_dir, "01.object_neg_raw.rda"))
             }
-            shinyalert("Success",paste0("Negative peak picking finish, the mass_dataset file saved at:\n",file.path(mass_dataset_dir, "object_neg_raw.rda")), type = "success")
+            shinyalert("Success",paste0("Negative peak picking finish, the mass_dataset file saved at:\n",file.path(prj_init$mass_dataset_dir, "object_neg_raw.rda")), type = "success")
           }
         })
 

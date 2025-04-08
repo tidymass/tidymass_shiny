@@ -207,6 +207,11 @@ project_init_server <- function(id,volumes,prj_init) {
         prj_init$wd_path <- parseDirPath(volumes, input$prj_wd)
         prj_init$wd <- as.character(prj_init$wd_path)
 
+        # result files
+
+        prj_init$mass_dataset_dir <- file.path(prj_init$wd, "mass_dataset")
+        dir.create(prj_init$mass_dataset_dir, showWarnings = FALSE, recursive = TRUE)
+
         # Sample info file
         prj_init$sample_id_n = as.character(input$sample_id_raw)
         prj_init$injection.order_n = as.character(input$injection.order_raw)

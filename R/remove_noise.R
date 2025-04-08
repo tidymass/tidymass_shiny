@@ -95,7 +95,7 @@ remove_noise_ui <- function(id) {
                 ),
                 selectInput(
                   inputId = ns("order_by_smv"),label = "order by",
-                  choices = c("injection.order","class","..."),selected = "class",
+                  choices = c("injection.order","class","..."),selected = "injection.order",
                   multiple = F
                 ),
                 radioButtons(
@@ -229,6 +229,12 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
           updateSelectInput(session, "cut_index",
                             choices = cut_index_choices,
                             selected = "group")
+          updateSelectInput(session, "color_by_smv",
+                            choices = cut_index_choices,
+                            selected = "group")
+          updateSelectInput(session, "order_by_smv",
+                            choices = cut_index_choices,
+                            selected = "injection.order")
         }
       }, error = function(e) {
         message("UI update error: ", e$message)
@@ -237,100 +243,70 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
 
     ### Noise Removal Core Logic ###
     observeEvent(input$mv_start, {
-      # Data validation
+      # check input data
+      ##> sample info
       if(is.null(prj_init$sample_info)) {
         shinyalert("Error", "Sample information not loaded", type = "error")
         return()
       }
 
-      print("check point1, data init.pos:")
-      print(prj_init$object_positive.init)
-      print("check point2, data init.neg:")
-      print(prj_init$object_negative.init)
-
-
       # Detect available modes
       has_pos <- !is.null(data_import_rv$object_pos_raw) || !is.null(prj_init$object_positive.init)
       has_neg <- !is.null(data_import_rv$object_neg_raw) || !is.null(prj_init$object_negative.init)
-
-
 
       if(!has_pos && !has_neg) {
         shinyalert("Error", "No valid data detected", type = "error")
         return()
       }
 
-      # Initialize processing
-      shinyalert("Processing", "Starting noise removal...", type = "info", timer = 200)
+      if(has_pos) {
+        shinyalert("Processing", "Removing noise from POSITIVE mode data...",type = "info",timer = 1000)
 
-      # Process POS mode
-      # if(has_pos) {
-      #   tryCatch({
-      #     shinyalert("Processing", "Removing noise from POSITIVE mode data...",
-      #                type = "info", timer = 1300)
-      #
-      #     p2_dataclean$object_pos <- if(!is.null(prj_init$object_positive.init) &&
-      #                                   prj_init$steps == "Remove noisy feature") {
-      #       prj_init$object_positive.init
-      #     } else {
-      #       data_import_rv$object_pos_raw
-      #     }
-      #
-      #     processed_pos <- tryCatch({
-      #       find_noise_multiple(
-      #         object = p2_dataclean$object_pos,
-      #         tag = anal_para()$cut_index,
-      #         qc_na_freq = anal_para()$qc_cut/100,
-      #         S_na_freq = anal_para()$sample_cut/100
-      #       )
-      #     }, error = function(e) {
-      #       return(NULL)
-      #       shinyalert("POS Error", paste("POS processing failed:", e$message), type = "error")
-      #     })
-      #
-      #     p2_dataclean$object_pos_mv <- processed_pos$object_mv
-      #     output$vari_info_pos <- renderDataTable_formated(
-      #       actions = input$mv_start,condition1 = processed_pos$noisy_tbl,
-      #       tbl = processed_pos$noisy_tbl,
-      #       filename.a = "Noisy_features_pos.csv"
-      #     )
-      #
-      #     save_massobj(
-      #       polarity = 'positive',
-      #       file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-      #       stage = 'mv',
-      #       obj = p2_dataclean$object_pos_mv
-      #     )
-      #   }, error = function(e) {
-      #     return()
-      #     shinyalert("POS Error", paste("POS processing failed:", e$message), type = "error")
-      #   })
-      # }
+        if(prj_init$steps == "Remove noisey feature" && !is.null(prj_init$object_positive.init)) {
+          p2_dataclean$object_pos = prj_init$object_positive.init
+        } else {
+          p2_dataclean$object_pos = data_import_rv$object_pos_raw
+        }
 
-      # Process NEG mode
-      print("Check point 3:")
-      print(has_neg)
+        processed_pos <- find_noise_multiple(
+          object = p2_dataclean$object_pos,
+          tag = anal_para()$cut_index,
+          qc_na_freq = anal_para()$qc_cut/100,
+          S_na_freq = anal_para()$sample_cut/100
+        )
 
+        p2_dataclean$object_pos_mv <- processed_pos$object_mv
+        object_pos_mv <- processed_pos$object_mv
+        data_import_rv$object_pos_mv <- processed_pos$object_mv
+        save(object_pos_mv,file = file.path(prj_init$mass_dataset_dir, "02.object_pos_mv.rda"))
+        output$vari_info_pos <- renderDataTable_formated(
+          actions = input$mv_start,condition1 = processed_pos$noisy_tbl,
+          tbl = processed_pos$noisy_tbl,
+          filename.a = "Noisy_features_pos.csv"
+        )
+        output$obj_mv.pos = renderPrint({
+          if(is.null(data_import_rv$object_pos_mv)){
+            HTML(paste0(
+              '<div class="alert alert-warning" role="alert">',
+              '<i class="fas fa-exclamation-triangle"></i> ',
+              'No data in <span style="color: #FF0000; font-weight: bold;">POSITIVE</span> ion mode was detected.',
+              '</div>'
+            ))
+          } else {
+            print(data_import_rv$object_pos_mv)
+          }
+        })
+
+      }
 
       if(has_neg) {
-        shinyalert("Processing", "Removing noise from NEGATIVE mode data...",type = "info",timer = 200)
-        print(prj_init$object_negative.init)
+        shinyalert("Processing", "Removing noise from NEGATIVE mode data...",type = "info",timer = 1000)
 
-       if(!is.null(prj_init$object_negative.init) && prj_init$steps == "Remove noisy feature") {
-         temp_object_neg <-  prj_init$object_negative.init
-       } else {
-         temp_object_neg  <-  data_import_rv$object_neg_raw
-         print(data_import_rv$object_neg_raw)
-         print(temp_object_neg)
-       }
-        p2_dataclean$object_neg <- temp_object_neg
-        print(p2_dataclean$object_neg)
-
-      if (!inherits(p2_dataclean$object_neg, "mass_dataset")) {
-        shinyalert("Error", "Input object must be a 'mass_dataset' class object.\n,Please check the class of your input with class(object).",
-                   type = "info", timer = 20)
-          return(invisible())
-      }
+        if(prj_init$steps == "Remove noisey feature" && !is.null(prj_init$object_negative.init)) {
+          p2_dataclean$object_neg = prj_init$object_negative.init
+        } else {
+          p2_dataclean$object_neg = data_import_rv$object_neg_raw
+        }
 
         processed_neg <- find_noise_multiple(
           object = p2_dataclean$object_neg,
@@ -340,25 +316,27 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
         )
 
         p2_dataclean$object_neg_mv <- processed_neg$object_mv
+        object_neg_mv <- processed_neg$object_mv
+        data_import_rv$object_neg_mv <- processed_neg$object_mv
+        save(object_neg_mv,file = file.path(prj_init$mass_dataset_dir, "02.object_pos_mv.rda"))
         output$vari_info_neg <- renderDataTable_formated(
           actions = input$mv_start,condition1 = processed_neg$noisy_tbl,
           tbl = processed_neg$noisy_tbl,
           filename.a = "Noisy_features_neg.csv"
         )
-
-        save_massobj(
-          polarity = 'negative',
-          file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
-          stage = 'mv',
-          obj = p2_dataclean$object_neg_mv
-        )
+        output$obj_mv.neg = renderPrint({
+          if(is.null(data_import_rv$object_neg_mv)){
+            HTML(paste0(
+              '<div class="alert alert-info" role="alert">',
+              '<i class="fas fa-exclamation-triangle"></i> ',
+              'No data in <span style="color: #FF0000; font-weight: bold;">NEGATIVE</span> ion mode was detected.',
+              '</div>'))
+          } else {
+            print(data_import_rv$object_neg_mv )
+          }
+        })
       }
-
-      # Finalize processing
-      data_import_rv$object_pos_mv <- p2_dataclean$object_pos_mv
-      data_import_rv$object_neg_mv <- p2_dataclean$object_neg_mv
-
-      shinyalert("Success", "Noise removal completed!", type = "success")
+      shinyalert("Success", "Noisy features have been removed. Expand the visualization parameters in the sidebar to analyze the results.",type = "info",timer = 5000)
     })
 
     ### Visualization Handlers ###
@@ -377,38 +355,46 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
 
         output$plot_smv_plt.pos <- renderPlot({
           para = plot1_para()
-          if(is.null(p2_dataclean$object_pos_mv)){return()}
-          if(para$fig1_sample_group != "All") {
-            temp_obj <- p2_dataclean$object_pos_mv %>%
-              activate_mass_dataset(what = 'sample_info') %>%
-              dplyr::filter(class == para$fig1_sample_group)
-          } else {temp_obj <- p2_dataclean$object_pos_mv}
-          temp_obj %>% massqc::show_sample_missing_values(
-            color_by = para$fig1_color_by,
-            order_by = para$fig1_order_by,
-            percentage = para$fig1_percentage,
-            show_x_text = para$fig1_show_x_text,
-            show_x_ticks = para$fig1_show_x_ticks,
-            desc = para$fig1_desc
-          )
+          if(is.null(p2_dataclean$object_pos_mv)){
+            print(gg_message_plot("No data in positive ion mode was detected."))
+          } else{
+
+            if(para$fig1_sample_group != "All") {
+              temp_obj <- p2_dataclean$object_pos_mv %>%
+                activate_mass_dataset(what = 'sample_info') %>%
+                dplyr::filter(class == para$fig1_sample_group)
+            } else {temp_obj <- p2_dataclean$object_pos_mv}
+
+            temp_obj %>% massqc::show_sample_missing_values(
+              color_by = para$fig1_color_by,
+              order_by = para$fig1_order_by,
+              percentage = para$fig1_percentage,
+              show_x_text = para$fig1_show_x_text,
+              show_x_ticks = para$fig1_show_x_ticks,
+              desc = para$fig1_desc
+            )
+          }
         })
 
         output$plotly_smv_plt.pos <- renderPlotly({
           para = plot1_para()
-          if(is.null(p2_dataclean$object_pos_mv)){return()}
-          if(para$fig1_sample_group != "All") {
-            temp_obj <- p2_dataclean$object_pos_mv %>%
-              activate_mass_dataset(what = 'sample_info') %>%
-              dplyr::filter(class == para$fig1_sample_group)
-          } else {temp_obj <- p2_dataclean$object_pos_mv}
-          temp_obj %>% massqc::show_sample_missing_values(
-            color_by = para$fig1_color_by,
-            order_by = para$fig1_order_by,
-            percentage = para$fig1_percentage,
-            show_x_text = para$fig1_show_x_text,
-            show_x_ticks = para$fig1_show_x_ticks,
-            desc = para$fig1_desc
-          ) %>% plotly::ggplotly()
+          if(is.null(p2_dataclean$object_pos_mv)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+            if(para$fig1_sample_group != "All") {
+              temp_obj <- p2_dataclean$object_pos_mv %>%
+                activate_mass_dataset(what = 'sample_info') %>%
+                dplyr::filter(class == para$fig1_sample_group)
+            } else {temp_obj <- p2_dataclean$object_pos_mv}
+            temp_obj %>% massqc::show_sample_missing_values(
+              color_by = para$fig1_color_by,
+              order_by = para$fig1_order_by,
+              percentage = para$fig1_percentage,
+              show_x_text = para$fig1_show_x_text,
+              show_x_ticks = para$fig1_show_x_ticks,
+              desc = para$fig1_desc
+            ) %>% plotly::ggplotly()
+          }
         })
 
         # negative
@@ -421,38 +407,51 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
           }
         })
         output$plot_smv_plt.neg <- renderPlot({
-          para = plot1_para()
-          if(is.null(p2_dataclean$object_neg_mv)){return()}
-          if(para$fig1_sample_group != "All") {
-            temp_obj <- p2_dataclean$object_neg_mv %>%
-              activate_mass_dataset(what = 'sample_info') %>%
-              dplyr::filter(class == para$fig1_sample_group)
-          } else {temp_obj <- p2_dataclean$object_neg_mv}
-          temp_obj %>% massqc::show_sample_missing_values(
-            color_by = para$fig1_color_by,
-            order_by = para$fig1_order_by,
-            percentage = para$fig1_percentage,
-            show_x_text = para$fig1_show_x_text,
-            show_x_ticks = para$fig1_show_x_ticks,
-            desc = para$fig1_desc
-          )
+          para <- plot1_para()
+
+          if (is.null(p2_dataclean$object_neg_mv)) {
+            # Case 1: No data
+            print(gg_message_plot("No data in negative ion mode was detected."))
+          } else {
+            # Case 2/3: Data exists
+            if (para$fig1_sample_group != "All") {
+              temp_obj <- p2_dataclean$object_neg_mv %>%
+                activate_mass_dataset(what = 'sample_info') %>%
+                dplyr::filter(class == para$fig1_sample_group)
+            } else {
+              temp_obj <- p2_dataclean$object_neg_mv
+            }
+            # Plot ONLY when temp_obj is defined
+            temp_obj %>% massqc::show_sample_missing_values(
+              color_by = para$fig1_color_by,
+              order_by = para$fig1_order_by,
+              percentage = para$fig1_percentage,
+              show_x_text = para$fig1_show_x_text,
+              show_x_ticks = para$fig1_show_x_ticks,
+              desc = para$fig1_desc
+            )
+          }
         })
+
         output$plotly_smv_plt.neg <- renderPlotly({
           para = plot1_para()
-          if(is.null(p2_dataclean$object_neg_mv)){return()}
-          if(para$fig1_sample_group != "All") {
-            temp_obj <- p2_dataclean$object_neg_mv %>%
-              activate_mass_dataset(what = 'sample_info') %>%
-              dplyr::filter(class == para$fig1_sample_group)
-          } else {temp_obj <- p2_dataclean$object_neg_mv}
-          p2_dataclean$object_neg_mv %>% massqc::show_sample_missing_values(
-            color_by = para$fig1_color_by,
-            order_by = para$fig1_order_by,
-            percentage = para$fig1_percentage,
-            show_x_text = para$fig1_show_x_text,
-            show_x_ticks = para$fig1_show_x_ticks,
-            desc = para$fig1_desc
-          ) %>% plotly::ggplotly()
+          if(is.null(p2_dataclean$object_neg_mv)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+            if (para$fig1_sample_group != "All") {
+              temp_obj <- p2_dataclean$object_neg_mv %>%
+                activate_mass_dataset(what = 'sample_info') %>%
+                dplyr::filter(class == para$fig1_sample_group)
+            } else {temp_obj <- p2_dataclean$object_neg_mv}
+            p2_dataclean$object_neg_mv %>% massqc::show_sample_missing_values(
+              color_by = para$fig1_color_by,
+              order_by = para$fig1_order_by,
+              percentage = para$fig1_percentage,
+              show_x_text = para$fig1_show_x_text,
+              show_x_ticks = para$fig1_show_x_ticks,
+              desc = para$fig1_desc
+            ) %>% plotly::ggplotly()
+          }
         })
 
       }
@@ -470,7 +469,7 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
         para_d <- download_para()
 
         # draw condition
-        if (!is.null(p2_dataclean$object_neg_mv) & !is.null(p2_dataclean$object_neg_mv)) {
+        if (!is.null(p2_dataclean$object_pos_mv) & !is.null(p2_dataclean$object_neg_mv)) {
           para_d$fig1_width = para_d$fig1_width * 2
           if(para$fig1_sample_group != "All") {
             temp_obj.pos <- p2_dataclean$object_pos_mv %>%
