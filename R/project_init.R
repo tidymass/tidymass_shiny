@@ -81,6 +81,14 @@ project_init_ui <- function(id) {
             buttonLabel = "Browse...",
             placeholder = "No file selected",
             accept = '.rda'
+          ),
+          fileInput(
+            inputId = ns('saved_dblist'),
+            label = 'Annotation database list',
+            multiple = FALSE,
+            buttonLabel = "Browse...",
+            placeholder = "No file selected",
+            accept = '.dblist'
           )
         )
       ),
@@ -91,7 +99,7 @@ project_init_ui <- function(id) {
           actionButton(inputId = ns('action_init'),'Initialize project',icon = icon("play"), style = "width: 200px;"),
           tags$h3("Summary of input file",style = 'color: black'),
           hr_head(),
-          # htmlOutput(outputId = ns("file_check_init")),
+
           card(
             full_screen = T,
             height = 350,
@@ -149,6 +157,7 @@ project_init_ui <- function(id) {
 
 project_init_server <- function(id,volumes,prj_init) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
     #> set working directory and import sample information
 
     observe({
@@ -229,6 +238,7 @@ project_init_server <- function(id,volumes,prj_init) {
         # Resuming tasks
         temp_pos_path <- input$saved_obj_pos$datapath
         temp_neg_path <- input$saved_obj_neg$datapath
+        saved_dblist <- input$saved_dblist$datapath
         detectedModels <- character(0)
         error_messages <- list()
 
@@ -253,6 +263,17 @@ project_init_server <- function(id,volumes,prj_init) {
             obj_name_neg = load(temp_neg_path)
             prj_init$object_negative.init <- get(obj_name_neg)
             detectedModels <- c(detectedModels, "negative")
+          }
+        }
+
+        # Validate positive file
+        if (prj_init$steps == "Annotation filtering" & !is.null(saved_dblist)) {
+          validation_result <- validate_file(saved_dblist, "Annotation database list","Please upload autosaved in '.dblist' format which generated in annotation step")
+          if (!validation_result$success) {
+            error_messages <- c(error_messages, validation_result$message)
+          } else {
+            obj_saved_dblist = load(saved_dblist)
+            prj_init$dblist <- get(obj_saved_dblist)
           }
         }
 

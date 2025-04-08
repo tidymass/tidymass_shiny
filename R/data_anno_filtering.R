@@ -90,6 +90,10 @@ annotation_filter_ui <- function(id) {
             nav_panel("Negative", DT::dataTableOutput(
               outputId = ns("Annotation_filtering_neg")
             )),
+            nav_panel("Metabolite origin",
+                      DT::dataTableOutput(outputId = ns("Annotation_filtering_neg")),
+                      renderUI(ns(""))
+                      ),
             nav_panel(
               shiny::icon("circle-info"),
               markdown("description of noise remove method.")
@@ -595,7 +599,6 @@ annotation_filter_server <-
         content = function(file) {
           # extract parameters
           para_d <- download_para()
-
           # draw condition
           p = p2_af_filter$temp_ms2_match.pos[[1]]
           # save plot

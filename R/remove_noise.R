@@ -243,9 +243,17 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
         return()
       }
 
+      print("check point1, data init.pos:")
+      print(prj_init$object_positive.init)
+      print("check point2, data init.neg:")
+      print(prj_init$object_negative.init)
+
+
       # Detect available modes
       has_pos <- !is.null(data_import_rv$object_pos_raw) || !is.null(prj_init$object_positive.init)
       has_neg <- !is.null(data_import_rv$object_neg_raw) || !is.null(prj_init$object_negative.init)
+
+
 
       if(!has_pos && !has_neg) {
         shinyalert("Error", "No valid data detected", type = "error")
@@ -253,66 +261,74 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
       }
 
       # Initialize processing
-      shinyalert("Processing", "Starting noise removal...", type = "info", timer = 1000)
+      shinyalert("Processing", "Starting noise removal...", type = "info", timer = 200)
 
       # Process POS mode
-      if(has_pos) {
-        tryCatch({
-          shinyalert("Processing", "Removing noise from POSITIVE mode data...",
-                     type = "info", timer = 1300)
-
-          p2_dataclean$object_pos <- if(!is.null(prj_init$object_positive.init) &&
-                                        prj_init$steps == "Remove noisy feature") {
-            prj_init$object_positive.init
-          } else {
-            data_import_rv$object_pos_raw
-          }
-
-          processed_pos <- tryCatch({
-            find_noise_multiple(
-              object = p2_dataclean$object_pos,
-              tag = anal_para()$cut_index,
-              qc_na_freq = anal_para()$qc_cut/100,
-              S_na_freq = anal_para()$sample_cut/100
-            )
-          }, error = function(e) {
-            return(NULL)
-            shinyalert("POS Error", paste("POS processing failed:", e$message), type = "error")
-          })
-
-          p2_dataclean$object_pos_mv <- processed_pos$object_mv
-          output$vari_info_pos <- renderDataTable_formated(
-            actions = input$mv_start,condition1 = processed_pos$noisy_tbl,
-            tbl = processed_pos$noisy_tbl,
-            filename.a = "Noisy_features_pos.csv"
-          )
-
-          save_massobj(
-            polarity = 'positive',
-            file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-            stage = 'mv',
-            obj = p2_dataclean$object_pos_mv
-          )
-        }, error = function(e) {
-          return()
-          shinyalert("POS Error", paste("POS processing failed:", e$message), type = "error")
-        })
-      }
+      # if(has_pos) {
+      #   tryCatch({
+      #     shinyalert("Processing", "Removing noise from POSITIVE mode data...",
+      #                type = "info", timer = 1300)
+      #
+      #     p2_dataclean$object_pos <- if(!is.null(prj_init$object_positive.init) &&
+      #                                   prj_init$steps == "Remove noisy feature") {
+      #       prj_init$object_positive.init
+      #     } else {
+      #       data_import_rv$object_pos_raw
+      #     }
+      #
+      #     processed_pos <- tryCatch({
+      #       find_noise_multiple(
+      #         object = p2_dataclean$object_pos,
+      #         tag = anal_para()$cut_index,
+      #         qc_na_freq = anal_para()$qc_cut/100,
+      #         S_na_freq = anal_para()$sample_cut/100
+      #       )
+      #     }, error = function(e) {
+      #       return(NULL)
+      #       shinyalert("POS Error", paste("POS processing failed:", e$message), type = "error")
+      #     })
+      #
+      #     p2_dataclean$object_pos_mv <- processed_pos$object_mv
+      #     output$vari_info_pos <- renderDataTable_formated(
+      #       actions = input$mv_start,condition1 = processed_pos$noisy_tbl,
+      #       tbl = processed_pos$noisy_tbl,
+      #       filename.a = "Noisy_features_pos.csv"
+      #     )
+      #
+      #     save_massobj(
+      #       polarity = 'positive',
+      #       file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
+      #       stage = 'mv',
+      #       obj = p2_dataclean$object_pos_mv
+      #     )
+      #   }, error = function(e) {
+      #     return()
+      #     shinyalert("POS Error", paste("POS processing failed:", e$message), type = "error")
+      #   })
+      # }
 
       # Process NEG mode
+      print("Check point 3:")
+      print(has_neg)
+
+
       if(has_neg) {
-        shinyalert("Processing", "Removing noise from NEGATIVE mode data...",
-                   type = "info", timer = 2)
+        shinyalert("Processing", "Removing noise from NEGATIVE mode data...",type = "info",timer = 200)
+        print(prj_init$object_negative.init)
 
        if(!is.null(prj_init$object_negative.init) && prj_init$steps == "Remove noisy feature") {
-         p2_dataclean$object_neg  =  prj_init$object_negative.init
+         temp_object_neg <-  prj_init$object_negative.init
        } else {
-         p2_dataclean$object_neg  =  data_import_rv$object_neg_raw
+         temp_object_neg  <-  data_import_rv$object_neg_raw
+         print(data_import_rv$object_neg_raw)
+         print(temp_object_neg)
        }
+        p2_dataclean$object_neg <- temp_object_neg
+        print(p2_dataclean$object_neg)
 
       if (!inherits(p2_dataclean$object_neg, "mass_dataset")) {
-          stop("Input object must be a 'mass_dataset' class object.\n",
-               "Please check the class of your input with class(object).")
+        shinyalert("Error", "Input object must be a 'mass_dataset' class object.\n,Please check the class of your input with class(object).",
+                   type = "info", timer = 20)
           return(invisible())
       }
 

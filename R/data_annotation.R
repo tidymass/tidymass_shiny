@@ -129,7 +129,7 @@ feature_annotation_ui <- function(id) {
             inputId = ns('norm_db'),
             label = "Public database",
             choices = c(
-              "MoNA","Massbank","ReSpect","PlaSMA","MetaboBASE","KEGG","KNApSAcK","Ath_Cyc","Orbitrap"
+              "MoNA","Massbank","ReSpect","PlaSMA","MetaboBASE","KEGG","KNApSAcK","Ath_Cyc","Orbitrap","NULL"
             ),selected = c(
               "MoNA","Massbank"
             ),multiple = T,
@@ -140,6 +140,7 @@ feature_annotation_ui <- function(id) {
                          buttonType = "default", class = NULL,
                          icon = bs_icon("folder"), multiple = FALSE),
           tags$span(textOutput(outputId = ns("ms_db_folder_selected")), class = "text-wrap"),
+          br(),
           actionButton(inputId = ns('anno_start'),label = "Start annotation",icon = icon("play")),
         )
       ),
@@ -215,6 +216,13 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
         # browser()
         ms2_folder_selected<-parseDirPath(roots = volumes, input$MS2)
         output$MS2_path <- renderText(ms2_folder_selected)
+      }})
+    observe({
+      shinyDirChoose(input = input,id = "norm_customized_db", roots =  volumes, session = session)
+      if(!is.null(input$norm_customized_db)){
+        # browser()
+        dblist_selected<-parseDirPath(roots = volumes, input$norm_customized_db)
+        output$ms_db_folder_selected <- renderText(dblist_selected)
       }})
     ##> parameters ms2
     para_ms2 =  reactive({
@@ -352,7 +360,6 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
             KNApSAcK = knapsack_agri_database0.0.1,
             Ath_Cyc = ath_plantcyc.database0.0.1,
             MetaboBASE = metabobase_database0.0.1
-
           )
         ##
         data_anno$buildin_name = para$norm_db %>% as.character()
