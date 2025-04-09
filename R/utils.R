@@ -342,7 +342,7 @@ validate_sample_files <- function(
 }
 
 
-#
+
 #' Create empty plot with message
 #'
 #'
@@ -362,5 +362,300 @@ gg_message_plot = function(print_messages){
     theme(plot.background = element_rect(fill = "#f5f6fa", color = NA),
           panel.border = element_blank())
   return(p)
+}
+
+
+#' Summarize mass_dataset Object Information
+#'
+#' Generates a formatted report summarizing key metadata and processing history
+#' of a `mass_dataset` object. Designed for integration with Shiny's `renderPrint`.
+#'
+#' @param object A S4 object of class `mass_dataset` containing metabolomics data
+#' @param mode Ionization mode, either `"positive"` or `"negative"` (case-insensitive)
+#' @param show_processing Logical indicating whether to display processing history.
+#'   Requires `object@process_info` slot. Default: `TRUE`
+#' @param show_qc Logical indicating whether to perform QC sample detection.
+#'   Checks `sample_type` or `sample_id` columns. Default: `TRUE`
+#' @param color Logical enabling ANSI color codes in output.
+#'   Set to `FALSE` for Shiny/RMarkdown. Default: `TRUE`
+#'
+#' @return A character string containing formatted summary report, suitable for
+#'   rendering with `cat()` in Shiny `renderPrint` contexts
+#'
+#' @examples
+#' \dontrun{
+#' library(massdataset)
+#'
+#'
+#' data(example_dataset)
+#'
+#' # report in positive model
+#' cat(summarize_massdataset(example_dataset, mode = "positive"))
+#'
+#' # In shiny serve
+#' output$summary <- renderPrint({
+#'   cat(summarize_massdataset(object(), color = FALSE)
+#' })
+#' }
+#'
+#' @importFrom methods slotNames
+#' @importFrom utils head tail
+#' @importFrom stringr str_to_title
+
+summarize_massdataset <- function(
+    object,
+    mode = c("positive", "negative"),
+    show_processing = TRUE,
+    show_qc = TRUE,
+    color = TRUE
+) {
+  # check parameters
+  if (missing(object)) stop("No mass_dataset object provided")
+  if (!inherits(object, "mass_dataset")) {
+    stop("Input must be a mass_dataset S4 object")
+  }
+  mode <- match.arg(mode)
+
+  # colors
+  col_title <- if (color) "\033[1m\033[34m" else ""
+  col_reset <- if (color) "\033[0m" else ""
+  col_green <- if (color) "\033[32m" else ""
+  col_yellow <- if (color) "\033[33m" else ""
+
+  # process init
+  output <- character(0)
+
+  # title
+  output <- c(output,
+              sprintf("%s── massdataset Object Summary (%s Mode) ──%s",
+                      col_title, str_to_title(mode), col_reset),
+              ""
+  )
+
+  # core metadata -------------------------------------------------------------
+  output <- c(output,
+              sprintf("%sCore Components:%s", col_title, col_reset),
+              sprintf("├─ Expression Data: %s × %s variables",
+                      format(nrow(object@expression_data), big.mark = ","),
+                      format(ncol(object@expression_data), big.mark = ",")),
+              sprintf("├─ Sample Info: %s samples × %s metadata",
+                      format(nrow(object@sample_info), big.mark = ","),
+                      ncol(object@sample_info)),
+              sprintf("├─ Variable Info: %s features × %s annotations",
+                      format(nrow(object@variable_info), big.mark = ","),
+                      ncol(object@variable_info)),
+              sprintf("└─ MS2 Spectra: %s",
+                      ifelse(length(object@ms2_data) > 0,
+                             sprintf("%s spectra", format(length(object@ms2_data), big.mark = ",")),
+                             "Not available")),
+              ""
+  )
+
+  # Processing historical analysis -----------------------------------------------------------
+  if (show_processing && length(object@process_info) > 0) {
+    proc_list <- object@process_info
+
+    output <- c(output,
+                sprintf("%sProcessing History:%s", col_title, col_reset),
+                sprintf("├─ Total steps: %d", length(proc_list)))
+
+                # summary steps
+                step_names <- names(proc_list)
+                unique_steps <- unique(step_names)
+                freq_table <- table(step_names)
+
+                # summary step frequencies
+                output <- c(output, "├─ Step frequencies:")
+                for (step in unique_steps) {
+                  output <- c(output,
+                              sprintf("│  ├─ %s (×%d)", step, freq_table[[step]])
+                  )
+                }
+
+                # print details
+                last_step <- proc_list[[length(proc_list)]]
+                output <- c(output,
+                            "└─ Last operation details:",
+                            sprintf("   ├─ Step name: %s", names(proc_list)[length(proc_list)]),
+                            sprintf("   ├─ Function: %s::%s",
+                                    last_step@pacakge_name,
+                                    last_step@function_name),
+                            sprintf("   ├─ Time: %s",
+                                    format(as.POSIXct(last_step@time), "%Y-%m-%d %H:%M:%OS3")),
+                            "   └─ Parameters:"
+                )
+
+                # data format
+                if (length(last_step@parameter) > 0) {
+                  params <- last_step@parameter
+                  max_len <- max(nchar(names(params)))
+                  for (i in seq_along(params)) {
+                    param_name <- sprintf(paste0("%-", max_len, "s"), names(params)[i])
+                    param_value <- if (length(params[[i]]) > 50) {
+                      paste0(substr(params[[i]], 1, 47), "...")
+                    } else {
+                      params[[i]]
+                    }
+                    output <- c(output,
+                                sprintf("      %s : %s", param_name, param_value)
+                    )
+                  }
+                } else {
+                  output <- c(output, "      No parameters recorded")
+                }
+                output <- c(output, "")
+
+    }
+
+
+  # Check QCs -------------------------------------------------------------
+  if (show_qc) {
+    qc_samples <- if ("sample_type" %in% colnames(object@sample_info)) {
+      sum(grepl("QC", object@sample_info$sample_type, ignore.case = TRUE))
+    } else {
+      sum(grepl("QC", object@sample_info$sample_id, ignore.case = TRUE))
+    }
+
+    qc_msg <- if (qc_samples > 0) {
+      sprintf("%s✔ Contains %d QC samples%s", col_green, qc_samples, col_reset)
+    } else {
+      sprintf("%s⚠ No QC samples detected%s", col_yellow, col_reset)
+    }
+    output <- c(output, qc_msg)
+  }
+
+  # export
+  paste(output, collapse = "\n")
+}
+
+
+#' Generate Formatted Data Summary Report for Shiny
+#'
+#' Creates a reusable renderPrint component for validating and displaying mass_dataset objects
+#'
+#' @param object A reactive expression or object to validate (mass_dataset expected)
+#' @param mode Ionization mode, either "positive" or "negative" (case-insensitive)
+#' @param show_processing Logical to display processing history (default: TRUE)
+#' @param show_qc Logical to check QC samples existence (default: TRUE)
+#' @param color Enable ANSI colors (disable in Shiny, default: FALSE)
+#'
+#' @return A renderPrint closure ready for Shiny output assignment
+#'
+#' @examples
+#' \dontrun{
+#' # In Shiny server:
+#' output$neg_report <- check_massdata_info(
+#'   data_import_rv$object_neg_mv,
+#'   mode = "negative"
+#' )
+#' }
+#' @export
+check_massdata_info <- function(object,
+                                mode = c("positive", "negative"),
+                                show_processing = TRUE,
+                                show_qc = TRUE,
+                                color = FALSE) {
+  # Validate mode input
+  mode <- match.arg(mode, c("positive", "negative"))
+
+  # Return renderPrint closure
+  renderPrint({
+    # Get actual object value
+    obj <- if (is.reactive(object)) object() else object
+
+    # Case 1: Null object
+    if (is.null(obj)) {
+      cat(sprintf("\n⛔ No %s ion mode data detected\n", mode))
+    #  cat("Please perform data processing first\n")
+      return(invisible(NULL))
+    }
+
+    # Case 2: Invalid object type
+    if (!inherits(obj, "mass_dataset")) {
+      cat("\n⚠️ Object Validation Failed\n")
+      cat("Expected: mass_dataset S4 object\n")
+      cat("Actual: ", paste(class(obj), collapse = " > "), "\n")
+      return(invisible(NULL))
+    }
+
+    # Case 3: Valid object - generate summary
+    cat(summarize_massdataset(
+      object = obj,
+      mode = mode,
+      show_processing = show_processing,
+      show_qc = show_qc,
+      color = color
+    ))
+  })
+}
+
+#' Process Outliers in Mass Spectrometry Data
+#'
+#' @param object A mass_dataset object
+#' @param mv_method Detection method ("By tidymass" or "By myself")
+#' @param by_witch Parameters for automated detection (regex patterns)
+#' @param outlier_samples Manually specified outlier samples
+#' @param outlier_table Precomputed outlier table (for "By tidymass" method)
+#'
+#' @return A list containing:
+#' - $object: Filtered mass_dataset object
+#' - $outlier_ids: Identified outlier sample IDs
+#' - $message: Processing status messages
+#' @export
+process_outliers <- function(object,
+                             mv_method = c("By tidymass", "By myself"),
+                             by_witch = NULL,
+                             outlier_samples = NULL,
+                             outlier_table = NULL) {
+  # check parameters
+  mv_method <- match.arg(mv_method)
+  if (!inherits(object, "mass_dataset")) {
+    return(list(
+      error = "Invalid input: object must be a mass_dataset",
+      object = NULL,
+      outlier_ids = NULL
+    ))
+  }
+
+  tryCatch({
+    if (mv_method == "By tidymass") {
+      outlier_ids <- outlier_table %>%
+        rownames_to_column("sample_id") %>%
+        tidyr::pivot_longer(
+          cols = -sample_id,
+          names_to = "condition",
+          values_to = "judge"
+        ) %>%
+        dplyr::filter(stringr::str_detect(condition, paste(by_witch, collapse = "|"))) %>%
+        dplyr::group_by(sample_id) %>%
+        dplyr::summarise(is_outlier = all(judge == TRUE)) %>%
+        dplyr::filter(is_outlier) %>%
+        dplyr::pull(sample_id)
+    } else {
+      outlier_ids <- outlier_samples
+    }
+    if (length(outlier_ids) > 0 && !"none" %in% outlier_ids) {
+      filtered_object <- object %>%
+        massdataset::activate_mass_dataset(what = "sample_info") %>%
+        dplyr::filter(!sample_id %in% outlier_ids)
+      return(list(
+        object = filtered_object,
+        outlier_ids = outlier_ids,
+        message = paste("Removed", length(outlier_ids), "outliers")
+      ))
+    } else {
+      return(list(
+        object = object,
+        outlier_ids = NULL,
+        message = "No outliers removed"
+      ))
+    }
+  }, error = function(e) {
+    return(list(
+      error = paste("Processing failed:", e$message),
+      object = NULL,
+      outlier_ids = NULL
+    ))
+  })
 }
 

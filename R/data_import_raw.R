@@ -794,14 +794,16 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_e
             '</div>'
           ))
         })
-        output$obj_mass_check.pos = renderPrint({
-          if(is.null(para_data_check$object_pos_raw)){return()}
-          print(para_data_check$object_pos_raw)
-        })
-        output$obj_mass_check.neg = renderPrint({
-          if(is.null(para_data_check$object_neg_raw)){return()}
-          print(para_data_check$object_neg_raw )
-        })
+        output$obj_mass_check.pos = check_massdata_info(
+          object = para_data_check$object_pos_raw,
+          mode = "positive"
+        )
+
+        output$obj_mass_check.neg = check_massdata_info(
+          object = para_data_check$object_neg_raw,
+          mode = "negative"
+        )
+
         if(!is.null(para_data_check$parameters)){
           dir.create(file.path(prj_init$wd,"Peak_picking_parameter_optimize/"),showWarnings = F,recursive = T)
           writexl::write_xlsx(para_data_check$parameters,file.path(prj_init$wd,"Peak_picking_parameter_optimize/para_opt.xlsx"))

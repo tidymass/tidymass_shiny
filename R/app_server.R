@@ -78,7 +78,6 @@ app_server <-
       id = "mv_impute_id",
       volumes = volumes,
       prj_init = prj_init,
-      data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv,
       data_export_rv = data_export_rv
     )

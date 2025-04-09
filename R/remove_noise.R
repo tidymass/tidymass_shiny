@@ -260,7 +260,7 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
       }
 
       if(has_pos) {
-        shinyalert("Processing", "Removing noise from POSITIVE mode data...",type = "info",timer = 1000)
+        shinyalert("Processing", "Removing noise from POSITIVE mode data...",type = "info",timer = 2000)
 
         if(prj_init$steps == "Remove noisey feature" && !is.null(prj_init$object_positive.init)) {
           p2_dataclean$object_pos = prj_init$object_positive.init
@@ -284,23 +284,11 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
           tbl = processed_pos$noisy_tbl,
           filename.a = "Noisy_features_pos.csv"
         )
-        output$obj_mv.pos = renderPrint({
-          if(is.null(data_import_rv$object_pos_mv)){
-            HTML(paste0(
-              '<div class="alert alert-warning" role="alert">',
-              '<i class="fas fa-exclamation-triangle"></i> ',
-              'No data in <span style="color: #FF0000; font-weight: bold;">POSITIVE</span> ion mode was detected.',
-              '</div>'
-            ))
-          } else {
-            print(data_import_rv$object_pos_mv)
-          }
-        })
 
       }
 
       if(has_neg) {
-        shinyalert("Processing", "Removing noise from NEGATIVE mode data...",type = "info",timer = 1000)
+        shinyalert("Processing", "Removing noise from NEGATIVE mode data...",type = "info",timer = 2000)
 
         if(prj_init$steps == "Remove noisey feature" && !is.null(prj_init$object_negative.init)) {
           p2_dataclean$object_neg = prj_init$object_negative.init
@@ -318,24 +306,24 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
         p2_dataclean$object_neg_mv <- processed_neg$object_mv
         object_neg_mv <- processed_neg$object_mv
         data_import_rv$object_neg_mv <- processed_neg$object_mv
-        save(object_neg_mv,file = file.path(prj_init$mass_dataset_dir, "02.object_pos_mv.rda"))
+        save(object_neg_mv,file = file.path(prj_init$mass_dataset_dir, "02.object_neg_mv.rda"))
         output$vari_info_neg <- renderDataTable_formated(
           actions = input$mv_start,condition1 = processed_neg$noisy_tbl,
           tbl = processed_neg$noisy_tbl,
           filename.a = "Noisy_features_neg.csv"
         )
-        output$obj_mv.neg = renderPrint({
-          if(is.null(data_import_rv$object_neg_mv)){
-            HTML(paste0(
-              '<div class="alert alert-info" role="alert">',
-              '<i class="fas fa-exclamation-triangle"></i> ',
-              'No data in <span style="color: #FF0000; font-weight: bold;">NEGATIVE</span> ion mode was detected.',
-              '</div>'))
-          } else {
-            print(data_import_rv$object_neg_mv )
-          }
-        })
       }
+      output$obj_mv.pos = check_massdata_info(
+        object = data_import_rv$object_pos_mv,
+        mode = "positive"
+      )
+
+      output$obj_mv.neg = check_massdata_info(
+        object = data_import_rv$object_neg_mv,
+        mode = "negative"
+      )
+
+
       shinyalert("Success", "Noisy features have been removed. Expand the visualization parameters in the sidebar to analyze the results.",type = "info",timer = 5000)
     })
 

@@ -337,14 +337,15 @@ project_init_server <- function(id,volumes,prj_init) {
         }
 
         # Status and information of mass datasets
-        output$res_pos_mod = renderPrint({
-          if(is.null(prj_init$object_positive.init)){return()}
-          print(prj_init$object_positive.init)
-        })
-        output$res_neg_mod = renderPrint({
-          if(is.null(prj_init$object_negative.init)){return()}
-          print(prj_init$object_negative.init)
-        })
+        output$res_pos_mod = check_massdata_info(
+          object = prj_init$object_positive.init,
+          mode = "positive"
+        )
+
+        output$res_neg_mod = check_massdata_info(
+          object = prj_init$object_negative.init,
+          mode = "negative"
+        )
       }
     )
   })

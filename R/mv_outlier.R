@@ -243,465 +243,420 @@ remove_outlier_ui <- function(id) {
     )
 }
 
-
-#' Remove noise of server
-#' The application server-side
+#' Remove Outliers Server
 #'
-#' @param input,output,session Internal parameters for {shiny}.
-#'     DO NOT REMOVE.
+#' Server logic for outlier removal in metabolomics data processing
+#' @param input,output,session Shiny module parameters
 #' @import shiny
 #' @importFrom shinyjs toggle runjs useShinyjs
-#' @importFrom dplyr select left_join
+#' @importFrom dplyr select left_join filter
 #' @importFrom massdataset activate_mass_dataset
 #' @importFrom plotly renderPlotly plotlyOutput
-#' @param id module of server
-#' @param volumes shinyFiles volumes
-#' @param prj_init use project init variables.
-#' @param data_import_rv reactivevalues mass_dataset export
-#' @param data_clean_rv reactivevalues p2 dataclean
-#' @param data_export_rv reactivevalues mass_dataset export
+#' @param id Module namespace ID
+#' @param volumes File system volumes configuration
+#' @param prj_init Project initialization object
+#' @param data_import_rv Reactive values for imported data
+#' @param data_clean_rv Reactive values for cleaned data
+#' @param data_export_rv Reactive values for exported data
 #' @noRd
-
-
-remove_outlier_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_export_rv) {
+remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_clean_rv, data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     p2_dataclean <- reactiveValues(data = NULL)
 
-    analy_para = reactive({
+    # Helper functions --------------------------------------------------------
+    check_ion_modes <- function(data_rv, prj) {
       list(
-        mv_method = input$mv_method %>% as.character(),
-        by_witch = input$by_witch %>% as.character(),
-        outlier_in_pos = input$outlier_in_pos %>% as.character(),
-        outlier_in_neg = input$outlier_in_neg %>% as.character()
+        has_pos = !is.null(data_rv$object_pos_mv) || !is.null(prj$object_positive.init),
+        has_neg = !is.null(data_rv$object_neg_mv) || !is.null(prj$object_negative.init)
+      )
+    }
+
+    process_for_pca <- function(object, scale = FALSE) {
+      processed <- object %>%
+        `+`(1) %>%
+        log(2)
+
+      if(scale) processed <- scale(processed)
+      processed
+    }
+
+    detect_outliers <- function(object) {
+      object %>%
+        `+`(1) %>%
+        log(2) %>%
+        scale() %>%
+        detect_outlier()
+    }
+
+
+    ### Parameter Reactives ###
+    analy_para <- reactive({
+      list(
+        mv_method = as.character(input$mv_method),
+        by_witch = as.character(input$by_witch),
+        outlier_in_pos = as.character(input$outlier_in_pos),
+        outlier_in_neg = as.character(input$outlier_in_neg)
       )
     })
 
-    ###> plot parameters =========
-    plot1_para = reactive({
+    ### Visualization Parameters ###
+    plot1_para <- reactive({
       list(
-        fig1_color_by = input$color_by_smv %>% as.character(),
-        fig1_order_by = input$order_by_smv %>% as.character(),
-        fig1_percentage = input$percentage_smv %>% as.logical(),
-        fig1_show_x_text = input$show_x_text_smv %>% as.logical(),
-        fig1_show_x_ticks = input$show_x_ticks_smv %>% as.logical(),
-        fig1_desc = input$desc_smv %>% as.logical()
+        fig1_color_by = as.character(input$color_by_smv),
+        fig1_order_by = as.character(input$order_by_smv),
+        fig1_percentage = as.logical(input$percentage_smv),
+        fig1_show_x_text = as.logical(input$show_x_text_smv),
+        fig1_show_x_ticks = as.logical(input$show_x_ticks_smv),
+        fig1_desc = as.logical(input$desc_smv)
       )
     })
 
-    plot2_para = reactive({
+    plot2_para <- reactive({
       list(
-        fig2_color_by = input$fig2_color_by %>% as.character(),
-        fig2_scale = input$fig2_scale %>% as.logical(),
-        fig2_point_alpha = input$fig2_point_alpha %>% as.numeric(),
-        fig2_frame = input$fig2_frame %>% as.logical(),
-        fig2_line = input$fig2_line %>% as.logical(),
-        fig2_color_by_3d = input$fig2_color_by_3d %>% as.character(),
-        fig2_scale_3d = input$fig2_scale_3d %>% as.logical(),
-        fig2_x_axis = input$fig2_x_axis %>% as.character(),
-        fig2_y_axis = input$fig2_y_axis %>% as.character(),
-        fig2_z_axis = input$fig2_z_axis %>% as.character()
-      )
-    })
-    ###> download parameters =========
-    download_para = reactive({
-      list(
-        ##> fig1
-        fig1_width = as.numeric(input$fig1_width),
-        fig1_height = as.numeric(input$fig1_height),
-        fig1_format = as.character(input$fig1_format),
-        ##> fig2
-        fig2_width = as.numeric(input$fig2_width),
-        fig2_height = as.numeric(input$fig2_height),
-        fig2_format = as.character(input$fig2_format)
+        fig2_color_by = as.character(input$fig2_color_by),
+        fig2_scale = as.logical(input$fig2_scale),
+        fig2_point_alpha = as.numeric(input$fig2_point_alpha),
+        fig2_frame = as.logical(input$fig2_frame),
+        fig2_line = as.logical(input$fig2_line),
+        fig2_color_by_3d = as.character(input$fig2_color_by_3d),
+        fig2_scale_3d = as.logical(input$fig2_scale_3d),
+        fig2_x_axis = as.character(input$fig2_x_axis),
+        fig2_y_axis = as.character(input$fig2_y_axis),
+        fig2_z_axis = as.character(input$fig2_z_axis)
       )
     })
 
+    ### Dynamic UI Updates ###
     observe({
-      sample_info_colnames <- NULL
-      variable_info_colnames <- NULL
+      tryCatch({
+        sources <- list(
+          prj_init$object_negative.init,
+          prj_init$object_positive.init,
+          data_import_rv$object_neg_mv,
+          data_import_rv$object_pos_mv
+        )
 
-      if (!is.null(prj_init$object_negative.init)) {
-        sample_info_colnames <- colnames(prj_init$object_negative.init@sample_info)
-        temp_sample_id <- prj_init$object_negative.init@sample_info %>% pull("sample_id")
-      } else if (!is.null(prj_init$object_positive.init)) {
-        sample_info_colnames <- colnames(prj_init$object_positive.init@sample_info)
-        temp_sample_id <- prj_init$object_positive.init@sample_info %>% pull("sample_id")
-      } else if (!is.null(data_import_rv$object_neg.mv)) {
-        sample_info_colnames <- colnames(data_import_rv$object_neg.mv@sample_info)
-        temp_sample_id <- data_import_rv$object_neg.mv@sample_info %>% pull("sample_id")
-      } else if (!is.null(data_import_rv$object_pos.mv)) {
-        sample_info_colnames <- colnames(data_import_rv$object_pos.mv@sample_info)
-        temp_sample_id <- data_import_rv$object_pos.mv@sample_info %>% pull("sample_id")
-      }
-
-      # update
-      if (!is.null(sample_info_colnames)) {
-        updateSelectInput(session, "color_by_smv", choices = sample_info_colnames, selected = "group")
-        updateSelectInput(session, "order_by_smv", choices = sample_info_colnames, selected = "injection.order")
-        updateSelectInput(session, "fig2_color_by", choices = sample_info_colnames, selected = "group")
-        updateSelectInput(session, "fig2_color_by_3d", choices = sample_info_colnames, selected = "group")
-        updateSelectInput(session, "outlier_in_pos", choices = temp_sample_id, selected = "none")
-        updateSelectInput(session, "outlier_in_neg", choices = temp_sample_id, selected = "none")
-      }
-
+        valid_source <- Find(Negate(is.null), sources)
+        if(!is.null(valid_source)) {
+          col_names <- colnames(valid_source@sample_info)
+          sample_ids <- valid_source@sample_info$sample_id
+          updateSelectInput(session, "color_by_smv", choices = col_names, selected = "group")
+          updateSelectInput(session, "order_by_smv", choices = col_names, selected = "injection.order")
+          updateSelectInput(session, "fig2_color_by", choices = col_names, selected = "group")
+          updateSelectInput(session, "fig2_color_by_3d", choices = col_names, selected = "group")
+          updateSelectInput(session, "outlier_in_pos", choices = c("none", sample_ids), selected = "none")
+          updateSelectInput(session, "outlier_in_neg", choices = c("none", sample_ids), selected = "none")
+        }
+      }, error = function(e) {
+        message("UI update error: ", e$message)
+      })
     })
 
-    ##> draw plot ==================
-    observeEvent(
-      input$vis_butt_1,
-      {
-
-        ####> check object ===============
-        if(is.null(prj_init$sample_info)) {return()}
-
-        if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "Remove outlier"){
-          p2_dataclean$object_neg = prj_init$object_negative.init
-          p2_dataclean$object_pos = prj_init$object_positive.init
-        } else {
-          if(is.null(data_import_rv$object_neg.mv)) {return()}
-          if(is.null(data_import_rv$object_pos.mv)) {return()}
-          p2_dataclean$object_neg = data_import_rv$object_neg.mv
-          p2_dataclean$object_pos = data_import_rv$object_pos.mv
-        }
-
-
-        ###> fig1 missing value in samples ================
-
-        # positive
-        output$smv_plt.pos <- renderUI({
-          plot_type <- input$fig1_data_clean_plt_format
-          if (plot_type) {
-            plotlyOutput(outputId = ns("plotly_smv_plt.pos"))
-          } else {
-            plotOutput(outputId = ns("plot_smv_plt.pos"))
-          }
-        })
-        output$plot_smv_plt.pos <- renderPlot({
-          para = plot1_para()
-          if(is.null(input$vis_butt_1)){return()}
-          if(is.null(p2_dataclean$object_pos)){return()}
-          if(is.null(data_clean_rv$object_pos.outlier)) {
-            temp_obj = p2_dataclean$object_pos
-          } else{
-            temp_obj = data_clean_rv$object_pos.outlier
-          }
-          temp_obj %>% massqc::show_sample_missing_values(
-            color_by = para$fig1_color_by,
-            order_by = para$fig1_order_by,
-            percentage = para$fig1_percentage,
-            show_x_text = para$fig1_show_x_text,
-            show_x_ticks = para$fig1_show_x_ticks,
-            desc = para$fig1_desc
-          )
-        })
-        output$plotly_smv_plt.pos <- renderPlotly({
-          para = plot1_para()
-          if(is.null(input$vis_butt_1)){return()}
-          if(is.null(p2_dataclean$object_pos)){return()}
-          if(is.null(data_clean_rv$object_pos.outlier)) {
-            temp_obj = p2_dataclean$object_pos
-          } else{
-            temp_obj = data_clean_rv$object_pos.outlier
-          }
-          temp_obj %>% massqc::show_sample_missing_values(
-            color_by = para$fig1_color_by,
-            order_by = para$fig1_order_by,
-            percentage = para$fig1_percentage,
-            show_x_text = para$fig1_show_x_text,
-            show_x_ticks = para$fig1_show_x_ticks,
-            desc = para$fig1_desc
-          ) %>% plotly::ggplotly()
-        })
-        # negative
-        output$smv_plt.neg <- renderUI({
-          plot_type <- input$fig1_data_clean_plt_format
-          if (plot_type) {
-            plotlyOutput(outputId = ns("plotly_smv_plt.neg"))
-          } else {
-            plotOutput(outputId = ns("plot_smv_plt.neg"))
-          }
-        })
-        output$plot_smv_plt.neg <- renderPlot({
-          para = plot1_para()
-          if(is.null(input$vis_butt_1)){return()}
-          if(is.null(p2_dataclean$object_neg)){return()}
-          if(is.null(data_clean_rv$object_neg.outlier)) {
-            temp_obj = p2_dataclean$object_neg
-          } else{
-            temp_obj = data_clean_rv$object_neg.outlier
-          }
-          temp_obj %>% massqc::show_sample_missing_values(
-            color_by = para$fig1_color_by,
-            order_by = para$fig1_order_by,
-            percentage = para$fig1_percentage,
-            show_x_text = para$fig1_show_x_text,
-            show_x_ticks = para$fig1_show_x_ticks,
-            desc = para$fig1_desc
-          )
-        })
-        output$plotly_smv_plt.neg <- renderPlotly({
-          para = plot1_para()
-          if(is.null(input$vis_butt_1)){return()}
-          if(is.null(p2_dataclean$object_neg)){return()}
-          if(is.null(data_clean_rv$object_neg.outlier)) {
-            temp_obj = p2_dataclean$object_neg
-          } else{
-            temp_obj = data_clean_rv$object_neg.outlier
-          }
-          temp_obj %>% massqc::show_sample_missing_values(
-            color_by = para$fig1_color_by,
-            order_by = para$fig1_order_by,
-            percentage = para$fig1_percentage,
-            show_x_text = para$fig1_show_x_text,
-            show_x_ticks = para$fig1_show_x_ticks,
-            desc = para$fig1_desc
-          ) %>% plotly::ggplotly()
-        })
-
-        ###> fig1 PCA =============
-        output$fig2_pca.pos <- renderUI({
-          plot_type <- input$fig2_data_clean_plt_format
-          if (plot_type) {
-            plotlyOutput(outputId = ns("plotly_pca.pos"))
-          } else {
-            plotOutput(outputId = ns("plot_pca.pos"))
-          }
-        })
-        output$plot_pca.pos <- renderPlot({
-          para = plot2_para()
-          if(is.null(input$vis_butt_1)){return()}
-          if(is.null(p2_dataclean$object_pos)){return()}
-          if(is.null(data_clean_rv$object_pos.outlier)) {
-            temp_obj = p2_dataclean$object_pos
-          } else{
-            temp_obj = data_clean_rv$object_pos.outlier
-          }
-          if(isTRUE(para$fig2_scale)) {
-            temp_obj.pos <- temp_obj %>% +1 %>% log(2) %>% scale()
-          } else {
-            temp_obj.pos <- temp_obj %>% +1 %>% log(2)
-          }
-          temp_obj.pos %>%
-            massqc::massqc_pca(
-              color_by = para$fig2_color_by,
-              point_alpha = para$fig2_point_alpha,
-              frame = para$fig2_frame,
-              line = para$fig2_line
-            )
-        })
-        output$plotly_pca.pos <- renderPlotly({
-          para = plot2_para()
-          if(is.null(input$vis_butt_1)){return()}
-          if(is.null(p2_dataclean$object_pos)){return()}
-          if(is.null(data_clean_rv$object_pos.outlier)) {
-            temp_obj = p2_dataclean$object_pos
-          } else{
-            temp_obj = data_clean_rv$object_pos.outlier
-          }
-          if(isTRUE(para$fig2_scale_3d)) {
-            temp_obj.pos <- temp_obj %>% +1 %>% log(2) %>% scale()
-          } else {
-            temp_obj.pos <- temp_obj %>% +1 %>% log(2)
-          }
-          temp_obj.pos %>%
-            massqc_pca_3d(
-              color_by = para$fig2_color_by_3d,
-              x_axis = para$fig2_x_axis,
-              y_axis = para$fig2_y_axis,
-              z_axis = para$fig2_z_axis
-            )
-        })
-        # negative
-        output$fig2_pca.neg <- renderUI({
-          plot_type <- input$fig2_data_clean_plt_format
-          if (plot_type) {
-            plotlyOutput(outputId = ns("plotly_pca.neg"))
-          } else {
-            plotOutput(outputId = ns("plot_pca.neg"))
-          }
-        })
-        output$plot_pca.neg <- renderPlot({
-          para = plot2_para()
-          if(is.null(input$vis_butt_1)){return()}
-          if(is.null(p2_dataclean$object_neg)){return()}
-          if(is.null(data_clean_rv$object_neg.outlier)) {
-            temp_obj = p2_dataclean$object_neg
-          } else{
-            temp_obj = data_clean_rv$object_neg.outlier
-          }
-          if(isTRUE(para$fig2_scale)) {
-            temp_obj.neg <- temp_obj %>% +1 %>% log(2) %>% scale()
-          } else {
-            temp_obj.neg <- temp_obj %>% +1 %>% log(2)
-          }
-
-          temp_obj.neg %>%
-            massqc::massqc_pca(
-              color_by = para$fig2_color_by,
-              point_alpha = para$fig2_point_alpha,
-              frame = para$fig2_frame,
-              line = para$fig2_line
-            )
-        })
-        output$plotly_pca.neg <- renderPlotly({
-          para = plot2_para()
-          if(is.null(input$vis_butt_1)){return()}
-          if(is.null(p2_dataclean$object_neg)){return()}
-          if(is.null(data_clean_rv$object_neg.outlier)) {
-            temp_obj = p2_dataclean$object_neg
-          } else{
-            temp_obj = data_clean_rv$object_neg.outlier
-          }
-          if(isTRUE(para$fig2_scale_3d)) {
-            temp_obj.neg <- temp_obj %>% +1 %>% log(2) %>% scale()
-          } else {
-            temp_obj.neg <- temp_obj %>% +1 %>% log(2)
-          }
-
-          temp_obj.neg %>%
-            massqc_pca_3d(
-              color_by = para$fig2_color_by_3d,
-              x_axis = para$fig2_x_axis,
-              y_axis = para$fig2_y_axis,
-              z_axis = para$fig2_z_axis
-            )
-        })
-        ####>  outliers ========================
-
-        outlier_samples.neg <-
-          p2_dataclean$object_neg %>%
-          `+`(1) %>%
-          log(2) %>%
-          scale() %>%
-          detect_outlier()
-
-        outlier_samples.pos <-
-          p2_dataclean$object_pos %>%
-          `+`(1) %>%
-          log(2) %>%
-          scale() %>%
-          detect_outlier()
-
-      output$info_outlier.neg = renderPrint({
-        print(outlier_samples.neg)
-      })
-
-      output$info_outlier.pos = renderPrint({
-        print(outlier_samples.pos)
-      })
-      ####> outlier detailed table
-      p2_dataclean$outlier_tbl.neg = extract_outlier_table(outlier_samples.neg)
-      p2_dataclean$outlier_tbl.pos = extract_outlier_table(outlier_samples.pos)
-
-      output$tbl_outlier.pos = renderDataTable_formated(
-        actions = input$vis_butt_1,
-        filename.a = "outlier_summary_pos",
-        tbl = p2_dataclean$outlier_tbl.pos
-      )
-      output$tbl_outlier.neg = renderDataTable_formated(
-        actions = input$vis_butt_1,
-        filename.a = "outlier_summary_neg",
-        tbl = p2_dataclean$outlier_tbl.neg
-      )
+    ### Core Outlier Detection Logic ###
+    observeEvent(input$vis_butt_1, {
+      # Validate data presence
+      modes <- check_ion_modes(data_import_rv, prj_init)
+      if(!modes$has_pos && !modes$has_neg) {
+        shinyalert("Error", "No valid data detected", type = "error")
+        return()
       }
-    )
 
-    ## > remove outlier
-    observeEvent(
-      input$mv_start,
-      {
-        print('check point 1')
-        if(is.null(p2_dataclean$outlier_tbl.neg)){return()}
-        if(is.null(p2_dataclean$outlier_tbl.pos)){return()}
-        para = analy_para()
-        print('check point 2')
-        print(para$mv_method)
+      # Load data based on processing step
+      if(prj_init$steps == "Remove outlier") {
+        if(modes$has_pos) p2_dataclean$object_pos <- prj_init$object_positive.init
+        if(modes$has_neg) p2_dataclean$object_neg <- prj_init$object_negative.init
+      } else {
+        p2_dataclean$object_pos <- data_import_rv$object_pos_mv
+        p2_dataclean$object_neg <- data_import_rv$object_neg_mv
+      }
 
-        if(para$mv_method == "By tidymass") {
-          print('check point 3')
-          by_witch = para$by_witch %>% paste0(collapse = "|")
-          p2_dataclean$outlier_sid.pos =
-            p2_dataclean$outlier_tbl.pos %>%
-            rownames_to_column("sample_id") %>%
-            pivot_longer(
-              !sample_id,values_to = 'judge',names_to = 'condition'
-            ) %>%
-            dplyr::filter(str_detect(condition,by_witch)) %>%
-            group_by(sample_id) %>%
-            summarise(is_outlier = all(judge == TRUE)) %>%
-            filter(is_outlier) %>%
-            ungroup() %>%
-            pull(sample_id)
-          print('check point 4')
-          p2_dataclean$outlier_sid.neg =
-            p2_dataclean$outlier_tbl.neg %>%
-            rownames_to_column("sample_id") %>%
-            pivot_longer(
-              !sample_id,values_to = 'judge',names_to = 'condition'
-            ) %>%
-            dplyr::filter(str_detect(condition,by_witch)) %>%
-            group_by(sample_id) %>%
-            summarise(is_outlier = all(judge == TRUE)) %>%
-            filter(is_outlier) %>%
-            ungroup() %>%
-            pull(sample_id)
-          print('check point 5')
-
-          if(length(p2_dataclean$outlier_sid.pos) > 0) {
-            output$outlier_in_pos_1 = renderPrint({
-              print(p2_dataclean$outlier_sid.pos)
-            })
-            print('check point 6')
+      ### Missing Value Visualization ###
+      # Positive mode
+      if(modes$has_pos) {
+        output$smv_plt.pos <- renderUI({
+          if(input$fig1_data_clean_plt_format) {
+            plotlyOutput(ns("plotly_smv_plt.pos"))
           } else {
-            output$outlier_in_pos_1 = renderPrint({
-              print("No outliers!")
-            })
-            print('check point 7')
+            plotOutput(ns("plot_smv_plt.pos"))
           }
-          if(length(p2_dataclean$outlier_sid.neg) > 0) {
-            output$outlier_in_neg_1 = renderPrint({
-              print(p2_dataclean$outlier_sid.neg)
-            })
-            print('check point 8')
-          } else {
-            output$outlier_in_neg_1 = renderPrint({
-              print("No outliers!")
-            })
-            print('check point 9')
-          }
-        }
-        if(para$mv_method == "By myself") {
-          print('check point 10')
-          p2_dataclean$outlier_sid.pos = para$outlier_in_pos
-          p2_dataclean$outlier_sid.neg = para$outlier_in_neg
-        }
-        if(length(p2_dataclean$outlier_sid.pos) > 0 & !"none" %in% p2_dataclean$outlier_sid.pos ) {
-          print('check point 11')
-          p2_dataclean$object_pos =
-            p2_dataclean$object_pos %>% activate_mass_dataset(what = 'sample_info') %>%
-            filter(!sample_id %in% p2_dataclean$outlier_sid.pos)
-        }
-        if(length(p2_dataclean$outlier_sid.neg) > 0 & !"none" %in% p2_dataclean$outlier_sid.neg) {
-          print('check point 12')
-          p2_dataclean$object_neg =
-            p2_dataclean$object_neg %>% activate_mass_dataset(what = 'sample_info') %>%
-            filter(!sample_id %in% p2_dataclean$outlier_sid.neg)
-        }
-        print('check point 13')
-
-        output$obj_outlier.pos = renderPrint({
-          print(p2_dataclean$object_pos)
-        })
-        output$obj_outlier.neg = renderPrint({
-          print(p2_dataclean$object_neg)
         })
 
-        data_clean_rv$object_pos.outlier = p2_dataclean$object_pos
-        data_clean_rv$object_neg.outlier = p2_dataclean$object_neg
+        output$plot_smv_plt.pos <- renderPlot({
+          obj <- data_clean_rv$object_pos.outlier %||% p2_dataclean$object_pos
+          massqc::show_sample_missing_values(
+            obj,
+            color_by = plot1_para()$fig1_color_by,
+            order_by = plot1_para()$fig1_order_by,
+            percentage = plot1_para()$fig1_percentage,
+            show_x_text = plot1_para()$fig1_show_x_text,
+            show_x_ticks = plot1_para()$fig1_show_x_ticks,
+            desc = plot1_para()$fig1_desc
+          )
+        })
 
-      })
+        output$plotly_smv_plt.pos <- renderPlotly({
+          obj <- data_clean_rv$object_pos.outlier %||% p2_dataclean$object_pos
+          massqc::show_sample_missing_values(
+            obj,
+            color_by = plot1_para()$fig1_color_by,
+            order_by = plot1_para()$fig1_order_by,
+            percentage = plot1_para()$fig1_percentage,
+            show_x_text = plot1_para()$fig1_show_x_text,
+            show_x_ticks = plot1_para()$fig1_show_x_ticks,
+            desc = plot1_para()$fig1_desc
+          ) %>% plotly::ggplotly()
+        })
+      }
 
+      # Negative mode
+      if(modes$has_neg) {
+        output$smv_plt.neg <- renderUI({
+          if(input$fig1_data_clean_plt_format) {
+            plotlyOutput(ns("plotly_smv_plt.neg"))
+          } else {
+            plotOutput(ns("plot_smv_plt.neg"))
+          }
+        })
+
+        output$plot_smv_plt.neg <- renderPlot({
+          obj <- data_clean_rv$object_neg.outlier %||% p2_dataclean$object_neg
+          massqc::show_sample_missing_values(
+            obj,
+            color_by = plot1_para()$fig1_color_by,
+            order_by = plot1_para()$fig1_order_by,
+            percentage = plot1_para()$fig1_percentage,
+            show_x_text = plot1_para()$fig1_show_x_text,
+            show_x_ticks = plot1_para()$fig1_show_x_ticks,
+            desc = plot1_para()$fig1_desc
+          )
+        })
+
+        output$plotly_smv_plt.neg <- renderPlotly({
+          obj <- data_clean_rv$object_neg.outlier %||% p2_dataclean$object_neg
+          massqc::show_sample_missing_values(
+            obj,
+            color_by = plot1_para()$fig1_color_by,
+            order_by = plot1_para()$fig1_order_by,
+            percentage = plot1_para()$fig1_percentage,
+            show_x_text = plot1_para()$fig1_show_x_text,
+            show_x_ticks = plot1_para()$fig1_show_x_ticks,
+            desc = plot1_para()$fig1_desc
+          ) %>% plotly::ggplotly()
+        })
+      }
+
+      ### PCA Analysis ###
+      # Positive mode PCA
+      if(modes$has_pos) {
+        output$fig2_pca.pos <- renderUI({
+          if(input$fig2_data_clean_plt_format) {
+            plotlyOutput(ns("plotly_pca.pos"))
+          } else {
+            plotOutput(ns("plot_pca.pos"))
+          }
+        })
+
+        output$plot_pca.pos <- renderPlot({
+          obj <- data_clean_rv$object_pos.outlier %||% p2_dataclean$object_pos
+          processed_data <- process_for_pca(obj, plot2_para()$fig2_scale)
+          massqc::massqc_pca(
+            processed_data,
+            color_by = plot2_para()$fig2_color_by,
+            point_alpha = plot2_para()$fig2_point_alpha,
+            frame = plot2_para()$fig2_frame,
+            line = plot2_para()$fig2_line
+          )
+        })
+
+        output$plotly_pca.pos <- renderPlotly({
+          obj <- data_clean_rv$object_pos.outlier %||% p2_dataclean$object_pos
+          processed_data <- process_for_pca(obj, plot2_para()$fig2_scale_3d)
+          massqc_pca_3d(
+            processed_data,
+            color_by = plot2_para()$fig2_color_by_3d,
+            x_axis = plot2_para()$fig2_x_axis,
+            y_axis = plot2_para()$fig2_y_axis,
+            z_axis = plot2_para()$fig2_z_axis
+          )
+        })
+      }
+
+      # Negative mode PCA
+      if(modes$has_neg) {
+        output$fig2_pca.neg <- renderUI({
+          if(input$fig2_data_clean_plt_format) {
+            plotlyOutput(ns("plotly_pca.neg"))
+          } else {
+            plotOutput(ns("plot_pca.neg"))
+          }
+        })
+
+        output$plot_pca.neg <- renderPlot({
+          obj <- data_clean_rv$object_neg.outlier %||% p2_dataclean$object_neg
+          processed_data <- process_for_pca(obj, plot2_para()$fig2_scale)
+          massqc::massqc_pca(
+            processed_data,
+            color_by = plot2_para()$fig2_color_by,
+            point_alpha = plot2_para()$fig2_point_alpha,
+            frame = plot2_para()$fig2_frame,
+            line = plot2_para()$fig2_line
+          )
+        })
+
+        output$plotly_pca.neg <- renderPlotly({
+          obj <- data_clean_rv$object_neg.outlier %||% p2_dataclean$object_neg
+          processed_data <- process_for_pca(obj, plot2_para()$fig2_scale_3d)
+          massqc_pca_3d(
+            processed_data,
+            color_by = plot2_para()$fig2_color_by_3d,
+            x_axis = plot2_para()$fig2_x_axis,
+            y_axis = plot2_para()$fig2_y_axis,
+            z_axis = plot2_para()$fig2_z_axis
+          )
+        })
+      }
+
+      ### Outlier Detection ###
+      if(modes$has_pos) {
+        outlier_samples.pos <- detect_outliers(p2_dataclean$object_pos)
+        p2_dataclean$outlier_tbl.pos <- extract_outlier_table(outlier_samples.pos)
+        output$info_outlier.pos <- renderPrint(print(outlier_samples.pos))
+        output$tbl_outlier.pos <- renderDataTable_formated(
+          tbl = p2_dataclean$outlier_tbl.pos,
+          filename.a = "outlier_summary_pos"
+        )
+      }
+
+      if(modes$has_neg) {
+        outlier_samples.neg <- detect_outliers(p2_dataclean$object_neg)
+        p2_dataclean$outlier_tbl.neg <- extract_outlier_table(outlier_samples.neg)
+        output$info_outlier.neg <- renderPrint(print(outlier_samples.neg))
+        output$tbl_outlier.neg <- renderDataTable_formated(
+          tbl = p2_dataclean$outlier_tbl.neg,
+          filename.a = "outlier_summary_neg"
+        )
+      }
+    })
+
+    ### Outlier Removal Execution ###
+    observeEvent(input$mv_start, {
+      modes <- check_ion_modes(data_import_rv, prj_init)
+      if(!modes$has_pos && !modes$has_neg) {
+        shinyalert("Error", "No valid data for processing", type = "error")
+        return()
+      }
+
+      # Process positive mode data
+      if(modes$has_pos) {
+        temp_pos_res = process_outliers(
+          object = p2_dataclean$object_pos,
+          mv_method = para$mv_method,
+          by_witch = para$by_witch,
+          outlier_samples = para$outlier_samples,
+          outlier_table = p2_dataclean$outlier_tbl.pos
+        )
+        p2_dataclean$object_pos_mv = temp_pos_res$object
+        # Build alert message
+        method_type <- ifelse(para$mv_method == "By tidymass",
+                              "Auto detection (Criteria: ${para$by_witch})",
+                              "Manual selection")
+
+        alert_msg <- paste(
+          "Positive Mode Outlier Processing",
+          "\n\nMethod: ", method_type,
+          "\n\nDetected outliers: "
+        )
+
+        if(length(temp_neg_res$outlier_ids) > 0) {
+          alert_msg <- paste0(
+            alert_msg,
+            paste(temp_neg_res$outlier_ids, collapse = ", ")
+          )
+          alert_type <- "warning"
+        } else {
+          alert_msg <- paste0(alert_msg, "No outliers detected")
+          alert_type <- "info"
+        }
+
+        # Show shinyalert
+        shinyalert(
+          title = "Outlier Processing Result",
+          text = alert_msg,
+          type = alert_type,
+          closeOnEsc = TRUE,
+          animation = "slide-from-top",
+          className = "outlier-alert"
+        )
+      }
+
+      # Process negative mode data
+      if(modes$has_neg) {
+        para <- analy_para()
+        temp_neg_res <- process_outliers(
+          object = p2_dataclean$object_neg,
+          mv_method = para$mv_method,
+          by_witch = para$by_witch,
+          outlier_samples = para$outlier_in_neg,
+          outlier_table = p2_dataclean$outlier_tbl.neg
+        )
+
+        # Update negative mode data
+        p2_dataclean$object_neg_mv <- temp_neg_res$object
+
+        # Build alert message
+        method_type <- ifelse(para$mv_method == "By tidymass",
+                              "Auto detection (Criteria: ${para$by_witch})",
+                              "Manual selection")
+
+        alert_msg <- paste(
+          "Negative Mode Outlier Processing",
+          "\n\nMethod: ", method_type,
+          "\n\nDetected outliers: "
+        )
+
+        if(length(temp_neg_res$outlier_ids) > 0) {
+          alert_msg <- paste0(
+            alert_msg,
+            paste(temp_neg_res$outlier_ids, collapse = ", ")
+          )
+          alert_type <- "warning"
+        } else {
+          alert_msg <- paste0(alert_msg, "No outliers detected")
+          alert_type <- "info"
+        }
+
+        # Show shinyalert
+        shinyalert(
+          title = "Outlier Processing Result",
+          text = alert_msg,
+          type = alert_type,
+          closeOnEsc = TRUE,
+          animation = "slide-from-top",
+          className = "outlier-alert"
+        )
+      }
+
+
+      # Update results display
+
+      output$obj_outlier.pos = check_massdata_info(
+        object = p2_dataclean$object_pos_mv,
+        mode = "positive"
+      )
+
+      output$obj_outlier.neg  = check_massdata_info(
+        object = p2_dataclean$object_neg_mv,
+        mode = "negative"
+      )
+
+      if(modes$has_pos) {
+        data_clean_rv$object_pos.outlier <- p2_dataclean$object_pos_mv
+      }
+
+      if(modes$has_neg) {
+        data_clean_rv$object_neg.outlier <- p2_dataclean$object_neg_mv
+      }
+    })
   })
 }
-
