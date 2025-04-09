@@ -474,6 +474,9 @@ summarize_massdataset <- function(
 
                 # print details
                 last_step <- proc_list[[length(proc_list)]]
+                if(length(last_step) > 1) {
+                  last_step = last_step[[length(last_step)]]
+                }
                 output <- c(output,
                             "└─ Last operation details:",
                             sprintf("   ├─ Step name: %s", names(proc_list)[length(proc_list)]),

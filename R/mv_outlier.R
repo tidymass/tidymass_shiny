@@ -41,10 +41,6 @@ remove_outlier_ui <- function(id) {
             choices = c("according_to_na","pc_sd","pc_mad","accordint_to_distance"),
             selected = "according_to_na",multiple = T
           ),
-          tags$span(textOutput(outputId = ns("outlier_in_pos_1")), class = "text-wrap"),
-          hr_head(),
-          tags$span(textOutput(outputId = ns("outlier_in_neg_1")), class = "text-wrap"),
-          hr_bar(),
           h5("By myself"),
           selectInput(
             inputId = ns("outlier_in_pos"),
@@ -357,10 +353,32 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
     observeEvent(input$vis_butt_1, {
       # Validate data presence
       modes <- check_ion_modes(data_import_rv, prj_init)
-      if(!modes$has_pos && !modes$has_neg) {
-        shinyalert("Error", "No valid data detected", type = "error")
+      if (!modes$has_pos && !modes$has_neg) {
+
+          # No data initialized at all
+          shinyalert(
+            "Data Not Loaded",
+            "No positive/negative ion mode data found. Upload data first.",
+            type = "error"
+          )
         return()
       }
+
+      # Check if data initialization exists
+      if(is.null(data_import_rv$object_pos_mv) && is.null(data_import_rv$object_neg_mv)){
+        if (!is.null(prj_init$object_negative.init) || !is.null(prj_init$object_positive.init)) {
+          # Data initialized but current step is invalid
+          if (prj_init$steps != "Remove outlier") {
+            shinyalert(
+              "Step Error",
+              "Invalid workflow sequence detected.\nPlease restart from the 'REMOVE OUTLIER' step.",
+              type = "error"
+            )
+            return()
+          }
+        }
+      }
+
 
       # Load data based on processing step
       if(prj_init$steps == "Remove outlier") {
@@ -542,24 +560,50 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
     ### Outlier Removal Execution ###
     observeEvent(input$mv_start, {
       modes <- check_ion_modes(data_import_rv, prj_init)
-      if(!modes$has_pos && !modes$has_neg) {
-        shinyalert("Error", "No valid data for processing", type = "error")
+      if (!modes$has_pos && !modes$has_neg) {
+
+        # No data initialized at all
+        shinyalert(
+          "Data Not Loaded",
+          "No positive/negative ion mode data found. Upload data first.",
+          type = "error"
+        )
         return()
       }
 
+      # Check if data initialization exists
+      if(is.null(data_import_rv$object_pos_mv) && is.null(data_import_rv$object_neg_mv)){
+        if (!is.null(prj_init$object_negative.init) || !is.null(prj_init$object_positive.init)) {
+          # Data initialized but current step is invalid
+          if (prj_init$steps != "Remove outlier") {
+            shinyalert(
+              "Step Error",
+              "Invalid workflow sequence detected.\nPlease restart from the 'REMOVE OUTLIER' step.",
+              type = "error"
+            )
+            return()
+          }
+        }
+      }
+
+
       # Process positive mode data
       if(modes$has_pos) {
+        para = analy_para()
         temp_pos_res = process_outliers(
           object = p2_dataclean$object_pos,
           mv_method = para$mv_method,
           by_witch = para$by_witch,
-          outlier_samples = para$outlier_samples,
+          outlier_samples = para$outlier_in_pos,
           outlier_table = p2_dataclean$outlier_tbl.pos
         )
-        p2_dataclean$object_pos_mv = temp_pos_res$object
+        p2_dataclean$object_pos_mv = temp_pos_res[[1]]
+        object_pos_outlier = p2_dataclean$object_pos_mv
+        save(object_pos_outlier,file = file.path(prj_init$mass_dataset_dir, "03.object_pos_outlier.rda"))
+
         # Build alert message
         method_type <- ifelse(para$mv_method == "By tidymass",
-                              "Auto detection (Criteria: ${para$by_witch})",
+                              paste0("Auto detection (Criteria: ",paste0(para$by_witch,collapse = " | "),")"),
                               "Manual selection")
 
         alert_msg <- paste(
@@ -568,10 +612,10 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
           "\n\nDetected outliers: "
         )
 
-        if(length(temp_neg_res$outlier_ids) > 0) {
+        if(length(temp_pos_res$outlier_ids) > 0) {
           alert_msg <- paste0(
             alert_msg,
-            paste(temp_neg_res$outlier_ids, collapse = ", ")
+            paste(temp_pos_res$outlier_ids, collapse = ", ")
           )
           alert_type <- "warning"
         } else {
@@ -602,13 +646,14 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         )
 
         # Update negative mode data
-        p2_dataclean$object_neg_mv <- temp_neg_res$object
+        p2_dataclean$object_neg_mv <- temp_neg_res[[1]]
+        object_neg_outlier <- p2_dataclean$object_neg_mv
+        save(object_neg_outlier,file = file.path(prj_init$mass_dataset_dir, "03.object_neg_outlier.rda"))
 
         # Build alert message
         method_type <- ifelse(para$mv_method == "By tidymass",
-                              "Auto detection (Criteria: ${para$by_witch})",
+                              paste0("Auto detection (Criteria: ",para$by_witch,")"),
                               "Manual selection")
-
         alert_msg <- paste(
           "Negative Mode Outlier Processing",
           "\n\nMethod: ", method_type,
@@ -636,9 +681,11 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
           className = "outlier-alert"
         )
       }
-
-
       # Update results display
+
+      print(class(p2_dataclean$object_pos_mv))
+
+
 
       output$obj_outlier.pos = check_massdata_info(
         object = p2_dataclean$object_pos_mv,

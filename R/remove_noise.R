@@ -253,10 +253,30 @@ remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_expo
       # Detect available modes
       has_pos <- !is.null(data_import_rv$object_pos_raw) || !is.null(prj_init$object_positive.init)
       has_neg <- !is.null(data_import_rv$object_neg_raw) || !is.null(prj_init$object_negative.init)
+      if (!has_pos && !has_neg) {
 
-      if(!has_pos && !has_neg) {
-        shinyalert("Error", "No valid data detected", type = "error")
+        # No data initialized at all
+        shinyalert(
+          "Data Not Loaded",
+          "No positive/negative ion mode data found. Upload data first.",
+          type = "error"
+        )
         return()
+      }
+
+      # Check if data initialization exists
+      if (is.null(data_import_rv$object_pos_raw) && is.null(data_import_rv$object_neg_raw)) {
+        if (!is.null(prj_init$object_negative.init) || !is.null(prj_init$object_positive.init)) {
+          # Data initialized but current step is invalid
+          if (prj_init$steps != "Remove noisey feature") {
+            shinyalert(
+              "Step Error",
+              "Invalid workflow sequence detected.\nPlease restart from the 'REMOVE NOISEY FEATURE' step.",
+              type = "error"
+            )
+            return()
+          }
+        }
       }
 
       if(has_pos) {
