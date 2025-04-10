@@ -441,7 +441,7 @@ summarize_massdataset <- function(
               sprintf("├─ Sample Info: %s samples × %s metadata",
                       format(nrow(object@sample_info), big.mark = ","),
                       ncol(object@sample_info)),
-              sprintf("├─ Variable Info: %s features × %s annotations",
+              sprintf("├─ Variable Info: %s features × %s annotation",
                       format(nrow(object@variable_info), big.mark = ","),
                       ncol(object@variable_info)),
               sprintf("└─ MS2 Spectra: %s",

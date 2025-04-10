@@ -20,7 +20,7 @@ mv_impute_ui <- function(id) {
     layout_sidebar(
       sidebar = accordion(
         accordion_panel(
-          title = "Parameters",
+          title = "Methods",
           icon = bsicons::bs_icon("gear"),
           selectInput(
             inputId = ns('impute_mv_method'),
@@ -28,9 +28,10 @@ mv_impute_ui <- function(id) {
             choices = c("knn", "rf", "mean", "median", "zero", "minimum", "bpca", "svdImpute",
                         "ppca"),
             selected = 'knn'
-          ),
-          tags$h4("for knn",style = 'color: #008080'),
-          hr_bar(),
+          )),
+        accordion_panel(
+          title = "For KNN",
+          icon = bsicons::bs_icon("gear"),
           textInput(
             inputId = ns('impute_mv_k'),
             label = "k",
@@ -59,9 +60,11 @@ mv_impute_ui <- function(id) {
             inputId = ns('impute_mv_rng.seed'),
             label = "rng.seed",
             value = 362436069
+          )
           ),
-          tags$h4("for missForest (rf)",style = 'color: #008080'),
-          hr_bar(),
+        accordion_panel(
+          title = "For missForest (rf)",
+          icon = bsicons::bs_icon("gear"),
           textInput(
             inputId = ns('impute_mv_maxiter'),
             label = "maxiter",
@@ -76,9 +79,11 @@ mv_impute_ui <- function(id) {
             inputId = ns('impute_mv_decreasing'),
             label = "decreasing",choices = c("TRUE","FALSE"),
             selected = "FALSE"
+          )
           ),
-          tags$h4("for ppca",style = 'color: #008080'),
-          hr_bar(),
+        accordion_panel(
+          title = "For bpca",
+          icon = bsicons::bs_icon("gear"),
           textInput(
             inputId = ns('impute_mv_npcs'),
             label = "nPcs",
@@ -93,12 +98,13 @@ mv_impute_ui <- function(id) {
             inputId = ns('impute_mv_threshold'),
             label = "threshold",
             value = 0.0001
+          )
           ),
           actionButton(
             inputId = ns("impute_start"),
-            label = "Start",icon = icon("play")
+            label = "Start",icon = icon("play"),width = "100%"
           )
-        )),
+        ),
       page_fluid(
         nav_panel(title = "Missing value imputation",
                   navset_card_tab(
@@ -150,120 +156,195 @@ mv_impute_ui <- function(id) {
 #' @param data_clean_rv reactivevalues p2 dataclean
 #' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
-
-
-mv_impute_server <- function(id,volumes,prj_init,data_clean_rv,data_export_rv) {
+mv_impute_server <- function(id, volumes, prj_init, data_clean_rv, data_export_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     p2_impute_mv <- reactiveValues(data = NULL)
 
-    analy_para = reactive({
+    # Ion mode check function ----
+    check_ion_modes <- function(data_rv, prj) {
       list(
-        method = input$impute_mv_method %>% as.character(),
-        k = input$impute_mv_k %>% as.numeric(),
-        rowmax = input$impute_mv_rowmax %>% as.numeric(),
-        colmax = input$impute_mv_colmax %>% as.numeric(),
-        maxp = input$impute_mv_maxp %>% as.numeric(),
-        rng.seed = input$impute_mv_rng.seed %>% as.numeric(),
-        maxiter = input$impute_mv_maxiter %>% as.numeric(),
-        ntree = input$impute_mv_ntree %>% as.numeric(),
-        decreasing = input$impute_mv_decreasing %>% as.character(),
-        npcs = input$impute_mv_npcs %>% as.numeric(),
-        maxsteps = input$impute_mv_maxsteps %>% as.numeric(),
-        threshold = input$impute_mv_threshold %>% as.numeric()
+        has_pos = !is.null(data_rv$object_pos_outlier) || !is.null(prj$object_positive.init),
+        has_neg = !is.null(data_rv$object_neg_outlier) || !is.null(prj$object_negative.init)
+      )
+    }
+    # parameters ----
+    analy_para <- reactive({
+      list(
+        method = input$impute_mv_method,
+        k = as.numeric(input$impute_mv_k),
+        rowmax = as.numeric(input$impute_mv_rowmax),
+        colmax = as.numeric(input$impute_mv_colmax),
+        maxp = as.numeric(input$impute_mv_maxp),
+        rng.seed = as.numeric(input$impute_mv_rng.seed),
+        maxiter = as.numeric(input$impute_mv_maxiter),
+        ntree = as.numeric(input$impute_mv_ntree),
+        decreasing = as.logical(input$impute_mv_decreasing),
+        npcs = as.numeric(input$impute_mv_npcs),
+        maxsteps = as.numeric(input$impute_mv_maxsteps),
+        threshold = as.numeric(input$impute_mv_threshold)
       )
     })
-    observeEvent(
-      input$impute_start,
-      {
-        if(is.null(prj_init$sample_info)) {return()}
-        if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "impute missing value"){
-          p2_impute_mv$object_neg.outlier = prj_init$object_negative.init
-          p2_impute_mv$object_pos.outlier = prj_init$object_positive.init
-        } else {
-          if(is.null(data_clean_rv$object_pos.outlier)) {return()}
-          if(is.null(data_clean_rv$object_neg.outlier)) {return()}
-          p2_impute_mv$object_neg.outlier = data_clean_rv$object_neg.outlier
-          p2_impute_mv$object_pos.outlier = data_clean_rv$object_pos.outlier
-        }
 
-        para = analy_para()
 
-        if(para$decreasing == "TRUE") {
-          p2_impute_mv$object_pos.impute <-
-            p2_impute_mv$object_pos.outlier %>%
-            impute_mv(method = para$method,
-                      rowmax = para$rowmax,k = para$k,colmax = para$colmax,maxp = para$maxp,rng.seed = para$rng.seed,
-                      maxiter = para$maxiter,ntree = para$ntree,decreasing = TRUE,
-                      nPcs = para$npcs,maxSteps = para$maxsteps,threshold = para$threshold)
-          p2_impute_mv$object_neg.impute <-
-            p2_impute_mv$object_neg.outlier %>%
-            impute_mv(method = para$method,
-                      rowmax = para$rowmax,k = para$k,colmax = para$colmax,maxp = para$maxp,rng.seed = para$rng.seed,
-                      maxiter = para$maxiter,ntree = para$ntree,decreasing = TRUE,
-                      nPcs = para$npcs,maxSteps = para$maxsteps,threshold = para$threshold)
-        } else {
-          p2_impute_mv$object_pos.impute <-
-            p2_impute_mv$object_pos.outlier %>%
-            impute_mv(method = para$method,
-                      rowmax = para$rowmax,k = para$k,colmax = para$colmax,maxp = para$maxp,rng.seed = para$rng.seed,
-                      maxiter = para$maxiter,ntree = para$ntree,decreasing = FALSE,
-                      nPcs = para$npcs,maxSteps = para$maxsteps,threshold = para$threshold)
-          p2_impute_mv$object_neg.impute <-
-            p2_impute_mv$object_neg.outlier %>%
-            impute_mv(method = para$method,
-                      rowmax = para$rowmax,k = para$k,colmax = para$colmax,maxp = para$maxp,rng.seed = para$rng.seed,
-                      maxiter = para$maxiter,ntree = para$ntree,decreasing = FALSE,
-                      nPcs = para$npcs,maxSteps = para$maxsteps,threshold = para$threshold)
-        }
-        #> acc tbl
-        temp_acc_mat.pos <- p2_impute_mv$object_pos.impute %>%
-          extract_expression_data() %>%
-          rownames_to_column("variable_id")
-        output$impute_tbl_pos = renderDataTable_formated(
-          actions = input$impute_start,
-          condition1 = p2_impute_mv$object_pos.impute,
-          filename.a = "3.6.4.ImputAccumulationMatrix.pos",
-          tbl = temp_acc_mat.pos
+
+    # imputation functions ----
+    perform_imputation <- function(object, para) {
+      tryCatch({
+        impute_mv(
+          object,
+          method = para$method,
+          rowmax = para$rowmax,
+          k = para$k,
+          colmax = para$colmax,
+          maxp = para$maxp,
+          rng.seed = para$rng.seed,
+          maxiter = para$maxiter,
+          ntree = para$ntree,
+          decreasing = para$decreasing,
+          nPcs = para$npcs,
+          maxSteps = para$maxsteps,
+          threshold = para$threshold
         )
+      }, error = function(e) {
+        shinyalert("Imputation Error",
+                   paste("Failed to perform imputation:", e$message),
+                   type = "error")
+        NULL
+      })
+    }
 
 
-        temp_acc_mat.neg <- p2_impute_mv$object_neg.impute %>%
-          extract_expression_data() %>%
-          rownames_to_column("variable_id")
-        output$impute_tbl_neg = renderDataTable_formated(
-          actions = input$impute_start,
-          condition1 = p2_impute_mv$object_neg.impute,
-          filename.a = "3.6.4.ImputAccumulationMatrix.neg",
-          tbl = temp_acc_mat.neg
+
+    # core processing ----
+    observeEvent(input$impute_start, {
+
+      # check data
+      modes <- check_ion_modes(data_clean_rv, prj_init)
+
+
+      if (!modes$has_pos && !modes$has_neg) {
+        # No data initialized at all
+        shinyalert(
+          "Data Not Loaded",
+          "No positive/negative ion mode data found. Upload data first.",
+          type = "error"
         )
-
-        data_clean_rv$object_pos.impute = p2_impute_mv$object_pos.impute
-        data_clean_rv$object_neg.impute = p2_impute_mv$object_neg.impute
-
-        save_massobj(
-          polarity = 'positive',
-          file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-          stage = 'impute',
-          obj = p2_impute_mv$object_pos.impute)
-
-        save_massobj(
-          polarity = 'negative',
-          file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
-          stage = 'impute',
-          obj = p2_impute_mv$object_neg.impute)
-
-        #> information of mass datasets
-        output$obj_impute.pos = renderPrint({
-          print(p2_impute_mv$object_pos.impute)
-        })
-        output$obj_impute.neg = renderPrint({
-          print(p2_impute_mv$object_neg.impute)
-        })
+        return()
       }
-    )
+      # Check if data initialization exists
+      if(is.null(data_clean_rv$object_pos_outlier) && is.null(data_clean_rv$object_neg_outlier)){
+        if (!is.null(prj_init$object_negative.init) || !is.null(prj_init$object_positive.init)) {
+          # Data initialized but current step is invalid
+          if (prj_init$steps != "impute missing value") {
+            shinyalert(
+              "Step Error",
+              "Invalid workflow sequence detected.\nPlease restart from the 'IMPUTE MISSING VALUE' step.",
+              type = "error"
+            )
+            return()
+          }
+        }
+      }
 
 
+      # Load data based on processing step
+      if(prj_init$steps == "impute missing value") {
+        if(modes$has_pos) p2_impute_mv$object_pos <- prj_init$object_positive.init
+        if(modes$has_neg) p2_impute_mv$object_neg <- prj_init$object_negative.init
+      } else {
+        p2_impute_mv$object_pos <- data_clean_rv$object_pos_outlier
+        p2_impute_mv$object_neg <- data_clean_rv$object_neg_outlier
+      }
+
+
+      # processing core data
+      withProgress(message = 'Imputing missing values...', value = 0.5, {
+        if(modes$has_pos) {
+          para = analy_para()
+          p2_impute_mv$object_pos_impute <- perform_imputation(object = p2_impute_mv$object_pos, para = para)
+          incProgress(0.2, detail = "Positive mode completed")
+        }
+
+        if(modes$has_neg) {
+          para = analy_para()
+          p2_impute_mv$object_neg_impute <- perform_imputation(object = p2_impute_mv$object_neg, para = para)
+          incProgress(0.2, detail = "Negative mode completed")
+        }
+      })
+
+
+      # check result
+      if((modes$has_pos && is.null(p2_impute_mv$object_pos_impute)) ||
+         (modes$has_neg && is.null(p2_impute_mv$object_neg_impute))) {
+        shinyalert("Processing Error",
+                   "Failed to generate imputation results. Please check parameters.",
+                   type = "error")
+        return()
+      }
+
+
+      # update massdataset
+      data_clean_rv$object_pos_impute <- p2_impute_mv$object_pos_impute
+      data_clean_rv$object_neg_impute <- p2_impute_mv$object_neg_impute
+
+      # save massdataset
+      tryCatch({
+        if(modes$has_pos) {
+          object_pos_impute <- p2_impute_mv$object_pos_impute
+          output$impute_tbl_pos = renderDataTable_formated(
+            action = input$impute_start,
+            condition1 = object_pos_impute,
+            tbl = object_pos_impute %>% extract_expression_data() %>% rownames_to_column("variable_id"),
+            filename.a = "04.expr_mat_imputated_pos.csv"
+          )
+          save(object_pos_impute,
+               file = file.path(prj_init$mass_dataset_dir, "04.object_pos_impute.rda"))
+        }
+        if(modes$has_neg) {
+          object_neg_impute <- p2_impute_mv$object_neg_impute
+          output$impute_tbl_neg = renderDataTable_formated(
+            action = input$impute_start,
+            condition1 = object_neg_impute,
+            tbl = object_neg_impute %>% extract_expression_data() %>% rownames_to_column("variable_id"),
+            filename.a = "04.expr_mat_imputated_neg.csv"
+          )
+          save(object_neg_impute,
+               file = file.path(prj_init$mass_dataset_dir, "04.object_neg_impute.rda"))
+        }
+      }, error = function(e) {
+        shinyalert("Save Error",
+                   paste("Failed to save results:", e$message),
+                   type = "error")
+      })
+
+
+
+
+      # show process
+      output$obj_impute.pos  = check_massdata_info(
+        object = p2_impute_mv$object_pos_impute,
+        mode = "positive"
+      )
+
+      output$obj_impute.neg  = check_massdata_info(
+        object = p2_impute_mv$object_neg_impute,
+        mode = "negative"
+      )
+
+
+
+      # success alert
+      shinyalert(
+        title = "Imputation Completed",
+        text = paste(
+          "Successfully processed:",
+          ifelse(modes$has_pos, "\n- Positive mode", ""),
+          ifelse(modes$has_neg, "\n- Negative mode", "")
+        ),
+        type = "success"
+      )
+    })
   })
 }
 

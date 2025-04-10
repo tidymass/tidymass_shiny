@@ -401,7 +401,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         })
 
         output$plot_smv_plt.pos <- renderPlot({
-          obj <- data_clean_rv$object_pos.outlier %||% p2_dataclean$object_pos
+          obj <- data_clean_rv$object_pos_outlier %||% p2_dataclean$object_pos
           massqc::show_sample_missing_values(
             obj,
             color_by = plot1_para()$fig1_color_by,
@@ -414,7 +414,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         })
 
         output$plotly_smv_plt.pos <- renderPlotly({
-          obj <- data_clean_rv$object_pos.outlier %||% p2_dataclean$object_pos
+          obj <- data_clean_rv$object_pos_outlier %||% p2_dataclean$object_pos
           massqc::show_sample_missing_values(
             obj,
             color_by = plot1_para()$fig1_color_by,
@@ -438,7 +438,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         })
 
         output$plot_smv_plt.neg <- renderPlot({
-          obj <- data_clean_rv$object_neg.outlier %||% p2_dataclean$object_neg
+          obj <- data_clean_rv$object_neg_outlier %||% p2_dataclean$object_neg
           massqc::show_sample_missing_values(
             obj,
             color_by = plot1_para()$fig1_color_by,
@@ -451,7 +451,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         })
 
         output$plotly_smv_plt.neg <- renderPlotly({
-          obj <- data_clean_rv$object_neg.outlier %||% p2_dataclean$object_neg
+          obj <- data_clean_rv$object_neg_outlier %||% p2_dataclean$object_neg
           massqc::show_sample_missing_values(
             obj,
             color_by = plot1_para()$fig1_color_by,
@@ -476,7 +476,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         })
 
         output$plot_pca.pos <- renderPlot({
-          obj <- data_clean_rv$object_pos.outlier %||% p2_dataclean$object_pos
+          obj <- data_clean_rv$object_pos_outlier %||% p2_dataclean$object_pos
           processed_data <- process_for_pca(obj, plot2_para()$fig2_scale)
           massqc::massqc_pca(
             processed_data,
@@ -488,7 +488,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         })
 
         output$plotly_pca.pos <- renderPlotly({
-          obj <- data_clean_rv$object_pos.outlier %||% p2_dataclean$object_pos
+          obj <- data_clean_rv$object_pos_outlier %||% p2_dataclean$object_pos
           processed_data <- process_for_pca(obj, plot2_para()$fig2_scale_3d)
           massqc_pca_3d(
             processed_data,
@@ -511,7 +511,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         })
 
         output$plot_pca.neg <- renderPlot({
-          obj <- data_clean_rv$object_neg.outlier %||% p2_dataclean$object_neg
+          obj <- data_clean_rv$object_neg_outlier %||% p2_dataclean$object_neg
           processed_data <- process_for_pca(obj, plot2_para()$fig2_scale)
           massqc::massqc_pca(
             processed_data,
@@ -523,7 +523,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
         })
 
         output$plotly_pca.neg <- renderPlotly({
-          obj <- data_clean_rv$object_neg.outlier %||% p2_dataclean$object_neg
+          obj <- data_clean_rv$object_neg_outlier %||% p2_dataclean$object_neg
           processed_data <- process_for_pca(obj, plot2_para()$fig2_scale_3d)
           massqc_pca_3d(
             processed_data,
@@ -652,7 +652,7 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
 
         # Build alert message
         method_type <- ifelse(para$mv_method == "By tidymass",
-                              paste0("Auto detection (Criteria: ",para$by_witch,")"),
+                              paste0("Auto detection (Criteria: ",paste0(para$by_witch,collapse = " | "),")"),
                               "Manual selection")
         alert_msg <- paste(
           "Negative Mode Outlier Processing",
@@ -698,11 +698,11 @@ remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_cl
       )
 
       if(modes$has_pos) {
-        data_clean_rv$object_pos.outlier <- p2_dataclean$object_pos_mv
+        data_clean_rv$object_pos_outlier <- p2_dataclean$object_pos_mv
       }
 
       if(modes$has_neg) {
-        data_clean_rv$object_neg.outlier <- p2_dataclean$object_neg_mv
+        data_clean_rv$object_neg_outlier <- p2_dataclean$object_neg_mv
       }
     })
   })
