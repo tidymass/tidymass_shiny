@@ -19,15 +19,20 @@ data_normalize_ui <- function(id) {
     icon = bs_icon("justify"),
     layout_sidebar(
       sidebar = accordion(
+        open = c("Normalization method","Action buttoms"),
         accordion_panel(
-          title = "Normalization parameters",
+          title = "Normalization method",
           icon = bsicons::bs_icon("gear"),
           selectInput(
             inputId = ns('method'),
             label = "method ",multiple = F,
             choices = c("svr", "total", "median", "mean", "pqn", "loess","ppca"),
             selected = 'svr'
+          )
           ),
+        accordion_panel(
+          title = "Normalization parameters",
+          icon = bsicons::bs_icon("gear"),
           radioButtons(
             inputId = ns('keep_scale'),
             label = "keep_scale",choices = c("TRUE","FALSE"),selected = "TRUE"
@@ -65,15 +70,21 @@ data_normalize_ui <- function(id) {
             label = "threads",
             value = 1
           ),
+        ),
+        accordion_panel(
+          title = "Action buttoms",
+          icon = bsicons::bs_icon("hand-index"),
           actionButton(
             inputId = ns("norm_start"),
-            label = "Start",icon = icon("play")
+            label = "Start analysis",icon = icon("play")
           ),
+          br(),
           actionButton(
             inputId = ns("norm_vis"),
             label = "Show plot",icon = icon("image")
           )
-        )),
+        )
+        ),
       page_fluid(
         nav_panel(title = "normalization",
                   navset_card_tab(
@@ -380,6 +391,14 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
     ns <- session$ns
     p2_norm <- reactiveValues(data = NULL)
 
+    # Utility functions ----
+    check_ion_modes <- function(data_rv, prj) {
+      list(
+        has_pos = !is.null(data_rv$object_pos_impute) || !is.null(prj$object_positive.init),
+        has_neg = !is.null(data_rv$object_neg_impute) || !is.null(prj$object_negative.init)
+      )
+    }
+
 
     analy_para = reactive({
       list(
@@ -463,126 +482,203 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
       )
     })
 
+    # Core processing function ----
+    perform_normalization <- function(object, para) {
+      tryCatch({
+        res <- object %>%
+          normalize_data(
+            method = para$method,
+            keep_scale = para$keep_scale,
+            optimization = para$optimization,
+            pqn_reference = para$pqn_reference,
+            begin = para$begin,
+            end = para$end,
+            step = para$step,
+            multiple = para$multiple,
+            threads = para$threads
+          )
+
+        if (res %>% extract_sample_info() %>% pull(batch) %>% unique() %>% length() > 1) {
+          res <- integrate_data(res, method = "qc_mean")
+        }
+
+        res
+      }, error = function(e) {
+        shinyalert("Normalization Error", paste("Error details:", e$message), type = "error")
+        NULL
+      })
+    }
+
+    ### Dynamic UI Updates ###
     observe({
-      sample_info_colnames <- NULL
-      variable_info_colnames <- NULL
+      tryCatch({
+        sources <- list(
+          prj_init$object_negative.init,
+          prj_init$object_positive.init,
+          data_clean_rv$object_pos_impute,
+          data_clean_rv$object_neg_impute
+        )
 
-      if (!is.null(prj_init$object_negative.init)) {
-        sample_info_colnames <- colnames(prj_init$object_negative.init@sample_info)
-      } else if (!is.null(prj_init$object_positive.init)) {
-        sample_info_colnames <- colnames(prj_init$object_positive.init@sample_info)
-      } else if (!is.null(data_clean_rv$object_neg.impute)) {
-        sample_info_colnames <- colnames(data_clean_rv$object_neg.impute@sample_info)
-      } else if (!is.null(data_clean_rv$object_pos.impute)) {
-        sample_info_colnames <- colnames(data_clean_rv$object_pos.impute@sample_info)
-      }
-
-      # update
-      if (!is.null(sample_info_colnames)) {
-        updateSelectInput(session, "fig2_color_by", choices = sample_info_colnames, selected = "group")
-        updateSelectInput(session, "fig2_color_by_3d", choices = sample_info_colnames, selected = "group")
-
-        updateSelectInput(session, "fig1_color_by", choices = sample_info_colnames, selected = "group")
-        updateSelectInput(session, "fig1_color_by_3d", choices = sample_info_colnames, selected = "group")
-      }
-
+        valid_source <- Find(Negate(is.null), sources)
+        if(!is.null(valid_source)) {
+          col_names <- colnames(valid_source@sample_info)
+          sample_ids <- valid_source@sample_info$sample_id
+          updateSelectInput(session, "fig2_color_by", choices = col_names, selected = "group")
+          updateSelectInput(session, "fig2_color_by_3d", choices = col_names, selected = "group")
+          updateSelectInput(session, "fig1_color_by", choices = col_names, selected = "group")
+          updateSelectInput(session, "fig1_color_by_3d", choices = col_names, selected = "group")
+        }
+      }, error = function(e) {
+        message("UI update error: ", e$message)
+      })
     })
 
     observeEvent(
       input$norm_start,
       {
-        if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "Normalization"){
-          p2_norm$object_neg.impute= prj_init$object_negative.init
-          p2_norm$object_pos.impute = prj_init$object_positive.init
-        } else {
-          if(is.null(data_clean_rv$object_pos.impute)) {return()}
-          if(is.null(data_clean_rv$object_neg.impute)) {return()}
-          p2_norm$object_neg.impute = data_clean_rv$object_neg.impute
-          p2_norm$object_pos.impute = data_clean_rv$object_pos.impute
+
+        # check data
+        modes <- check_ion_modes(data_clean_rv, prj_init)
+
+
+        if (!modes$has_pos && !modes$has_neg) {
+          # No data initialized at all
+          shinyalert(
+            "Data Not Loaded",
+            "No positive/negative ion mode data found. Upload data first.",
+            type = "error"
+          )
+          return()
         }
-        para = analy_para()
-        print(para)
-        pro_step_tbl = c(
-          'Positive',
-          'Negative',
-          'All finish'
-        )
-        #functions
-        withProgress(message = 'Data normalization', value = 0,
-                     expr = {
-                       for (i in 1:3) {
-                         incProgress(1/3,detail = pro_step_tbl[i])
-                         if(i == 1) {
-                           p2_norm$object_pos.norm <-
-                             p2_norm$object_pos.impute %>%
-                             normalize_data(
-                               method = para$method,
-                               keep_scale = para$keep_scale,
-                               optimization = para$optimization,
-                               pqn_reference = para$pqn_reference,
-                               begin = para$begin,
-                               end = para$end,
-                               step = para$step,
-                               multiple = para$multiple,
-                               threads = para$threads
-                             )
-                           if((p2_norm$object_pos.norm %>% extract_sample_info() %>% pull(batch) %>% unique() %>% length()) >1)
-                           { p2_norm$object_pos.norm = integrate_data(object = p2_norm$object_pos.norm,method = "qc_mean")}
-                         } else if(i == 2){
-                           p2_norm$object_neg.norm <-
-                             p2_norm$object_neg.impute %>%
-                             normalize_data(
-                               method = para$method,
-                               keep_scale = para$keep_scale,
-                               optimization = para$optimization,
-                               pqn_reference = para$pqn_reference,
-                               begin = para$begin,
-                               end = para$end,
-                               step = para$step,
-                               multiple = para$multiple,
-                               threads = para$threads
-                             )
-                           if((p2_norm$object_neg.norm %>% extract_sample_info() %>% pull(batch) %>% unique() %>% length()) >1)
-                           { p2_norm$object_neg.norm = integrate_data(object = p2_norm$object_neg.norm,method = "qc_mean")}
-                         } else {Sys.sleep(time = 1.5)}
-                       }})
+        # Check if data initialization exists
+        if(is.null(data_clean_rv$object_pos_impute) && is.null(data_clean_rv$object_neg_impute)){
+          if (!is.null(prj_init$object_negative.init) || !is.null(prj_init$object_positive.init)) {
+            # Data initialized but current step is invalid
+            if (prj_init$steps != "Normalization") {
+              shinyalert(
+                "Step Error",
+                "Invalid workflow sequence detected.\nPlease restart from the 'NORMALIZATION' step.",
+                type = "error"
+              )
+              return()
+            }
+          }
+        }
+
+
+        # Load data based on processing step
+        if(prj_init$steps == "Normalization") {
+          if(modes$has_pos) p2_norm$object_pos <- prj_init$object_positive.init
+          if(modes$has_neg) p2_norm$object_neg <- prj_init$object_negative.init
+        } else {
+          p2_norm$object_pos <- data_clean_rv$object_pos_impute
+          p2_norm$object_neg <- data_clean_rv$object_neg_impute
+        }
+        para <- analy_para()
+        # QC sample validation check -------------------------------------------------
+        qc_check_required <- c("svr", "pqn", "loess")
+        # Check positive mode data
+        if (!is.null(p2_norm$object_pos) && para$method %in% qc_check_required) {
+          qc_samples_pos <- p2_norm$object_pos %>%
+            extract_sample_info() %>%
+            dplyr::filter(class == "QC") %>%
+            nrow()
+
+          if (qc_samples_pos == 0) {
+            shinyalert(
+              "QC Samples Required",
+              paste("Method", input$method, "requires QC samples but none found in positive mode data"),
+              type = "error"
+            )
+            return()
+          }
+        }
+        # Check negative mode data
+        if (!is.null(p2_norm$object_neg) && para$method %in% qc_check_required) {
+          qc_samples_neg <- p2_norm$object_neg %>%
+            extract_sample_info() %>%
+            dplyr::filter(class == "QC") %>%
+            nrow()
+
+          if (qc_samples_neg == 0) {
+            shinyalert(
+              "QC Samples Required",
+              paste("Method", input$method, "requires QC samples but none found in negative mode data"),
+              type = "error"
+            )
+            return()
+          }
+        }
+
+        # Core processing
+        withProgress(message = "Processing normalization...", value = 0, {
+          para <- analy_para()
+
+          if (modes$has_pos) {
+            incProgress(0.3, detail = "Processing positive mode")
+            p2_norm$object_pos_norm <- perform_normalization(p2_norm$object_pos, para)
+          }
+
+          if (modes$has_neg) {
+            incProgress(0.3, detail = "Processing negative mode")
+            p2_norm$object_neg_norm <- perform_normalization(p2_norm$object_neg, para)
+          }
+        })
+
+
+        # Data persistence
+        tryCatch({
+          data_clean_rv$object_pos_norm <- p2_norm$object_pos_norm
+          data_clean_rv$object_neg_norm <- p2_norm$object_neg_norm
+          object_pos_norm <- p2_norm$object_pos_norm
+          save(
+            object_pos_norm,
+            file = file.path(prj_init$mass_dataset_dir, "05.object_pos_norm.rda")
+          )
+          object_neg_norm <- p2_norm$object_neg_norm
+          save(
+            p2_norm$object_neg_norm,
+            file = file.path(prj_init$mass_dataset_dir, "05.object_neg_norm.rda")
+          )
+        }, error = function(e) {
+          shinyalert("Save Error", paste("Failed to save results:", e$message), type = "error")
+        })
+
 
         output$norm_expdata_pos = renderDataTable_formated(
           actions = input$norm_start,
-          condition1 = p2_norm$object_pos.norm,
+          condition1 = p2_norm$object_pos_norm,
           filename.a = "3.6.5.Normalization_Acc_Mat_pos",
-          tbl = p2_norm$object_pos.norm %>% extract_expression_data() %>% rownames_to_column("variable_id")
+          tbl = p2_norm$object_pos_norm %>% extract_expression_data() %>% rownames_to_column("variable_id")
         )
         output$norm_expdata_neg = renderDataTable_formated(
-          actions = input$norm_start,condition1 = p2_norm$object_neg.norm,
+          actions = input$norm_start,
+          condition1 = p2_norm$object_neg_norm,
           filename.a = "3.6.5.Normalization_Acc_Mat_neg",
-          tbl = p2_norm$object_neg.norm %>% extract_expression_data() %>% rownames_to_column("variable_id")
+          tbl = p2_norm$object_neg_norm %>% extract_expression_data() %>% rownames_to_column("variable_id")
         )
 
-        data_clean_rv$object_pos.norm = p2_norm$object_pos.norm
-        data_clean_rv$object_neg.norm = p2_norm$object_neg.norm
+        # show process
+        output$obj_impute.pos  = check_massdata_info(
+          object = p2_norm$object_pos_norm,
+          mode = "positive"
+        )
 
-        #> save mass object
-        save_massobj(
-          polarity = 'positive',
-          file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-          stage = 'norm',
-          obj = p2_norm$object_pos.norm)
+        output$obj_impute.neg  = check_massdata_info(
+          object = p2_norm$object_neg_norm,
+          mode = "negative"
+        )
 
-        save_massobj(
-          polarity = 'negative',
-          file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
-          stage = 'norm',
-          obj = p2_norm$object_neg.norm)
-
-
-        #> information of mass datasets
-        output$obj_norm.pos = renderPrint({
-          print(p2_norm$object_pos.norm)
-        })
-        output$obj_norm.neg = renderPrint({
-          print(p2_norm$object_neg.norm)
-        })
+        shinyalert(
+          title = "Normalization Completed",
+          text = paste(
+            "Successfully processed:",
+            ifelse(modes$has_pos, "\n- Positive mode", ""),
+            ifelse(modes$has_neg, "\n- Negative mode", ""),
+            "Click Show plot buttom in sidebar to perform data visualiz progress"
+          ),
+          type = "success"
+        )
 
       }
     )
@@ -603,29 +699,35 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_pca.pos <- renderPlot({
           para = plot1_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos.impute)){return()}
-          if(isTRUE(para$fig1_scale)) {
-            temp_obj.pos <- p2_norm$object_pos.impute %>% +1 %>% log(2) %>% scale()
+          if(is.null(p2_norm$object_pos)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
           } else {
-            temp_obj.pos <- p2_norm$object_pos.impute %>% +1 %>% log(2)
+            if(isTRUE(para$fig1_scale)) {
+              temp_obj.pos <- p2_norm$object_pos %>% +1 %>% log(2) %>% scale()
+            } else {
+              temp_obj.pos <- p2_norm$object_pos %>% +1 %>% log(2)
+            }
+
+            temp_obj.pos %>%
+              massqc::massqc_pca(
+                color_by = para$fig1_color_by,
+                point_alpha = para$fig1_point_alpha,
+                frame = para$fig1_frame,
+                line = para$fig1_line
+              )
           }
 
-          temp_obj.pos %>%
-            massqc::massqc_pca(
-              color_by = para$fig1_color_by,
-              point_alpha = para$fig1_point_alpha,
-              frame = para$fig1_frame,
-              line = para$fig1_line
-            )
         })
         output$plotly_pca.pos <- renderPlotly({
           para = plot1_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos.impute)){return()}
-          if(isTRUE(para$fig1_scale_3d)) {
-            temp_obj.pos <- p2_norm$object_pos.impute %>% +1 %>% log(2) %>% scale()
+          if(is.null(p2_norm$object_pos)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
           } else {
-            temp_obj.pos <- p2_norm$object_pos.impute %>% +1 %>% log(2)
+          if(isTRUE(para$fig1_scale_3d)) {
+            temp_obj.pos <- p2_norm$object_pos %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.pos <- p2_norm$object_pos %>% +1 %>% log(2)
           }
           temp_obj.pos %>%
             massqc_pca_3d(
@@ -634,6 +736,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               y_axis = para$fig1_y_axis,
               z_axis = para$fig1_z_axis
             )
+          }
         })
         # negative
         output$pca_before_neg <- renderUI({
@@ -647,12 +750,14 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_pca.neg <- renderPlot({
           para = plot1_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_neg.impute)){return()}
+          if(is.null(p2_norm$object_pos)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
 
           if(isTRUE(para$fig1_scale)) {
-            temp_obj.neg <- p2_norm$object_neg.impute %>% +1 %>% log(2) %>% scale()
+            temp_obj.neg <- p2_norm$object_neg %>% +1 %>% log(2) %>% scale()
           } else {
-            temp_obj.neg <- p2_norm$object_neg.impute %>% +1 %>% log(2)
+            temp_obj.neg <- p2_norm$object_neg %>% +1 %>% log(2)
           }
 
           temp_obj.neg %>%
@@ -662,16 +767,19 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               frame = para$fig1_frame,
               line = para$fig1_line
             )
+          }
         })
         output$plotly_pca.neg <- renderPlotly({
           para = plot1_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_neg.impute)){return()}
+          if(is.null(p2_norm$object_pos)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
 
           if(isTRUE(para$fig1_scale_3d)) {
-            temp_obj.neg <- p2_norm$object_neg.impute %>% +1 %>% log(2) %>% scale()
+            temp_obj.neg <- p2_norm$object_neg %>% +1 %>% log(2) %>% scale()
           } else {
-            temp_obj.neg <- p2_norm$object_neg.impute %>% +1 %>% log(2)
+            temp_obj.neg <- p2_norm$object_neg %>% +1 %>% log(2)
           }
 
           temp_obj.neg %>%
@@ -681,6 +789,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               y_axis = para$fig1_y_axis,
               z_axis = para$fig1_z_axis
             )
+          }
         })
 
         ##>fig2 pca after ======
@@ -696,11 +805,13 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_pca2.pos <- renderPlot({
           para = plot2_para()
           if(is.null(input$norm_start)){return()}
-          if(is.null(p2_norm$object_pos.norm)){return()}
-          if(isTRUE(para$fig2_scale)) {
-            temp_obj.pos <- p2_norm$object_pos.norm %>% +1 %>% log(2) %>% scale()
+          if(is.null(p2_norm$object_pos_norm)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
           } else {
-            temp_obj.pos <- p2_norm$object_pos.norm %>% +1 %>% log(2)
+          if(isTRUE(para$fig2_scale)) {
+            temp_obj.pos <- p2_norm$object_pos_norm %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.pos <- p2_norm$object_pos_norm %>% +1 %>% log(2)
           }
 
           temp_obj.pos %>%
@@ -710,15 +821,18 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               frame = para$fig2_frame,
               line = para$fig2_line
             )
+          }
         })
         output$plotly_pca2.pos <- renderPlotly({
           para = plot2_para()
           if(is.null(input$norm_start)){return()}
-          if(is.null(p2_norm$object_pos.norm)){return()}
-          if(isTRUE(para$fig2_scale_3d)) {
-            temp_obj.pos <- p2_norm$object_pos.norm %>% +1 %>% log(2) %>% scale()
+          if(is.null(p2_norm$object_pos_norm)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
           } else {
-            temp_obj.pos <- p2_norm$object_pos.norm %>% +1 %>% log(2)
+          if(isTRUE(para$fig2_scale_3d)) {
+            temp_obj.pos <- p2_norm$object_pos_norm %>% +1 %>% log(2) %>% scale()
+          } else {
+            temp_obj.pos <- p2_norm$object_pos_norm %>% +1 %>% log(2)
           }
           temp_obj.pos %>%
             massqc_pca_3d(
@@ -727,6 +841,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               y_axis = para$fig2_y_axis,
               z_axis = para$fig2_z_axis
             )
+          }
         })
         # negative
         output$pca_after_neg <- renderUI({
@@ -740,12 +855,14 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_pca2.neg <- renderPlot({
           para = plot2_para()
           if(is.null(input$norm_start)){return()}
-          if(is.null(p2_norm$object_neg.norm)){return()}
+          if(is.null(p2_norm$object_pos_norm)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
 
           if(isTRUE(para$fig2_scale)) {
-            temp_obj.neg <- p2_norm$object_neg.norm %>% +1 %>% log(2) %>% scale()
+            temp_obj.neg <- p2_norm$object_neg_norm %>% +1 %>% log(2) %>% scale()
           } else {
-            temp_obj.neg <- p2_norm$object_neg.norm %>% +1 %>% log(2)
+            temp_obj.neg <- p2_norm$object_neg_norm %>% +1 %>% log(2)
           }
 
           temp_obj.neg %>%
@@ -755,16 +872,19 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               frame = para$fig2_frame,
               line = para$fig2_line
             )
+          }
         })
         output$plotly_pca2.neg <- renderPlotly({
           para = plot2_para()
           if(is.null(input$norm_start)){return()}
-          if(is.null(p2_norm$object_neg.norm)){return()}
+          if(is.null(p2_norm$object_pos_norm)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
 
           if(isTRUE(para$fig2_scale_3d)) {
-            temp_obj.neg <- p2_norm$object_neg.norm %>% +1 %>% log(2) %>% scale()
+            temp_obj.neg <- p2_norm$object_neg_norm %>% +1 %>% log(2) %>% scale()
           } else {
-            temp_obj.neg <- p2_norm$object_neg.norm %>% +1 %>% log(2)
+            temp_obj.neg <- p2_norm$object_neg_norm %>% +1 %>% log(2)
           }
 
           temp_obj.neg %>%
@@ -774,6 +894,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               y_axis = para$fig2_y_axis,
               z_axis = para$fig2_z_axis
             )
+          }
         })
 
         ###> fig3 rsd =======
@@ -790,8 +911,10 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_rsd_plt.pos <- renderPlot({
           para = plot3_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos.impute)){return()}
-          p2_norm$object_pos.impute %>%
+          if(is.null(p2_norm$object_pos)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+          p2_norm$object_pos %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -799,12 +922,15 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig3_color,
               title = 'All of QC sample'
             )
+          }
         })
         output$plotly_rsd_plt.pos <- renderPlotly({
           para = plot3_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos.impute)){return()}
-          p2_norm$object_pos.impute %>%
+          if(is.null(p2_norm$object_pos)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+          p2_norm$object_pos %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
@@ -812,6 +938,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig3_color,
               title = 'All of QC sample'
             ) %>% plotly::ggplotly()
+          }
         })
         # negative
         output$rsd_before_neg <- renderUI({
@@ -825,8 +952,10 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_rsd_plt.neg <- renderPlot({
           para = plot3_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_neg.impute)){return()}
-          p2_norm$object_neg.impute %>%
+          if(is.null(p2_norm$object_pos)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+          p2_norm$object_neg %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
@@ -834,12 +963,15 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig3_color,
               title = 'All of QC sample'
             )
+          }
         })
         output$plotly_rsd_plt.neg <- renderPlotly({
           para = plot3_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_neg.impute)){return()}
-          p2_norm$object_neg.impute %>%
+          if(is.null(p2_norm$object_neg)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+          p2_norm$object_neg %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
@@ -847,6 +979,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig3_color,
               title = 'All of QC sample'
             ) %>% plotly::ggplotly()
+          }
         })
 
         ###> fig4 rsd after =======
@@ -863,8 +996,10 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_rsd_plt2.pos <- renderPlot({
           para = plot4_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos.norm)){return()}
-          p2_norm$object_pos.norm %>%
+          if(is.null(p2_norm$object_pos_norm)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+          p2_norm$object_pos_norm %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -872,12 +1007,15 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig4_color,
               title = 'All of QC sample'
             )
+          }
         })
         output$plotly_rsd_plt2.pos <- renderPlotly({
           para = plot4_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos.norm)){return()}
-          p2_norm$object_pos.norm%>%
+          if(is.null(p2_norm$object_pos_norm)){
+            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+          p2_norm$object_pos_norm%>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
@@ -885,6 +1023,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig4_color,
               title = 'All of QC sample'
             ) %>% plotly::ggplotly()
+          }
         })
         # negative
         output$rsd_after.neg <- renderUI({
@@ -898,8 +1037,10 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_rsd_plt2.neg <- renderPlot({
           para = plot4_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_neg.norm)){return()}
-          p2_norm$object_neg.norm %>%
+          if(is.null(p2_norm$object_neg_norm)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+          p2_norm$object_neg_norm %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
@@ -907,12 +1048,15 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig4_color,
               title = 'All of QC sample'
             )
+          }
         })
         output$plotly_rsd_plt2.neg <- renderPlotly({
           para = plot4_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_neg.norm)){return()}
-          p2_norm$object_neg.norm %>%
+          if(is.null(p2_norm$object_neg_norm)){
+            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          } else {
+          p2_norm$object_neg_norm %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC")%>%
             massqc::massqc_cumulative_rsd_plot(
@@ -920,6 +1064,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig4_color,
               title = 'All of QC sample'
             ) %>% plotly::ggplotly()
+          }
         })
 
 
@@ -944,7 +1089,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         # draw condition
         if (!is.null(p2_dataclean$object_pos) & !is.null(p2_dataclean$object_neg)) {
           para_d$fig3_width = para_d$fig3_width * 2
-          p1 <-  p2_norm$object_pos.impute %>%
+          p1 <-  p2_norm$object_pos %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -952,7 +1097,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig3_color,
               title = 'All of QC sample'
             )
-          p2 <-  p2_norm$object_neg.impute %>%
+          p2 <-  p2_norm$object_neg %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -962,7 +1107,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
             )
           p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
         } else if (!is.null(p2_dataclean$object_pos)) {
-          p <- p2_norm$object_pos.impute %>%
+          p <- p2_norm$object_pos %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -971,7 +1116,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               title = 'All of QC sample'
             )
         } else {
-          p <-  p2_norm$object_neg.impute %>%
+          p <-  p2_norm$object_neg %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -1002,9 +1147,9 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         para_d <- download_para()
 
         # draw condition
-        if (!is.null(p2_norm$object_pos.norm) & !is.null(p2_norm$object_neg.norm)) {
+        if (!is.null(p2_norm$object_pos_norm) & !is.null(p2_norm$object_neg_norm)) {
           para_d$fig4_width = para_d$fig4_width * 2
-          p1 <-  p2_norm$object_pos.norm %>%
+          p1 <-  p2_norm$object_pos_norm %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -1012,7 +1157,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               color = para$fig4_color,
               title = 'All of QC sample'
             )
-          p2 <-  p2_norm$object_neg.norm %>%
+          p2 <-  p2_norm$object_neg_norm %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -1022,7 +1167,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
             )
           p <- (p1 + ggtitle("Positive")) + (p2 + ggtitle("Negative"))
         } else if (!is.null(p2_dataclean$object_pos)) {
-          p <- p2_norm$object_pos.norm%>%
+          p <- p2_norm$object_pos_norm%>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
@@ -1031,7 +1176,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
               title = 'All of QC sample'
             )
         } else {
-          p <-  p2_norm$object_neg.norm %>%
+          p <-  p2_norm$object_neg_norm %>%
             activate_mass_dataset("sample_info") %>%
             dplyr::filter(class == "QC") %>%
             massqc::massqc_cumulative_rsd_plot(
