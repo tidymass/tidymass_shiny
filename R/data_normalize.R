@@ -484,29 +484,27 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
 
     # Core processing function ----
     perform_normalization <- function(object, para) {
-      tryCatch({
-        res <- object %>%
-          normalize_data(
-            method = para$method,
-            keep_scale = para$keep_scale,
-            optimization = para$optimization,
-            pqn_reference = para$pqn_reference,
-            begin = para$begin,
-            end = para$end,
-            step = para$step,
-            multiple = para$multiple,
-            threads = para$threads
-          )
+      if(!"batch" %in% colnames(object@sample_info)){
+        object <- object %>% activate_mass_dataset("sample_info") %>%
+          dplyr::mutate(batch = 1)
+      }
+      res <- object %>%
+        normalize_data(
+          method = para$method,
+          keep_scale = para$keep_scale,
+          optimization = para$optimization,
+          pqn_reference = para$pqn_reference,
+          begin = para$begin,
+          end = para$end,
+          step = para$step,
+          multiple = para$multiple,
+          threads = para$threads
+        )
 
-        if (res %>% extract_sample_info() %>% pull(batch) %>% unique() %>% length() > 1) {
-          res <- integrate_data(res, method = "qc_mean")
-        }
-
-        res
-      }, error = function(e) {
-        shinyalert("Normalization Error", paste("Error details:", e$message), type = "error")
-        NULL
-      })
+      if (res %>% extract_sample_info() %>% pull(batch) %>% unique() %>% length() > 1) {
+        res <- integrate_data(res, method = "qc_mean")
+      }
+      return(res)
     }
 
     ### Dynamic UI Updates ###
@@ -571,8 +569,8 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           if(modes$has_pos) p2_norm$object_pos <- prj_init$object_positive.init
           if(modes$has_neg) p2_norm$object_neg <- prj_init$object_negative.init
         } else {
-          p2_norm$object_pos <- data_clean_rv$object_pos_impute
-          p2_norm$object_neg <- data_clean_rv$object_neg_impute
+          if(modes$has_pos) p2_norm$object_pos <- data_clean_rv$object_pos_impute
+          if(modes$has_neg) p2_norm$object_neg <- data_clean_rv$object_neg_impute
         }
         para <- analy_para()
         # QC sample validation check -------------------------------------------------
@@ -617,32 +615,26 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           if (modes$has_pos) {
             incProgress(0.3, detail = "Processing positive mode")
             p2_norm$object_pos_norm <- perform_normalization(p2_norm$object_pos, para)
+            data_clean_rv$object_pos_norm <- p2_norm$object_pos_norm
+            object_pos_norm <- p2_norm$object_pos_norm
+            save(
+              object_pos_norm,
+              file = file.path(prj_init$mass_dataset_dir, "05.object_pos_norm.rda")
+            )
           }
 
           if (modes$has_neg) {
             incProgress(0.3, detail = "Processing negative mode")
             p2_norm$object_neg_norm <- perform_normalization(p2_norm$object_neg, para)
+            data_clean_rv$object_neg_norm <- p2_norm$object_neg_norm
+            object_neg_norm <- p2_norm$object_neg_norm
+            save(
+              object_neg_norm,
+              file = file.path(prj_init$mass_dataset_dir, "05.object_neg_norm.rda")
+            )
           }
         })
 
-
-        # Data persistence
-        tryCatch({
-          data_clean_rv$object_pos_norm <- p2_norm$object_pos_norm
-          data_clean_rv$object_neg_norm <- p2_norm$object_neg_norm
-          object_pos_norm <- p2_norm$object_pos_norm
-          save(
-            object_pos_norm,
-            file = file.path(prj_init$mass_dataset_dir, "05.object_pos_norm.rda")
-          )
-          object_neg_norm <- p2_norm$object_neg_norm
-          save(
-            p2_norm$object_neg_norm,
-            file = file.path(prj_init$mass_dataset_dir, "05.object_neg_norm.rda")
-          )
-        }, error = function(e) {
-          shinyalert("Save Error", paste("Failed to save results:", e$message), type = "error")
-        })
 
 
         output$norm_expdata_pos = renderDataTable_formated(
@@ -651,6 +643,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           filename.a = "3.6.5.Normalization_Acc_Mat_pos",
           tbl = p2_norm$object_pos_norm %>% extract_expression_data() %>% rownames_to_column("variable_id")
         )
+
         output$norm_expdata_neg = renderDataTable_formated(
           actions = input$norm_start,
           condition1 = p2_norm$object_neg_norm,
@@ -659,12 +652,12 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         )
 
         # show process
-        output$obj_impute.pos  = check_massdata_info(
+        output$obj_norm.pos  = check_massdata_info(
           object = p2_norm$object_pos_norm,
           mode = "positive"
         )
 
-        output$obj_impute.neg  = check_massdata_info(
+        output$obj_norm.neg  = check_massdata_info(
           object = p2_norm$object_neg_norm,
           mode = "negative"
         )
@@ -683,6 +676,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
       }
     )
 
+
     observeEvent(
       input$norm_vis,
       {
@@ -700,7 +694,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           para = plot1_para()
           if(is.null(input$norm_vis)){return()}
           if(is.null(p2_norm$object_pos)){
-            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+            print(gg_message_plot("No data in positive ion mode was detected."))
           } else {
             if(isTRUE(para$fig1_scale)) {
               temp_obj.pos <- p2_norm$object_pos %>% +1 %>% log(2) %>% scale()
@@ -750,8 +744,8 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_pca.neg <- renderPlot({
           para = plot1_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos)){
-            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          if(is.null(p2_norm$object_neg)){
+            print(gg_message_plot("No data in negative ion mode was detected."))
           } else {
 
           if(isTRUE(para$fig1_scale)) {
@@ -772,7 +766,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plotly_pca.neg <- renderPlotly({
           para = plot1_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos)){
+          if(is.null(p2_norm$object_neg)){
             print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
           } else {
 
@@ -806,7 +800,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           para = plot2_para()
           if(is.null(input$norm_start)){return()}
           if(is.null(p2_norm$object_pos_norm)){
-            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+            print(gg_message_plot("No data in positive ion mode was detected."))
           } else {
           if(isTRUE(para$fig2_scale)) {
             temp_obj.pos <- p2_norm$object_pos_norm %>% +1 %>% log(2) %>% scale()
@@ -855,8 +849,8 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_pca2.neg <- renderPlot({
           para = plot2_para()
           if(is.null(input$norm_start)){return()}
-          if(is.null(p2_norm$object_pos_norm)){
-            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          if(is.null(p2_norm$object_neg_norm)){
+            print(gg_message_plot("No data in negative ion mode was detected."))
           } else {
 
           if(isTRUE(para$fig2_scale)) {
@@ -877,7 +871,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plotly_pca2.neg <- renderPlotly({
           para = plot2_para()
           if(is.null(input$norm_start)){return()}
-          if(is.null(p2_norm$object_pos_norm)){
+          if(is.null(p2_norm$object_neg_norm)){
             print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
           } else {
 
@@ -912,7 +906,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           para = plot3_para()
           if(is.null(input$norm_vis)){return()}
           if(is.null(p2_norm$object_pos)){
-            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+            print(gg_message_plot("No data in positive ion mode was detected."))
           } else {
           p2_norm$object_pos %>%
             activate_mass_dataset("sample_info") %>%
@@ -952,8 +946,8 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
         output$plot_rsd_plt.neg <- renderPlot({
           para = plot3_para()
           if(is.null(input$norm_vis)){return()}
-          if(is.null(p2_norm$object_pos)){
-            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+          if(is.null(p2_norm$object_neg)){
+            print(gg_message_plot("No data in negative ion mode was detected."))
           } else {
           p2_norm$object_neg %>%
             activate_mass_dataset("sample_info") %>%
@@ -997,7 +991,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           para = plot4_para()
           if(is.null(input$norm_vis)){return()}
           if(is.null(p2_norm$object_pos_norm)){
-            print(gg_message_plot("No data in positive ion mode was detected.") %>% plotly::ggplotly())
+            print(gg_message_plot("No data in positive ion mode was detected."))
           } else {
           p2_norm$object_pos_norm %>%
             activate_mass_dataset("sample_info") %>%
@@ -1038,7 +1032,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           para = plot4_para()
           if(is.null(input$norm_vis)){return()}
           if(is.null(p2_norm$object_neg_norm)){
-            print(gg_message_plot("No data in negative ion mode was detected.") %>% plotly::ggplotly())
+            print(gg_message_plot("No data in negative ion mode was detected."))
           } else {
           p2_norm$object_neg_norm %>%
             activate_mass_dataset("sample_info") %>%

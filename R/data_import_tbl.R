@@ -190,6 +190,7 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv,data_expor
               str_detect(ion,regex("\\+|pos",ignore_case = T)) ~ "pos",
               str_detect(ion,regex("\\-|neg",ignore_case = T)) ~ "neg"
             ))
+          para_tbl_check$polarity = para_tbl_check$vari_info %>% pull(ion) %>% unique()
 
         } else {
           para_tbl_check$ion_judge = "Faild, make sure there is polarity tags in the variable information table such as +,-,pos,neg"
@@ -222,53 +223,71 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv,data_expor
         #> check expmat and sample information
         para_tbl_check$vari_sample_info = prj_init$sample_info %>%  pull(sample_id) %>%  sort()
         para_tbl_check$vari_vari_info = colnames(para_tbl_check$temp_exp ) %>%  sort()
-        if(length(setdiff(para_tbl_check$vari_sample_info,para_tbl_check$vari_vari_info)) > 0 |
-           length(setdiff(para_tbl_check$vari_vari_info,para_tbl_check$vari_sample_info)) > 0 ) {
-          para_tbl_check$sample_match = paste0(c(setdiff(para_tbl_check$vari_sample_info,para_tbl_check$vari_vari_info),
-                                                 setdiff(para_tbl_check$vari_vari_info,para_tbl_check$vari_sample_info))," not match, please check your input file and re-upload!")
+
+        diff1 <- setdiff(para_tbl_check$vari_sample_info, para_tbl_check$vari_vari_info)
+        diff2 <- setdiff(para_tbl_check$vari_vari_info, para_tbl_check$vari_sample_info)
+
+        if (length(diff1) + length(diff2) > 0) {
+          # details print
+          mismatch_info <- paste(
+            if (length(diff1) > 0) paste("Missing in data:", paste(diff1, collapse = ", ")),
+            if (length(diff2) > 0) paste("Extra in data:", paste(diff2, collapse = ", ")),
+            sep = "<br>"
+          )
+          para_tbl_check$sample_match <- paste0("<span style='color:red;'>Mismatch found!</span><br>", mismatch_info)
         } else {
-          para_tbl_check$sample_match = "all match, pass!"
+          para_tbl_check$sample_match <- "<span style='color:green;'>✓ All samples match</span>"
         }
 
-        para_tbl_check$sample_subject =
-          prj_init$sample_info %>%
+
+        para_tbl_check$sample_subject <- prj_init$sample_info %>%
           filter(class == "Subject") %>%
           nrow()
 
-        para_tbl_check$sample_QC =
-          prj_init$sample_info %>%
+        para_tbl_check$sample_QC <- prj_init$sample_info %>%
           filter(class == "QC") %>%
           nrow()
 
-        #> MS1 information
-        output$file_check2 = renderUI({
-          isolate(HTML(
-            paste0(
-              '<div class="info-block">',
-              '  <div>',
-              '    <span class="info-label">Sample information match with accumulation matrix:</span>',
-              '    <span class="info-value"><font color="red">(', para_tbl_check$sample_match, ')</font></span>',
-              '  </div>',
-              '  <div>',
-              '    <span class="info-label">Polarity information check:</span>',
-              '    <span class="info-value"><font color="red">(', para_tbl_check$ion_judge, ')</font></span>',
-              '  </div>',
-              '  <div>',
-              '    <span class="info-label">QC samples number in Sample information file:</span>',
-              '    <span class="info-value"><font color="red">(', para_tbl_check$sample_QC, ')</font></span>',
-              '  </div>',
-              '  <div>',
-              '    <span class="info-label">Subject sample number in Sample information file:</span>',
-              '    <span class="info-value"><font color="red">(', para_tbl_check$sample_subject, ')</font></span>',
-              '  </div>',
-              '  <div>',
-              '    <span class="info-label">Feature number:</span>',
-              '    <span class="info-value"><font color="red">(', nrow(para_tbl_check$temp_exp), ')</font></span>',
-              '  </div>',
-              '</div>'
-            )
-          ))
-        })
+        alert_content <- paste0(
+          "<div style='text-align: left; font-size: 14px;'>",
+          "<h4 style='color: #2c3e50; margin-top: 0;'>Data Validation Report</h4>",
+
+          # 样本匹配模块
+          "<div style='margin-bottom: 12px;'>",
+          "<b>🔍 Sample ID Matching:</b><br>",
+          para_tbl_check$sample_match,
+          "</div>",
+
+          # 极性检查模块
+          "<div style='margin-bottom: 12px;'>",
+          "<b>⚡ Polarity Check:</b><br>",
+          "<span style='color:", ifelse(grepl("pass", para_tbl_check$ion_judge), "#27ae60", "#e74c3c"), "'>",
+          para_tbl_check$ion_judge,
+          "</span></div>",
+
+          # 样本统计模块
+          "<div style='border-top: 1px solid #eee; padding-top: 8px;'>",
+          "<b>📊 Sample Statistics:</b><br>",
+          "• QC Samples: ", para_tbl_check$sample_QC, "<br>",
+          "• Subject Samples: ", para_tbl_check$sample_subject, "<br>",
+          "• Total Features: ", nrow(para_tbl_check$temp_exp),
+          "</div>",
+
+          "</div>"
+        )
+
+        # 显示弹窗
+        shinyalert(
+          title = "Validation Results",
+          text = alert_content,
+          html = TRUE,
+          type = ifelse(grepl("Mismatch", para_tbl_check$sample_match), "error", "success"),
+          closeOnEsc = TRUE,
+          showConfirmButton = TRUE,
+          confirmButtonText = "OK",
+          animation = "pop",
+          className = "validation-alert"
+        )
       }
     )
 
@@ -278,120 +297,155 @@ data_import_tbl_server <- function(id,volumes,prj_init,data_import_rv,data_expor
     observeEvent(
       input$action2.1,
       {
-        if(is.null(input$expmat)){return()}
-        pro_step_tbl = c(
-          'Create mass_dataset class:\nPositive model ...',
-          'Create mass_dataset class:\nNegative model ...',
+        req(input$expmat)
+        current_polarity <- para_tbl_check$polarity
+
+        pro_step_tbl <- c(
+          if ("pos" %in% current_polarity) 'Create mass_dataset class: Positive model...',
+          if ("neg" %in% current_polarity) 'Create mass_dataset class: Negative model...',
           'All finish'
-        )
+        ) %>% compact()
+
         data_import_rv$tbl_ms2_mz_tol = input$tbl_ms2_mz_tol %>%  as.numeric()
         data_import_rv$tbl_ms2_rt_tol = input$tbl_ms2_rt_tol %>%  as.numeric()
         #functions
-        withProgress(message = 'Create mass_dataset class', value = 0,
-                     expr = {
-                       for (i in 1:4) {
-                         incProgress(1/4,detail = pro_step_tbl[i])
-                         if (i == 1) {
-                           ##> pos variables
-                           variable_pos =
-                             para_tbl_check$vari_info %>%
-                             filter(ion == "pos") %>%
-                             select(variable_id)
-                           ##> pos sample informations
-                           sample_info_pos = prj_init$sample_info
-                           ##> pos expression table
-                           expression_data_pos =
-                             para_tbl_check$temp_exp %>%
-                             rownames_to_column("variable_id") %>%
-                             inner_join(variable_pos) %>%
-                             column_to_rownames("variable_id") %>%
-                             select(sample_info_pos %>%  pull(sample_id))
-                           ##> pos variables informations
-                           variable_info_pos =
-                             para_tbl_check$vari_info %>%
-                             filter(ion == "pos")
-                           ##> pos mass datasets
-                           data_import_rv$object_pos =
-                             create_mass_dataset(
-                               expression_data = expression_data_pos,
-                               sample_info = sample_info_pos,
-                               variable_info = variable_info_pos
-                             )
-                           data_import_rv$object_pos
-                           print(data_import_rv$object_pos)
-                         } else if (i == 2) {
-                           ##> neg variables
-                           variable_neg =
-                             para_tbl_check$vari_info %>%
-                             filter(ion == "neg") %>%
-                             select(variable_id)
-                           ##> neg expression table
-                           ##> neg sample informations
-                           sample_info_neg = prj_init$sample_info
-                           expression_data_neg =
-                             para_tbl_check$temp_exp %>%
-                             rownames_to_column("variable_id") %>%
-                             inner_join(variable_neg) %>%
-                             column_to_rownames("variable_id") %>%
-                             select(sample_info_neg %>%  pull(sample_id))
-                           ##> neg variables informations
-                           variable_info_neg =
-                             para_tbl_check$vari_info %>%
-                             filter(ion == "neg")
-                           ##> neg mass datasets
-                           data_import_rv$object_neg =
-                             create_mass_dataset(
-                               expression_data = expression_data_neg,
-                               sample_info = sample_info_neg,
-                               variable_info = variable_info_neg
-                             )
-                         } else if (i == 3) {
-                           save_massobj(
-                             polarity = 'positive',
-                             file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-                             stage = 'step1',
-                             obj = data_import_rv$object_pos)
-                           save_massobj(
-                             polarity = 'negative',
-                             file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
-                             stage = 'step1',
-                             obj = data_import_rv$object_neg)
-                         } else {}
+        withProgress(
+          message = 'Creating mass_dataset',
+          value = 0,
+          expr = {
+            # 正模式处理
+            if ("pos" %in% current_polarity) {
+              incProgress(1/length(pro_step_tbl),
+                          detail = "Processing positive mode...")
+              variable_pos =
+                para_tbl_check$vari_info %>%
+                filter(ion == "pos") %>%
+                select(variable_id)
+              ##> pos sample informations
+              sample_info_pos = prj_init$sample_info
+              ##> pos expression table
+              expression_data_pos =
+                para_tbl_check$temp_exp %>%
+                rownames_to_column("variable_id") %>%
+                inner_join(variable_pos) %>%
+                column_to_rownames("variable_id") %>%
+                select(sample_info_pos %>%  pull(sample_id))
+              ##> pos variables informations
+              variable_info_pos =
+                para_tbl_check$vari_info %>%
+                filter(ion == "pos")
+              ##> pos mass datasets
+              data_import_rv$object_pos_raw =
+                create_mass_dataset(
+                  expression_data = expression_data_pos,
+                  sample_info = sample_info_pos,
+                  variable_info = variable_info_pos
+                )
+              object_pos_raw <- data_import_rv$object_pos_raw
+              save(object_pos_raw,
+                   file = file.path(prj_init$mass_dataset_dir, "01.object_pos_raw.rda"))
+            }
 
-                       }
-                     }
+            # 负模式处理
+            if ("neg" %in% current_polarity) {
+              incProgress(1/length(pro_step_tbl),
+                          detail = "Processing negative mode...")
+              variable_neg =
+                para_tbl_check$vari_info %>%
+                filter(ion == "neg") %>%
+                select(variable_id)
+              ##> neg expression table
+              ##> neg sample informations
+              sample_info_neg = prj_init$sample_info
+              expression_data_neg =
+                para_tbl_check$temp_exp %>%
+                rownames_to_column("variable_id") %>%
+                inner_join(variable_neg) %>%
+                column_to_rownames("variable_id") %>%
+                select(sample_info_neg %>%  pull(sample_id))
+              ##> neg variables informations
+              variable_info_neg =
+                para_tbl_check$vari_info %>%
+                filter(ion == "neg")
+              ##> neg mass datasets
+              data_import_rv$object_neg_raw =
+                create_mass_dataset(
+                  expression_data = expression_data_neg,
+                  sample_info = sample_info_neg,
+                  variable_info = variable_info_neg
+                )
+              object_neg_raw <- data_import_rv$object_neg_raw
+              save(object_neg_raw,
+                   file = file.path(prj_init$mass_dataset_dir, "01.object_neg_raw.rda"))
+            }
 
+
+            incProgress(1/length(pro_step_tbl), detail = "Finalizing...")
+          }
         )
-        #> file path of original massdata set object
-        output$obj_mass_res_path = renderUI({
-          isolate(HTML(
-            paste0(
-              '<div class="info-block">',
-              '  <div>',
-              '    <span class="info-label">Positive model:</span>',
-              '    <span class="info-value">',
-              '      <a href="',
-              paste0("file://", gsub(" ", "%20", prj_init$wd), "/Result/POS"), '">POS</a>',
-              '    </span>',
-              '  </div>',
-              '  <div>',
-              '    <span class="info-label">Negative model:</span>',
-              '    <span class="info-value">',
-              '      <a href="',
-              paste0("file://", gsub(" ", "%20", prj_init$wd), "/Result/NEG"), '">NEG</a>',
-              '    </span>',
-              '  </div>',
-              '</div>'
-            )
-          ))
-        })
-        #> information of mass datasets
-        output$obj_mass_check.pos_tbl = renderPrint({
-          print(data_import_rv$object_pos)
-        })
-        output$obj_mass_check.neg_tbl = renderPrint({
-          print(data_import_rv$object_neg)
-        })
+
+
+        # generate dynamic results
+        alert_content <- paste0(
+          "<div style='text-align: left; font-size: 14px;'>",
+          "<h4 style='color: #2c3e50; margin-top: 0;'>Analysis Results</h4>"
+        )
+
+        # add pos path
+        if ("pos" %in% current_polarity && dir.exists(file.path(prj_init$mass_dataset_dir))) {
+          alert_content <- paste0(
+            alert_content,
+            "<div style='margin-bottom: 10px;'>",
+            "<span style='display: inline-block; width: 120px; color: #3498db;'>Positive mode:</span>",
+            "<a href='", paste0("file://", gsub(" ", "%20", prj_init$mass_dataset_dir)),
+            "' style='color: #27ae60; text-decoration: underline;' target='_blank'>View POS results</a>",
+            "</div>"
+          )
+        }
+
+        # add neg path
+        if ("neg" %in% current_polarity && dir.exists(file.path(prj_init$mass_dataset_dir))) {
+          alert_content <- paste0(
+            alert_content,
+            "<div style='margin-bottom: 10px;'>",
+            "<span style='display: inline-block; width: 120px; color: #3498db;'>Negative mode:</span>",
+            "<a href='", paste0("file://", gsub(" ", "%20", prj_init$mass_dataset_dir)),
+            "' style='color: #e74c3c; text-decoration: underline;' target='_blank'>View NEG results</a>",
+            "</div>"
+          )
+        }
+
+        # add summary
+        alert_content <- paste0(
+          alert_content,
+          "<div style='border-top: 1px solid #eee; padding-top: 8px; margin-top: 12px;'>",
+          "<b>Processed modes:</b> ", paste(current_polarity, collapse = " + "), "<br>",
+          "<b>Total variables:</b> ", nrow(para_tbl_check$temp_exp),
+          "</div></div>"
+        )
+
+
+        shinyalert(
+          title = "Analysis Results",
+          text = alert_content,
+          html = TRUE,
+          type = ifelse(length(current_polarity) > 0, "success", "warning"),
+          closeOnEsc = TRUE,
+          showConfirmButton = TRUE,
+          confirmButtonText = "OK",
+          animation = "pop",
+          className = "result-alert"
+        )
+        output$obj_mass_check.pos_tbl = check_massdata_info(
+          object = data_import_rv$object_pos_raw,
+          mode = "positive"
+        )
+
+        output$obj_mass_check.neg_tbl = check_massdata_info(
+          object = data_import_rv$object_neg_raw,
+          mode = "negative"
+        )
+
 
       }
     )

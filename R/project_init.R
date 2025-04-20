@@ -273,13 +273,10 @@ project_init_server <- function(id,volumes,prj_init) {
 
         # Validate positive file
         if (prj_init$steps == "Annotation filtering" & !is.null(saved_dblist)) {
-          validation_result <- validate_file(saved_dblist, "Annotation database list","Please upload autosaved in '.dblist' format which generated in annotation step")
-          if (!validation_result$success) {
-            error_messages <- c(error_messages, validation_result$message)
-          } else {
+
             obj_saved_dblist = load(saved_dblist)
             prj_init$dblist <- get(obj_saved_dblist)
-          }
+
         }
 
         # Error handling

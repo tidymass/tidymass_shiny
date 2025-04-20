@@ -224,6 +224,33 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
         dblist_selected<-parseDirPath(roots = volumes, input$norm_customized_db)
         output$ms_db_folder_selected <- renderText(dblist_selected)
       }})
+
+    # Utility functions ----
+    check_ion_modes <- function(data_rv, prj) {
+      list(
+        has_pos = !is.null(data_rv$object_pos_norm) || !is.null(prj$object_positive.init),
+        has_neg = !is.null(data_rv$object_neg_norm) || !is.null(prj$object_negative.init)
+      )
+    }
+
+    # functions -----
+    perform_add_ms2 = function(object,para,polarity) {
+      tryCatch({
+        res <- object %>%
+          mutate_ms2(
+            polarity = polarity,
+            column = para$column,
+            ms1.ms2.match.rt.tol = para$ms1.ms2.match.rt.tol,
+            ms1.ms2.match.mz.tol = para$ms1.ms2.match.mz.tol,
+            path = paste0(data_anno$MS2_path,"/POS/")
+          )
+      },error = function(e) {
+        shinyalert("Add ms2 Error", paste("Error details:", e$message), type = "error")
+        NULL
+      })
+    }
+
+
     ##> parameters ms2
     para_ms2 =  reactive({
       list(
@@ -237,16 +264,50 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
     observeEvent(
       input$add_ms2,
       {
-        if(is.null(input$MS2)){return()}
-        if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "Annotation"){
-          data_anno$object_neg.norm= prj_init$object_negative.init
-          data_anno$object_pos.norm = prj_init$object_positive.init
-        } else {
-          if(is.null(data_clean_rv$object_neg.norm)){return()}
-          if(is.null(data_clean_rv$object_pos.norm)){return()}
-          data_anno$object_neg.norm = data_clean_rv$object_neg.norm
-          data_anno$object_pos.norm = data_clean_rv$object_pos.norm
+
+        modes <- check_ion_modes(data_clean_rv, prj_init)
+
+        if (!modes$has_pos && !modes$has_neg) {
+          # No data initialized at all
+          shinyalert(
+            "Data Not Loaded",
+            "No positive/negative ion mode data found. Upload data first.",
+            type = "error"
+          )
+          return()
         }
+        if (!modes$has_pos && !modes$has_neg) {
+          # No data initialized at all
+          shinyalert(
+            "Data Not Loaded",
+            "No positive/negative ion mode data found. Upload data first.",
+            type = "error"
+          )
+          return()
+        }
+
+        # Check if data initialization exists
+        if(is.null(data_clean_rv$object_pos_norm) && is.null(data_clean_rv$object_neg_norm)){
+          if (!is.null(prj_init$object_negative.init) || !is.null(prj_init$object_positive.init)) {
+            # Data initialized but current step is invalid
+            if (prj_init$steps != "Annotation") {
+              shinyalert(
+                "Step Error",
+                "Invalid workflow sequence detected.\nPlease restart from the 'ANNOTATION' step.",
+                type = "error"
+              )
+              return()
+            }
+          }
+        }
+        if(prj_init$steps == "Annotation") {
+          if(modes$has_pos) data_anno$object_pos <- prj_init$object_positive.init
+          if(modes$has_neg) data_anno$object_neg <- prj_init$object_negative.init
+        } else {
+          if(modes$has_pos) data_anno$object_pos <- data_clean_rv$object_pos_norm
+          if(modes$has_neg) data_anno$object_neg <- data_clean_rv$object_neg_norm
+        }
+        if(is.null(input$MS2)){return()}
         para = para_ms2()
         data_anno$ms2_folder_selected <- parseDirPath(volumes, input$MS2)
         data_anno$MS2_path <- data_anno$ms2_folder_selected |> as.character()
@@ -255,47 +316,76 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
           'running negative model',
           'All finish'
         )
-        withProgress(message = 'Add MS2', value = 0,
-                     expr = {
-                       for (i in 1:3) {
-                         incProgress(1/3,detail = steps[i])
-                         if(i == 1) {
-                           data_anno$object_pos.norm <-
-                             mutate_ms2(
-                               object = data_anno$object_pos.norm,
-                               polarity = 'positive',
-                               column = para$column,
-                               ms1.ms2.match.rt.tol = para$ms1.ms2.match.rt.tol,
-                               ms1.ms2.match.mz.tol = para$ms1.ms2.match.mz.tol,
-                               path = paste0(data_anno$MS2_path,"/POS/")
-                             )
-                           save_massobj(
-                             polarity = 'positive',
-                             file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-                             stage = 'norm',obj = data_anno$object_pos.norm)
 
-                         } else if(i ==2) {
-                           data_anno$object_neg.norm <-
-                             mutate_ms2(
-                               object = data_anno$object_neg.norm,
-                               polarity = 'negative',
-                               column = para$column,
-                               ms1.ms2.match.rt.tol = para$ms1.ms2.match.rt.tol,
-                               ms1.ms2.match.mz.tol = para$ms1.ms2.match.mz.tol,
-                               path = paste0(data_anno$MS2_path,"/NEG/")
-                             )
-                           save_massobj(
-                             polarity = 'negative',
-                             file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
-                             stage = 'norm',obj = data_anno$object_neg.norm)
-                         }
+        # Core processing
+        withProgress(message = "Processing Add MS2 spectra...", value = 0, {
+          para <- para_ms2()
+          if (modes$has_pos) {
+            incProgress(0.3, detail = "Processing positive mode")
+            data_anno$object_pos <- perform_add_ms2(data_anno$object_pos, para,"positive")
+            object_pos_ms2 <- data_anno$object_pos
+            save(object_pos_ms2 ,
+                 file = file.path(prj_init$mass_dataset_dir, "06.object_pos_ms2.rda"))
+          }
 
-                       }
-                     })
+          if (modes$has_neg) {
+            incProgress(0.3, detail = "Processing negative mode")
+            data_anno$object_neg <- perform_add_ms2(data_anno$object_neg, para,"negative")
+            object_neg_ms2 <- data_anno$object_neg
+            save(object_neg_ms2 ,
+                 file = file.path(prj_init$mass_dataset_dir, "06.object_neg_ms2.rda"))
+          }
+        })
+        if(!is.null(data_anno$object_pos) || !is.null(data_anno$object_neg)) {
+          data_anno$ms2_status <- TRUE
+          shinyalert::shinyalert(
+            title = "MS2 spectra have been successfully added.",
+            text = paste0("Please start compound annotation step."),
+            html = TRUE,
+            type = "success",
+            animation = "pop"
+          )
+        } else {
+          data_anno$ms2_status <- FALSE
+        }
+
 
       }
     )
     ##> Annotation parameters
+    ##>
+    run_annotation <- function(object, para, polarity, database) {
+      annotate_metabolites_mass_dataset(
+        object = object,
+        polarity = polarity,
+        database = database,
+        ms1.match.ppm = para$ms1.match.ppm,
+        ms2.match.ppm = para$ms2.match.ppm,
+        rt.match.tol = para$rt.match.tol,
+        candidate.num = para$candidate.num,
+        column = para$column,
+        threads = para$threads,
+        mz.ppm.thr = para$mz.ppm.thr,
+        ms2.match.tol = para$ms2.match.tol,
+        fraction.weight = para$fraction.weight,
+        dp.forward.weight = para$dp.forward.weight,
+        dp.reverse.weight = para$dp.reverse.weight,
+        remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
+        ce = para$ce,
+        ms1.match.weight = para$ms1.match.weight,
+        rt.match.weight = para$rt.match.weight,
+        ms2.match.weight = para$ms2.match.weight,
+        total.score.tol = para$total.score.tol
+      )
+    }
+    check_ms2 = function(object){
+      if(length(object@ms2_data) == 0) {
+        return(FALSE)
+      } else {
+        return(TRUE)
+      }
+    }
+
     para_anno = reactive({
       list(
         ms1.match.ppm = as.numeric(input$anno_ms1.match.ppm),
@@ -318,36 +408,72 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
         total.score.tol= as.numeric(input$anno_total.score.tol)
       )
     })
+
     ##> run_anno
     observeEvent(
       input$anno_start,
       {
-        if(is.null(data_anno$object_neg.norm) | is.null(data_anno$object_neg.norm)) {
-          if(!is.null(prj_init$object_negative.init) & !is.null(prj_init$object_positive.init) & prj_init$steps == "Annotation"){
-            data_anno$object_neg.norm= prj_init$object_negative.init
-            data_anno$object_pos.norm = prj_init$object_positive.init
-          } else {
-            if(is.null(data_clean_rv$object_neg.norm)){return()}
-            if(is.null(data_clean_rv$object_pos.norm)){return()}
-            data_anno$object_neg.norm = data_clean_rv$object_neg.norm
-            data_anno$object_pos.norm = data_clean_rv$object_pos.norm
-          }
+        modes <- check_ion_modes(data_clean_rv, prj_init)
+
+        if (!modes$has_pos && !modes$has_neg) {
+          # No data initialized at all
+          shinyalert(
+            "Data Not Loaded",
+            "No positive/negative ion mode data found. Upload data first.",
+            type = "error"
+          )
+          return()
+        }
+        if (!modes$has_pos && !modes$has_neg) {
+          # No data initialized at all
+          shinyalert(
+            "Data Not Loaded",
+            "No positive/negative ion mode data found. Upload data first.",
+            type = "error"
+          )
+          return()
         }
 
+        # Check if data initialization exists
+        if(is.null(data_clean_rv$object_pos_norm) && is.null(data_clean_rv$object_neg_norm)){
+          if (!is.null(prj_init$object_negative.init) || !is.null(prj_init$object_positive.init)) {
+            # Data initialized but current step is invalid
+            if (prj_init$steps != "Annotation") {
+              shinyalert(
+                "Step Error",
+                "Invalid workflow sequence detected.\nPlease restart from the 'ANNOTATION' step.",
+                type = "error"
+              )
+              return()
+            }
+          }
+        }
+        ## previous add ms2 has been finished
+        if(!isTRUE(data_anno$ms2_status)) {
+          if(prj_init$steps == "Annotation") {
+            if(modes$has_pos) data_anno$object_pos <- prj_init$object_positive.init
+            if(modes$has_neg) data_anno$object_neg <- prj_init$object_negative.init
+          } else {
+            if(modes$has_pos) data_anno$object_pos <- data_clean_rv$object_pos_norm
+            if(modes$has_neg) data_anno$object_neg <- data_clean_rv$object_neg_norm
+          }
+        }
+        print("check point1")
+
         # check ms2
-        if (length(data_anno$object_pos.norm@ms2_data) == 0 || length(data_anno$object_neg.norm@ms2_data) == 0) {
-          showNotification(
+        if ((modes$has_pos && !isTRUE(check_ms2(data_anno$object_pos))) || (modes$has_neg && !isTRUE(check_ms2(data_anno$object_neg)))){
+          shinyalert(
+            "Warning!",
             "MS2 data was not detected. Annotations will be based on MS1 data only.",
             type = "warning"
           )
         }
 
         para = para_anno()
-        print(para)
-        print(data_anno$object_neg.norm)
-        print(data_anno$object_pos.norm)
 
         ## buildin database
+
+        ##! The integrated database needs to be loaded, then replace this code.
 
         data_anno$buildin_db <-
           list(
@@ -394,18 +520,19 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
             data_anno$db <- c(data_anno$buildin_db,data_anno$cuz_db)
           }
         }
-        dir.create(path = paste0(prj_init$wd,"/Result/Database/"),showWarnings = F,recursive = T)
+        dir.create(path = paste0(prj_init$wd,"/temp/Anno_Database/"),showWarnings = F,recursive = T)
         temp_db <- data_anno$db
         data_clean_rv$db <- data_anno$db
-        save(temp_db,file =  paste0(prj_init$wd,"/Result/Database/auto_saved.dblist"))
-
+        save(temp_db,file =  paste0(prj_init$wd,"/temp/Anno_Database/auto_saved.dblist"))
+        print("check point2")
         #> annotation
         if(length(data_anno$db) == 0) {
-          output$anno_check1_pos = renderUI({
-            isolate(HTML(paste0(
-              '<font color = red>"No database were selected!"<b></font></b>',
-            )))
-          })
+          shinyalert(
+            "Error!",
+            "No metabolomics database detected. Please select an existing database or upload a METID-generated metabolite database",
+            type = "error"
+          )
+          return()
         } else {
           tags = names(data_anno$db)
           ##> compound annotation
@@ -417,135 +544,94 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
                          for (i in 1:(anno_steps)) {
                            incProgress(1/anno_steps,detail = pro_steps_anno[i])
                            if(i == 1) {
-                             data_anno$object_neg.anno = annotate_metabolites_mass_dataset(
-                               object = data_anno$object_neg.norm,
-                               polarity = "negative",
-                               database = data_anno$db[[i]] ,
-                               ms1.match.ppm = para$ms1.match.ppm,
-                               ms2.match.ppm = para$ms2.match.ppm,
-                               rt.match.tol = para$rt.match.tol,
-                               candidate.num = para$candidate.num,
-                               column = para$column,
-                               threads = para$threads,
-                               mz.ppm.thr = para$mz.ppm.thr,
-                               ms2.match.tol = para$ms2.match.tol,
-                               fraction.weight = para$fraction.weight,
-                               dp.forward.weight = para$dp.forward.weight,
-                               dp.reverse.weight = para$dp.reverse.weight,
-                               remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
-                               ce = para$ce,
-                               ms1.match.weight = para$ms1.match.weight,
-                               rt.match.weight = para$rt.match.weight,
-                               ms2.match.weight = para$ms2.match.weight,
-                               total.score.tol = para$total.score.tol
-                             )
-                             data_anno$object_pos.anno = annotate_metabolites_mass_dataset(
-                               object = data_anno$object_pos.norm,
-                               polarity = "positive",
-                               database = data_anno$db[[i]] ,
-                               ms1.match.ppm = para$ms1.match.ppm,
-                               ms2.match.ppm = para$ms2.match.ppm,
-                               rt.match.tol = para$rt.match.tol,
-                               candidate.num = para$candidate.num,
-                               column = para$column,
-                               threads = para$threads,
-                               mz.ppm.thr = para$mz.ppm.thr,
-                               ms2.match.tol = para$ms2.match.tol,
-                               fraction.weight = para$fraction.weight,
-                               dp.forward.weight = para$dp.forward.weight,
-                               dp.reverse.weight = para$dp.reverse.weight,
-                               remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
-                               ce = para$ce,
-                               ms1.match.weight = para$ms1.match.weight,
-                               rt.match.weight = para$rt.match.weight,
-                               ms2.match.weight = para$ms2.match.weight,
-                               total.score.tol = para$total.score.tol
-                             )
+                             if(modes$has_pos){
+                               print("check point3")
+                               para = para_anno()
+                               data_anno$object_pos_anno <- run_annotation(
+                                 object = data_anno$object_pos,
+                                 para = para,
+                                 polarity = "positive",
+                                 database = data_anno$db[[i]]
+                               )
+                             }
+                             if(modes$has_neg){
+                               print("check point4")
+                               para = para_anno()
+                               data_anno$object_neg_anno <- run_annotation(
+                                 object = data_anno$object_neg,
+                                 para = para,
+                                 polarity = "negative",
+                                 database = data_anno$db[[i]]
+                               )
+                             }
+
                            } else if(i > 1 & i < anno_steps) {
-                             data_anno$object_neg.anno = annotate_metabolites_mass_dataset(
-                               object = data_anno$object_neg.anno,polarity = "negative",
-                               database = data_anno$db[[i]] ,
-                               ms1.match.ppm = para$ms1.match.ppm,
-                               ms2.match.ppm = para$ms2.match.ppm,
-                               rt.match.tol = para$rt.match.tol,
-                               candidate.num = para$candidate.num,
-                               column = para$column,
-                               threads = para$threads,
-                               mz.ppm.thr = para$mz.ppm.thr,
-                               ms2.match.tol = para$ms2.match.tol,
-                               fraction.weight = para$fraction.weight,
-                               dp.forward.weight = para$dp.forward.weight,
-                               dp.reverse.weight = para$dp.reverse.weight,
-                               remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
-                               ce = para$ce,
-                               ms1.match.weight = para$ms1.match.weight,
-                               rt.match.weight = para$rt.match.weight,
-                               ms2.match.weight = para$ms2.match.weight,
-                               total.score.tol = para$total.score.tol
-                             )
-                             data_anno$object_pos.anno = annotate_metabolites_mass_dataset(
-                               object = data_anno$object_pos.anno,polarity = "positive",
-                               database = data_anno$db[[i]] ,
-                               ms1.match.ppm = para$ms1.match.ppm,
-                               ms2.match.ppm = para$ms2.match.ppm,
-                               rt.match.tol = para$rt.match.tol,
-                               candidate.num = para$candidate.num,
-                               column = para$column,
-                               threads = para$threads,
-                               mz.ppm.thr = para$mz.ppm.thr,
-                               ms2.match.tol = para$ms2.match.tol,
-                               fraction.weight = para$fraction.weight,
-                               dp.forward.weight = para$dp.forward.weight,
-                               dp.reverse.weight = para$dp.reverse.weight,
-                               remove_fragment_intensity_cutoff = para$remove_fragment_intensity_cutoff,
-                               ce = para$ce,
-                               ms1.match.weight = para$ms1.match.weight,
-                               rt.match.weight = para$rt.match.weight,
-                               ms2.match.weight = para$ms2.match.weight,
-                               total.score.tol = para$total.score.tol
-                             )
+                             if(modes$has_pos){
+                               para = para_anno()
+                               data_anno$object_pos_anno <- run_annotation(
+                                 object = data_anno$object_pos_anno,
+                                 para = para,
+                                 polarity = "positive",
+                                 database = data_anno$db[[i]]
+                               )
+                             }
+                             if(modes$has_neg){
+                               para = para_anno()
+                               data_anno$object_neg_anno <- run_annotation(
+                                 object = data_anno$object_neg_anno,
+                                 para = para,
+                                 polarity = "negative",
+                                 database = data_anno$db[[i]]
+                               )
+                             }
                            } else if(i == anno_steps) {
-                             Sys.sleep(2)
+                             if (modes$has_pos) {
+                               data_clean_rv$object_pos_anno = data_anno$object_pos_anno
+                               object_pos_anno <- data_anno$object_pos_anno
+                               save(
+                                 object_pos_anno,
+                                 file = file.path(prj_init$mass_dataset_dir, "07.object_pos_anno.rda")
+                               )
+                             }
+                             if (modes$has_neg) {
+                               data_clean_rv$object_neg_anno = data_anno$object_neg_anno
+                               object_neg_anno <- data_anno$object_neg_anno
+                               save(
+                                 object_neg_anno,
+                                 file = file.path(prj_init$mass_dataset_dir, "07.object_neg_anno.rda")
+                               )
+                             }
                            }
                          }
                        }
 
           )
-          data_clean_rv$object_pos.anno = data_anno$object_pos.anno
-          data_clean_rv$object_neg.anno = data_anno$object_neg.anno
-          save_massobj(
-            polarity = 'positive',
-            file_path = paste0(prj_init$wd,"/Result/POS/Objects/"),
-            stage = 'anno',
-            obj = data_anno$object_pos.anno)
-
-          save_massobj(
-            polarity = 'negative',
-            file_path = paste0(prj_init$wd,"/Result/NEG/Objects/"),
-            stage = 'anno',
-            obj = data_anno$object_neg.anno)
 
 
-          #> information of mass datasets
-          output$obj_anno.pos = renderPrint({
-            print(data_anno$object_pos.anno)
-          })
-          output$obj_anno.neg = renderPrint({
-            print(data_anno$object_neg.anno)
-          })
+
+          # show process
+          output$obj_anno.pos  = check_massdata_info(
+            object = data_anno$object_pos_anno,
+            mode = "positive"
+          )
+
+          output$obj_anno.neg  = check_massdata_info(
+            object = data_anno$object_neg_anno,
+            mode = "negative"
+          )
 
           #> data table
           #>
           output$Annotation_pos = renderDataTable_formated(
             actions = input$anno_start,
-            condition1 = data_anno$object_pos.anno,filename.a = "3.6.6.annotation_pos",
-            tbl = data_anno$object_pos.anno %>% extract_annotation_table()
+            condition1 = data_anno$object_pos_anno,filename.a = "3.6.6.annotation_pos",
+            tbl = data_anno$object_pos_anno %>% extract_annotation_table()
           )
 
           output$Annotation_neg = renderDataTable_formated(
             actions = input$anno_start,
-            condition1 = data_anno$object_neg.anno,filename.a = "3.6.6.annotation_neg",
-            tbl = data_anno$object_neg.anno %>% extract_annotation_table()
+            condition1 = data_anno$object_neg_anno,filename.a = "3.6.6.annotation_neg",
+            tbl = data_anno$object_neg_anno %>% extract_annotation_table()
           )
 
           #> Summary
