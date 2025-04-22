@@ -129,9 +129,9 @@ feature_annotation_ui <- function(id) {
             inputId = ns('norm_db'),
             label = "Public database",
             choices = c(
-              "MoNA","Massbank","ReSpect","PlaSMA","MetaboBASE","KEGG","KNApSAcK","Ath_Cyc","Orbitrap","NULL"
+              "MoNA","Massbank","HMDB","NULL"
             ),selected = c(
-              "MoNA","Massbank"
+              "MoNA","Massbank","HMDB"
             ),multiple = T,
             title = "Select database"
           ),
@@ -477,15 +477,9 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
 
         data_anno$buildin_db <-
           list(
-            MoNA = mona_database0.0.4,
-            Massbank = massbank_database0.0.4,
-            ReSpect = respect_database0.0.1,
-            PlaSMA = plasma_database0.0.1,
-            Orbitrap = orbitrap_database0.0.3,
-            KEGG = kegg_plant_database0.0.1,
-            KNApSAcK = knapsack_agri_database0.0.1,
-            Ath_Cyc = ath_plantcyc.database0.0.1,
-            MetaboBASE = metabobase_database0.0.1
+            MoNA = mona_ms2,
+            Massbank = massbank_ms2,
+            HMDB = hmdb_ms2
           )
         ##
         data_anno$buildin_name = para$norm_db %>% as.character()

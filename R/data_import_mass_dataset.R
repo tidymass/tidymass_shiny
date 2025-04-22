@@ -150,7 +150,7 @@ data_import_massdataset_server <- function(id, volumes, prj_init, data_import_rv
       # Process Positive File
       if (!is.null(input$Pos_obj_mass)) {
         temp_pos_path <- input$Pos_obj_mass$datapath
-        pos_val <- validate_file(temp_pos_path, "positive", "Positive model file")
+        pos_val <- validate_file(temp_pos_path, "positive", "uploaded positive file")
         validation_results$pos <- pos_val
 
         alert_content <- paste0(
@@ -208,13 +208,18 @@ data_import_massdataset_server <- function(id, volumes, prj_init, data_import_rv
         '<hr style="border-color: #ecf0f1; margin: 15px 0;">',
         '<div style="color: #7f8c8d; font-size: 13px;">',
         '<strong>Detected Models:</strong> ',
-        if (length(detected_models) > 0) paste(detected_models, collapse = " + ") else "None",
+        if (length(detected_models)) {
+          paste(detected_models, collapse = " + ")
+        } else {
+          '<span style="color: #e74c3c;">None</span>'
+        },
         '<br><strong>Valid Files:</strong> ',
-        sum(sapply(validation_results, function(x) x$success)),
+        sum(vapply(validation_results, function(x) x$success, logical(1))),  # 修正的括号位置
         '/',
         length(validation_results),
         '</div></div>'
-      )
+        )
+
 
       # Show validation alert
       shinyalert::shinyalert(

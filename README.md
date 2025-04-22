@@ -34,7 +34,6 @@ if (!require('bsicons')) install.packages('bsicons');
 if (!require('bslib')) install.packages('bslib');
 if (!require('plotly')) install.packages('plotly');
 if (!require('colourpicker')) install.packages('colourpicker');
-if (!require('plantmdb')) remotes::install_github("xuebinzhang-lab/plantmdb")  ## plant metabolomics database. for test use.
 if (!require('tidymassshiny')) remotes::install_github('tidymass/tidymass_shiny')
 ```
 

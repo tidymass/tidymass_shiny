@@ -274,9 +274,10 @@ validate_file <- function(path, expected_polarity,object_label) {
 
     # Check polarity
     polarity <- tryCatch(
-      obj@process_info$process_data@parameter$polarity,
+      str_extract(string = (obj@variable_info$variable_id)[1],"POS|NEG"),
       error = function(e) NA_character_
     )
+    if(polarity == "POS") { polarity = "positive"} else if(polarity == "NEG") {polarity = "negative"}
     if (is.na(polarity) || polarity != expected_polarity) {
       return(list(success = FALSE, message = paste0("Wrong polarity: ", object_label, "\nExpected: ", expected_polarity,
                                                     "\nTested: ", ifelse(is.na(polarity), "NA", polarity))))

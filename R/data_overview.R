@@ -856,7 +856,7 @@ data_overview_server <- function(id,volumes,prj_init,data_import_rv,data_export_
         } else {
           # No data detected
           shinyalert::shinyalert(
-            title = "Warning!",
+            title = "Error!",
             text = "No valid data detected. Please check your data upload.",
             type = "error"
           )
