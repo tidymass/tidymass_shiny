@@ -62,7 +62,7 @@ project_init_ui <- function(id) {
           icon = bsicons::bs_icon("repeat"),
           selectInput_div(
             inputId = ns("init_steps"),label = "Choose steps",
-            choices = c("none","Remove noisey feature","Remove outlier","impute missing value","Normalization","Annotation","Annotation filtering","Merge data","DAM and rest"),
+            choices = c("none","Remove noisey feature","Remove outlier","impute missing value","Normalization","Annotation","Annotation filtering"),
             selected = "none",multiple = F,
             title = "Choose steps"
           ),
@@ -211,6 +211,8 @@ project_init_server <- function(id,volumes,prj_init) {
 
         prj_init$mass_dataset_dir <- file.path(prj_init$wd, "mass_dataset")
         dir.create(prj_init$mass_dataset_dir, showWarnings = FALSE, recursive = TRUE)
+        prj_init$data_export_dir <- file.path(prj_init$wd, "data_export")
+        dir.create(prj_init$data_export_dir, showWarnings = FALSE, recursive = TRUE)
 
         # Sample info file
         prj_init$sample_id_n = as.character(input$sample_id_raw)

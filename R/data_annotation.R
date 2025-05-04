@@ -236,13 +236,18 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
     # functions -----
     perform_add_ms2 = function(object,para,polarity) {
       tryCatch({
+        if(polarity == "positive") {
+          ms2_path = paste0(data_anno$MS2_path,"/POS/")
+        } else if (polarity == "negative") {
+          ms2_path = paste0(data_anno$MS2_path,"/NEG/")
+        }
         res <- object %>%
           mutate_ms2(
             polarity = polarity,
             column = para$column,
             ms1.ms2.match.rt.tol = para$ms1.ms2.match.rt.tol,
             ms1.ms2.match.mz.tol = para$ms1.ms2.match.mz.tol,
-            path = paste0(data_anno$MS2_path,"/POS/")
+            path = ms2_path
           )
       },error = function(e) {
         shinyalert("Add ms2 Error", paste("Error details:", e$message), type = "error")
@@ -413,6 +418,7 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
     observeEvent(
       input$anno_start,
       {
+        shinyjs::disable("anno_start")
         modes <- check_ion_modes(data_clean_rv, prj_init)
 
         if (!modes$has_pos && !modes$has_neg) {
@@ -458,7 +464,7 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
             if(modes$has_neg) data_anno$object_neg <- data_clean_rv$object_neg_norm
           }
         }
-        print("check point1")
+
 
         # check ms2
         if ((modes$has_pos && !isTRUE(check_ms2(data_anno$object_pos))) || (modes$has_neg && !isTRUE(check_ms2(data_anno$object_neg)))){
@@ -474,6 +480,14 @@ feature_annotation_server <- function(id,volumes,prj_init,data_import_rv,data_cl
         ## buildin database
 
         ##! The integrated database needs to be loaded, then replace this code.
+        shinyalert(
+          title = "Preparing Annotation Database",
+          text = HTML("Processing will take <b>10-20 seconds</b>. <br><br>
+                  <span style='color:red;'>DO NOT click the 'Start annotation' button again</span>"),
+          type = "warning",
+          timer = 5000,    # close in 5 s
+          html = TRUE
+        )
 
         data_anno$buildin_db <-
           list(

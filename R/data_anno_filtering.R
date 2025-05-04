@@ -89,15 +89,7 @@ annotation_filter_ui <- function(id) {
             )),
             nav_panel("Negative", DT::dataTableOutput(
               outputId = ns("Annotation_filtering_neg")
-            )),
-            nav_panel("Metabolite origin",
-                      DT::dataTableOutput(outputId = ns("Annotation_filtering_neg")),
-                      renderUI(ns(""))
-                      ),
-            nav_panel(
-              shiny::icon("circle-info"),
-              markdown("description of noise remove method.")
-            )
+            ))
           ),
           navset_card_tab(
             title = "MS/MS",
@@ -342,172 +334,268 @@ annotation_filter_server <-
 
           if(modes$has_pos) {
             ##> addcut filtering
-            p2_af_filter$object_pos <-
-              p2_af_filter$object_pos %>%
-              activate_mass_dataset("annotation_table") %>%
-              mutate(filter_tag_addcut =
-                       dplyr::case_when(
-                         Level == 3 & str_detect(Adduct,re_form_reg(af_Adduct_pos)) ~ "retain",
-                         Level == 1 | Level == 2 ~ "retain",
-                         TRUE ~ "remove"
-                       )
-              ) %>%
-              dplyr::filter(filter_tag_addcut == "retain")
-            ##> temp object
-            p2_af_filter$object_pos_temp.af <- p2_af_filter$object_pos
+            anno_check = p2_af_filter$object_pos %>% extract_annotation_table() %>% nrow()
+            if(anno_check == 0) {
+              shinyalert(
+                "Warning!",
+                "No metabolite annotation information was detected in positive model, please check your input",
+                type = "info"
+              )
 
-            if(para$multi_anno == "keep top total score") {
-              p2_af_filter$object_pos_temp.af =
-                p2_af_filter$object_pos_temp.af %>%
+            } else {
+              p2_af_filter$object_pos <-
+                p2_af_filter$object_pos %>%
                 activate_mass_dataset("annotation_table") %>%
-                dplyr::group_by(variable_id) %>%
-                dplyr::filter(Level == min(Level)) %>%
-                dplyr::filter(Total.score == max(Total.score))
-            } else if(para$multi_anno == "keep the first one") {
-              p2_af_filter$object_pos_temp.af =
-                p2_af_filter$object_pos_temp.af %>%
-                activate_mass_dataset("annotation_table") %>%
-                dplyr::group_by(variable_id) %>%
-                dplyr::filter(Level == min(Level)) %>%
-                dplyr::filter(Total.score == max(Total.score)) %>%
-                dplyr::mutate(order = 1:length(variable_id)) %>%
-                dplyr::filter(order == 1) %>% dplyr::select(-order)
-            }
-            ##> Remove redundancy
-            if(para$redundancy == "keep the first one") {
-              p2_af_filter$object_pos_temp.af =
-                p2_af_filter$object_pos_temp.af %>%
-                activate_mass_dataset("annotation_table") %>%
-                mutate(Compound.name.fix = str_split(Compound.name,";",Inf,T)[,1] %>% stringr::str_to_lower()) %>%
-                group_by(Compound.name.fix) %>%
-                slice_head(n = 1)
-            }
-            ##> for annotation table output
-            p2_af_filter$pos_clean_anno =
-              p2_af_filter$object_pos_temp.af %>%
-              extract_annotation_table()
-            p2_af_filter$pos_var_id =
-              p2_af_filter$pos_clean_anno %>%
-              filter(Level == 2) %>% pull(variable_id) %>% unique()
-            output$Annotation_filtering_pos = renderDataTable_formated(
-              actions = input$af_start,
-              condition1 = p2_af_filter$object_pos_temp.af,
-              condition2 = p2_af_filter$object_pos,
-              filename.a = "3.6.7.AnnoFiltering_pos",
-              tbl = p2_af_filter$pos_clean_anno
-            )
-            ##> for mirror play
-            p2_af_filter$temp_af_pos_tbl = p2_af_filter$pos_clean_anno %>% dplyr::filter(Level < 3) %>%
-              select(variable_id,Compound.name,Lab.ID,Database)
-            output$MS2_pos_tbl = renderDataTable_formated(
-              actions = input$af_start,
-              filename.a = "3.6.7.AnnoFiltering_pos_ms2",
-              tbl = p2_af_filter$temp_af_pos_tbl
-            )
-            temp_anno.pos = p2_af_filter$object_pos_temp.af %>%
-              extract_annotation_table()
+                mutate(filter_tag_addcut =
+                         dplyr::case_when(
+                           Level == 3 & str_detect(Adduct,re_form_reg(af_Adduct_pos)) ~ "retain",
+                           Level == 1 | Level == 2 ~ "retain",
+                           TRUE ~ "remove"
+                         )
+                ) %>%
+                dplyr::filter(filter_tag_addcut == "retain")
+              ##> temp object
+              p2_af_filter$object_pos_temp.af <- p2_af_filter$object_pos
 
-            if(para$feature_remove == "Both") {
-              p2_af_filter$object_pos_af = filter_annotations_massdataset(object = p2_af_filter$object_pos,annotate_tbl = temp_anno.pos,method = 'both')
-            } else if(para$feature_remove == "Only features with MS2 spectra") {
-              p2_af_filter$object_pos_af = filter_annotations_massdataset(object = p2_af_filter$object_pos,method = 'only ms2')
-            } else if(para$feature_remove == "Only annotated features") {
-              p2_af_filter$object_pos_af = p2_af_filter$object_pos_temp.af
-            } else if(para$feature_remove == "Keep unknown features"){
-              p2_af_filter$object_pos_af = p2_af_filter$object_pos
+              if(para$multi_anno == "keep top total score") {
+                p2_af_filter$object_pos_temp.af =
+                  p2_af_filter$object_pos_temp.af %>%
+                  activate_mass_dataset("annotation_table") %>%
+                  dplyr::group_by(variable_id) %>%
+                  dplyr::filter(Level == min(Level)) %>%
+                  dplyr::filter(Total.score == max(Total.score))
+              } else if(para$multi_anno == "keep the first one") {
+                p2_af_filter$object_pos_temp.af =
+                  p2_af_filter$object_pos_temp.af %>%
+                  activate_mass_dataset("annotation_table") %>%
+                  dplyr::group_by(variable_id) %>%
+                  dplyr::filter(Level == min(Level)) %>%
+                  dplyr::filter(Total.score == max(Total.score)) %>%
+                  dplyr::mutate(order = 1:length(variable_id)) %>%
+                  dplyr::filter(order == 1) %>% dplyr::select(-order)
+              }
+              ##> Remove redundancy
+              if(para$redundancy == "keep the first one") {
+                p2_af_filter$object_pos_temp.af =
+                  p2_af_filter$object_pos_temp.af %>%
+                  activate_mass_dataset("annotation_table") %>%
+                  mutate(Compound.name.fix = str_split(Compound.name,";",Inf,T)[,1] %>% stringr::str_to_lower()) %>%
+                  group_by(Compound.name.fix) %>%
+                  slice_head(n = 1)
+              }
+              ##> for annotation table output
+              p2_af_filter$pos_clean_anno =
+                p2_af_filter$object_pos_temp.af %>%
+                extract_annotation_table()
+              p2_af_filter$pos_var_id =
+                p2_af_filter$pos_clean_anno %>%
+                filter(Level == 2) %>% pull(variable_id) %>% unique()
+              output$Annotation_filtering_pos = renderDataTable_formated(
+                actions = input$af_start,
+                condition1 = p2_af_filter$object_pos_temp.af,
+                condition2 = p2_af_filter$object_pos,
+                filename.a = "3.6.7.AnnoFiltering_pos",
+                tbl = p2_af_filter$pos_clean_anno
+              )
+              ##> for mirror play
+              p2_af_filter$temp_af_pos_tbl = p2_af_filter$pos_clean_anno %>% dplyr::filter(Level < 3) %>%
+                select(variable_id,Compound.name,Lab.ID,Database)
+              output$MS2_pos_tbl = renderDataTable_formated(
+                actions = input$af_start,
+                filename.a = "3.6.7.AnnoFiltering_pos_ms2",
+                tbl = p2_af_filter$temp_af_pos_tbl
+              )
+              temp_anno.pos = p2_af_filter$object_pos_temp.af %>%
+                extract_annotation_table()
+
+              if(para$feature_remove == "Both") {
+                p2_af_filter$object_pos_af = filter_annotations_massdataset(object = p2_af_filter$object_pos,annotate_tbl = temp_anno.pos,method = 'both')
+              } else if(para$feature_remove == "Only features with MS2 spectra") {
+                p2_af_filter$object_pos_af = filter_annotations_massdataset(object = p2_af_filter$object_pos,method = 'only ms2')
+              } else if(para$feature_remove == "Only annotated features") {
+                p2_af_filter$object_pos_af = p2_af_filter$object_pos_temp.af
+              } else if(para$feature_remove == "Keep unknown features"){
+                p2_af_filter$object_pos_af = p2_af_filter$object_pos
+              }
+              data_clean_rv$object_pos_af = p2_af_filter$object_pos_af
+              object_pos_af <- p2_af_filter$object_pos_af
+              save(
+                object_pos_af,
+                file = file.path(prj_init$mass_dataset_dir, "08.object_pos_af.rda")
+              )
             }
-            data_clean_rv$object_pos_af = p2_af_filter$object_pos_af
-            object_pos_af <- p2_af_filter$object_pos_af
-            save(
-              object_pos_af,
-              file = file.path(prj_init$mass_dataset_dir, "08.object_pos_af.rda")
-            )
 
           }
           if(modes$has_neg) {
-            ##> addcut filtering
-            p2_af_filter$object_neg <-
-              p2_af_filter$object_neg %>%
-              activate_mass_dataset("annotation_table") %>%
-              mutate(filter_tag_addcut =
-                       dplyr::case_when(
-                         Level == 3 & str_detect(Adduct,re_form_reg(af_Adduct_neg)) ~ "retain",
-                         Level == 1 | Level == 2 ~ "retain",
-                         TRUE ~ "remove"
-                       )
+            anno_check = p2_af_filter$object_neg %>% extract_annotation_table() %>% nrow()
+            if(anno_check == 0) {
+              shinyalert(
+                "Warning!",
+                "No metabolite annotation information was detected in negative model, please check your input",
+                type = "info"
+              )
+            } else {
+              ##> addcut filtering
+              p2_af_filter$object_neg <-
+                p2_af_filter$object_neg %>%
+                activate_mass_dataset("annotation_table") %>%
+                mutate(filter_tag_addcut =
+                         dplyr::case_when(
+                           Level == 3 & str_detect(Adduct,re_form_reg(af_Adduct_neg)) ~ "retain",
+                           Level == 1 | Level == 2 ~ "retain",
+                           TRUE ~ "remove"
+                         )
+                ) %>%
+                dplyr::filter(filter_tag_addcut == "retain")
+              ##> temp object
+              p2_af_filter$object_neg_temp.af <- p2_af_filter$object_neg
+
+              if(para$multi_anno == "keep top total score") {
+                p2_af_filter$object_neg_temp.af =
+                  p2_af_filter$object_neg_temp.af %>%
+                  activate_mass_dataset("annotation_table") %>%
+                  dplyr::group_by(variable_id) %>%
+                  dplyr::filter(Level == min(Level)) %>%
+                  dplyr::filter(Total.score == max(Total.score))
+              } else if(para$multi_anno == "keep the first one") {
+                p2_af_filter$object_neg_temp.af =
+                  p2_af_filter$object_neg_temp.af %>%
+                  activate_mass_dataset("annotation_table") %>%
+                  dplyr::group_by(variable_id) %>%
+                  dplyr::filter(Level == min(Level)) %>%
+                  dplyr::filter(Total.score == max(Total.score)) %>%
+                  dplyr::mutate(order = 1:length(variable_id)) %>%
+                  dplyr::filter(order == 1) %>% dplyr::select(-order)
+              }
+              ##> Remove redundancy
+              if(para$redundancy == "keep the first one") {
+                p2_af_filter$object_neg_temp.af =
+                  p2_af_filter$object_neg_temp.af %>%
+                  activate_mass_dataset("annotation_table") %>%
+                  mutate(Compound.name.fix = str_split(Compound.name,";",Inf,T)[,1] %>% stringr::str_to_lower()) %>%
+                  group_by(Compound.name.fix) %>%
+                  slice_head(n = 1)
+              }
+              ##> for annotation table output
+              p2_af_filter$neg_clean_anno =
+                p2_af_filter$object_neg_temp.af %>%
+                extract_annotation_table()
+              p2_af_filter$neg_var_id =
+                p2_af_filter$neg_clean_anno %>%
+                filter(Level == 2) %>% pull(variable_id) %>% unique()
+              output$Annotation_filtering_neg = renderDataTable_formated(
+                actions = input$af_start,
+                condition1 = p2_af_filter$object_neg_temp.af,
+                condition2 = p2_af_filter$object_neg,
+                filename.a = "3.6.7.AnnoFiltering_neg",
+                tbl = p2_af_filter$neg_clean_anno
+              )
+              ##> for mirror play
+              p2_af_filter$temp_af_neg_tbl = p2_af_filter$neg_clean_anno %>% dplyr::filter(Level < 3) %>%
+                select(variable_id,Compound.name,Lab.ID,Database)
+              output$MS2_neg_tbl = renderDataTable_formated(
+                actions = input$af_start,
+                filename.a = "3.6.7.AnnoFiltering_neg_ms2",
+                tbl = p2_af_filter$temp_af_neg_tbl
+              )
+
+              temp_anno.neg = p2_af_filter$object_neg_temp.af %>%
+                extract_annotation_table()
+
+              if(para$feature_remove == "Both") {
+                p2_af_filter$object_neg_af = filter_annotations_massdataset(object = p2_af_filter$object_neg,annotate_tbl = temp_anno.neg,method = 'both')
+              } else if(para$feature_remove == "Only features with MS2 spectra") {
+                p2_af_filter$object_neg_af = filter_annotations_massdataset(object = p2_af_filter$object_neg,method = 'only ms2')
+              } else if(para$feature_remove == "Only annotated features") {
+                p2_af_filter$object_neg_af = p2_af_filter$object_neg_temp.af
+              } else if(para$feature_remove == "Keep unknown features"){
+                p2_af_filter$object_neg_af = p2_af_filter$object_neg
+              }
+              data_clean_rv$object_neg_af = p2_af_filter$object_neg_af
+              object_neg_af <- p2_af_filter$object_neg_af
+              save(
+                object_neg_af,
+                file = file.path(prj_init$mass_dataset_dir, "08.object_neg_af.rda")
+              )
+            }
+
+
+          }
+
+
+          if (exists("object_pos_af") && exists("object_neg_af")) {
+
+            if (!is.null(object_pos_af) && !is.null(object_neg_af)) {
+              object_final <- merge_mass_dataset(
+                x = object_pos_af,
+                y = object_neg_af,
+                sample_direction = "inner",
+                variable_direction = "full",
+                sample_by = object_pos_af %>%
+                  extract_sample_info_note() %>%
+                  dplyr::pull(name),
+                variable_by = object_pos_af %>%
+                  extract_variable_info_note() %>%
+                  dplyr::pull(name)
               ) %>%
-              dplyr::filter(filter_tag_addcut == "retain")
-            ##> temp object
-            p2_af_filter$object_neg_temp.af <- p2_af_filter$object_neg
+                activate_mass_dataset("sample_info") %>%
+                dplyr::filter(class != "QC")
 
-            if(para$multi_anno == "keep top total score") {
-              p2_af_filter$object_neg_temp.af =
-                p2_af_filter$object_neg_temp.af %>%
-                activate_mass_dataset("annotation_table") %>%
-                dplyr::group_by(variable_id) %>%
-                dplyr::filter(Level == min(Level)) %>%
-                dplyr::filter(Total.score == max(Total.score))
-            } else if(para$multi_anno == "keep the first one") {
-              p2_af_filter$object_neg_temp.af =
-                p2_af_filter$object_neg_temp.af %>%
-                activate_mass_dataset("annotation_table") %>%
-                dplyr::group_by(variable_id) %>%
-                dplyr::filter(Level == min(Level)) %>%
-                dplyr::filter(Total.score == max(Total.score)) %>%
-                dplyr::mutate(order = 1:length(variable_id)) %>%
-                dplyr::filter(order == 1) %>% dplyr::select(-order)
+              save(
+                object_final,
+                file = file.path(prj_init$mass_dataset_dir, "09.object_clean.rda")
+              )
+
+              names(object_final@ms2_data) = c("pos","neg")
+              tryCatch({
+                export_final_data(object = object_final, path = prj_init$data_export_dir)
+              }, error = function(e) {
+                message("Export failed: ", e$message)
+              })
+              data_clean_rv$object_final = object_final
             }
-            ##> Remove redundancy
-            if(para$redundancy == "keep the first one") {
-              p2_af_filter$object_neg_temp.af =
-                p2_af_filter$object_neg_temp.af %>%
-                activate_mass_dataset("annotation_table") %>%
-                mutate(Compound.name.fix = str_split(Compound.name,";",Inf,T)[,1] %>% stringr::str_to_lower()) %>%
-                group_by(Compound.name.fix) %>%
-                slice_head(n = 1)
+          } else if (exists("object_pos_af") && !exists("object_neg_af")) {
+
+            if (!is.null(object_pos_af)) {
+              object_final <- object_pos_af %>%
+                activate_mass_dataset("sample_info") %>%
+                dplyr::filter(class != "QC")
+              save(
+                object_final,
+                file = file.path(prj_init$mass_dataset_dir, "09.object_clean.rda")
+              )
+              names(object_final@ms2_data) <- "pos"
+              tryCatch({
+                export_final_data(object = object_final, path = prj_init$data_export_dir)
+              }, error = function(e) {
+                message("Positive mode export failed: ", e$message)
+              })
+              data_clean_rv$object_final = object_final
             }
-            ##> for annotation table output
-            p2_af_filter$neg_clean_anno =
-              p2_af_filter$object_neg_temp.af %>%
-              extract_annotation_table()
-            p2_af_filter$neg_var_id =
-              p2_af_filter$neg_clean_anno %>%
-              filter(Level == 2) %>% pull(variable_id) %>% unique()
-            output$Annotation_filtering_neg = renderDataTable_formated(
-              actions = input$af_start,
-              condition1 = p2_af_filter$object_neg_temp.af,
-              condition2 = p2_af_filter$object_neg,
-              filename.a = "3.6.7.AnnoFiltering_neg",
-              tbl = p2_af_filter$neg_clean_anno
-            )
-            ##> for mirror play
-            p2_af_filter$temp_af_neg_tbl = p2_af_filter$neg_clean_anno %>% dplyr::filter(Level < 3) %>%
-              select(variable_id,Compound.name,Lab.ID,Database)
-            output$MS2_neg_tbl = renderDataTable_formated(
-              actions = input$af_start,
-              filename.a = "3.6.7.AnnoFiltering_neg_ms2",
-              tbl = p2_af_filter$temp_af_neg_tbl
-            )
+          } else if (!exists("object_pos_af") && exists("object_neg_af")) {
+            if (!is.null(object_neg_af)) {
+              object_final <- object_neg_af %>%
+                activate_mass_dataset("sample_info") %>%
+                dplyr::filter(class != "QC")
+              save(
+                object_final,
+                file = file.path(prj_init$mass_dataset_dir, "09.object_clean.rda")
+              )
+              names(object_final@ms2_data) <- "neg"
 
-            temp_anno.neg = p2_af_filter$object_neg_temp.af %>%
-              extract_annotation_table()
-
-            if(para$feature_remove == "Both") {
-              p2_af_filter$object_neg_af = filter_annotations_massdataset(object = p2_af_filter$object_neg,annotate_tbl = temp_anno.neg,method = 'both')
-            } else if(para$feature_remove == "Only features with MS2 spectra") {
-              p2_af_filter$object_neg_af = filter_annotations_massdataset(object = p2_af_filter$object_neg,method = 'only ms2')
-            } else if(para$feature_remove == "Only annotated features") {
-              p2_af_filter$object_neg_af = p2_af_filter$object_neg_temp.af
-            } else if(para$feature_remove == "Keep unknown features"){
-              p2_af_filter$object_neg_af = p2_af_filter$object_neg
+              tryCatch({
+                export_final_data(object = object_final, path = prj_init$data_export_dir)
+              }, error = function(e) {
+                message("Negative mode export failed: ", e$message)
+              })
+              data_clean_rv$object_final = object_final
             }
-            data_clean_rv$object_neg_af = p2_af_filter$object_neg_af
-            object_neg_af <- p2_af_filter$object_neg_af
-            save(
-              object_neg_af,
-              file = file.path(prj_init$mass_dataset_dir, "08.object_neg_af.rda")
-            )
+          } else {
 
+            warning("No valid annotation data found for processing")
+            shinyalert("Data Missing",
+                       "Both positive and negative mode data are unavailable",
+                       type = "error")
           }
 
 

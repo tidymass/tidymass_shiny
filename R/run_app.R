@@ -12,12 +12,13 @@ run_tidymass_shiny <- function(
     options = list(),
     enableBookmarking = NULL,
     uiPattern = "/",
-    maxRequestSize = 100,
+    maxRequestSize = 1000,
     ...
 ) {
   options(shiny.maxRequestSize = maxRequestSize * 1024^2)
   require(tidyverse)
   require(tidymass)
+  require(massdbbuildin)
   golem::with_golem_options(
     app = shinyApp(
       ui = app_ui,

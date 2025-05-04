@@ -35,7 +35,7 @@ app_ui <- function(request) {
         title = 'Annotation', icon = bs_icon('person-vcard'),
         feature_annotation_ui("feature_annotation_id"),
         annotation_filter_ui("annotation_filter_id"),
-        merge_data_ui("merge_data_id")
+        annotation_origin_ui("annotation_origin_id")
       ),
       nav_menu(
         title = 'Statistical analysis', icon = bs_icon('person-vcard'),
@@ -44,8 +44,8 @@ app_ui <- function(request) {
       ),
       nav_menu(
         title = 'Tidymass shiny toolkits', icon = bs_icon('person-vcard'),
-        fpa_ui("Feature-based_Pathway_Analysis_id")
-        # cz_mdb_construction_ui("cz_mdb_construction_construction_id"),
+        fpa_ui("Feature-based_Pathway_Analysis_id"),
+        database_ui("cz_mdb_construction_construction_id")
         # pathway_db_construction_ui("pathway_db_construction_id")
       ),
       # # flexible tools

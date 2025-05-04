@@ -223,24 +223,34 @@ get_compound_info <- function(compound_id) {
   return(result)
 }
 
-
-#' export mass_dataset
+#' export data
 #'
-#' match kegg cid 2 pathway.
-#' @return A dataframe to get term2gene
-#' @param compound_id kegg cid.
-#' @importFrom stringr str_extract_all
-#' @importFrom RCurl getURL
+#' convert mass_dataset to excel format.
+#' @param object mass_dataset object.
+#' @param path file path
+#' @importFrom massdataset extract_expression_data extract_variable_info extract_sample_info extract_annotation_table
+#' @importFrom dplyr select
+#' @importFrom tibble rownames_to_column
+#' @importFrom writexl write_xlsx
 #' @export
 #'
 
-export_data_for_shiny <- function(object,format,file_path,file_name) {
-  check_object_class(object = object, class = "mass_dataset")
-  format = match.arg(format)
-  if(format == "mass_dataset") {
-    save(object,file = file_path)
-  }
-
+export_final_data <- function(object,path) {
+  expmat <- object %>% extract_expression_data() %>%
+    rownames_to_column("variable_id")
+  variable_info <- object %>% extract_variable_info() %>%
+    dplyr::select(variable_id,mz,rt)
+  sample_info <- object %>% extract_sample_info()
+  annotation <- object %>% extract_annotation_table()
+  writexl::write_xlsx(
+   x =  list(
+      sample_info = sample_info,
+      expression_data = expmat,
+      variable_info = variable_info,
+      annotation = annotation
+    ),path = file.path(path,"Final_export_data.xlsx")
+  )
+  export_ms2_data(object,"mgf",path)
 }
 
 #' validate mass_dataset file
@@ -447,7 +457,7 @@ summarize_massdataset <- function(
                       ncol(object@variable_info)),
               sprintf("└─ MS2 Spectra: %s",
                       ifelse(length(object@ms2_data) > 0,
-                             sprintf("%s spectra", format(length(object@ms2_data), big.mark = ",")),
+                             sprintf("%s spectra", format(length((object@ms2_data)[[1]]@ms2_spectra), big.mark = ",")),
                              "Not available")),
               ""
   )
@@ -663,3 +673,65 @@ process_outliers <- function(object,
   })
 }
 
+#' upsetplot for metabolite origin
+#'
+#' @param object A mass_dataset object
+#' @param min_size see ComplexUpset
+#' @param counts see ComplexUpset
+#' @importFrom ComplexUpset upset upset_themes intersection_size
+#'
+#' @export
+
+metabolite_origin_upsetplot_fix = function (object, min_size = 1, counts = TRUE) {
+  check_object4metablite_origin(object)
+  temp_data <- object@annotation_table %>% dplyr::select(Lab.ID,
+                                                         from_human, from_which_part, from_bacteria, from_which_bacteria,
+                                                         from_plant, from_which_plant, from_animal, from_which_animal,
+                                                         from_environment, from_which_environment, from_drug,
+                                                         from_which_drug, from_food, from_which_food)
+  colnames(temp_data) <- c("Lab.ID", "Human", "Human_name",
+                           "Bacteria", "Bacteria_name", "Plant", "Plant_name", "Animal",
+                           "Animal_name", "Environment", "Environment_name", "Drug",
+                           "Drug_name", "Food", "Food_name")
+  final_name <- c("Human", "Bacteria", "Plant", "Animal", "Environment",
+                  "Drug", "Food")
+  temp_data2 <- temp_data[, c(final_name)]
+  temp_data2[temp_data2 == "Yes"] <- "1"
+  temp_data2[temp_data2 == "No"] <- "0"
+  temp_data2[temp_data2 == "Unknown"] <- "NA"
+  temp_data2 <- apply(temp_data2, 2, as.numeric) %>% as.data.frame()
+  if (requireNamespace("ComplexUpset", quietly = TRUE)) {
+    plot <- ComplexUpset::upset(data = temp_data2, intersect = final_name,
+                                name = "", themes = ComplexUpset::upset_themes, width_ratio = 0.15,
+                                min_size = min_size, base_annotations = list(`Intersection size` = ComplexUpset::intersection_size(counts = counts)))
+  }
+  else {
+    stop("Please install the ComplexUpset package")
+  }
+  plot
+}
+
+
+#' upsetplot for metabolite origin
+#'
+#' @param path A mass_dataset object file path
+#' @importFrom shinyalert shinyalert
+#'
+#' @export
+
+load_rdata <- function(path) {
+  tryCatch({
+    env <- new.env()
+    load(path, envir = env)
+    objs <- ls(env)
+    if(length(objs) != 1) stop("File should contain exactly one object")
+    get(objs, envir = env)
+  }, error = function(e) {
+    shinyalert(
+      title = "Load Error",
+      text = paste("Failed to load file:", e$message),
+      type = "error"
+    )
+    return(NULL)
+  })
+}

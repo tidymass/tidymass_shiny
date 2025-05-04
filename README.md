@@ -4,12 +4,6 @@
 
 A user-friendly shinyapp designed for metabolomics data analysis within the **tidymass** framework.
 
-# TODO list
-
-- [ ] Single ion mode ;
-- [ ] EIC for single peak;
-- [ ] Implementation of Flexible Tool Functionality;
-- [ ] Functional Analysis (e.g., Statistical Analysis, Metabolic Pathway Analysis);
 
 # Quick start
 
@@ -23,10 +17,14 @@ A user-friendly shinyapp designed for metabolomics data analysis within the **ti
 
 if (!require('remotes')) install.packages('remotes');
 if (!require('tidyverse')) install.packages('tidyverse');
+
+## Install tidymass follow: https://www.tidymass.org/docs/chapter1/1-installation/
+
 if (!require('tidymass')) {
   source("https://www.tidymass.org/tidymass-packages/install_tidymass.txt");
   install_tidymass(from = "tidymass.org")
 };
+
 if (!require('shinyFiles')) remotes::install_github('thomasp85/shinyFiles');
 if (!require('shinyWidgets')) remotes::install_github("dreamRs/shinyWidgets");
 if (!require('shiny')) install.packages('shiny');
@@ -34,6 +32,7 @@ if (!require('bsicons')) install.packages('bsicons');
 if (!require('bslib')) install.packages('bslib');
 if (!require('plotly')) install.packages('plotly');
 if (!require('colourpicker')) install.packages('colourpicker');
+if (!require('massdbbuildin')) remotes::install_github('tidymass/massdbbuildin');
 if (!require('tidymassshiny')) remotes::install_github('tidymass/tidymass_shiny')
 ```
 
@@ -43,10 +42,10 @@ if (!require('tidymassshiny')) remotes::install_github('tidymass/tidymass_shiny'
 library(tidyverse)
 library(tidymass)
 library(tidymassshiny)
-library(plantmdb) ## for test use
 run_tidymass_shiny()
 ```
 
 # Reference
+
 
 # Citation

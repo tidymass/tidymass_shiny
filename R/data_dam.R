@@ -22,6 +22,20 @@ dam_ui <- function(id) {
         accordion_panel(
           title = "Compare group",
           icon = bsicons::bs_icon("stars"),
+          fileInput(
+            inputId = ns("saved_obj"),
+            label = tooltip(
+              trigger = list(
+                "File upload (option)",
+                bsicons::bs_icon("info-circle")
+              ),
+              "For resuming tasks, please upload mass_dataset/09.object_clean.rda in the working directory"
+            ),
+            multiple = FALSE,
+            buttonLabel = "Browse...",
+            placeholder = "No file selected",
+            accept = ".rda"
+          ),
           radioButtons(
             inputId = ns("anno_level"),
             label = "Remove unknown metabolites",
@@ -93,25 +107,15 @@ dam_ui <- function(id) {
               "The cutoff based on Adjuested P-value"
             ),min = 0,max = 1,step = 0.01,value = 1
           ),
-          textInput(
-            inputId = ns("VIP"),
-            label = tooltip(
-              trigger = list(
-                "VIP",
-                bsicons::bs_icon("info-circle")
-              ),
-              "The cutoff based on VIP of PLS-DA or OPLS-DA"
-            ),value = 1
-          ),
           actionButton(inputId = ns("DAM_start"),label = "Start",icon = icon("play"))
           )
       ),
       page_fluid(
         layout_column_wrap(
           width = 1/2,
-          height = 350,
+          height = 500,
           navset_card_tab(
-            height = 350,
+            height = 500,
             full_screen = TRUE,
             title = "PCA",
             sidebar = accordion(
@@ -177,7 +181,7 @@ dam_ui <- function(id) {
             )
           ),
           navset_card_tab(
-            height = 350,
+            height = 500,
             full_screen = TRUE,
             title = "volcano",
             sidebar =
@@ -234,14 +238,14 @@ dam_ui <- function(id) {
                     inputId = ns('fig2_line_type'),label = 'line_type', 1
                   ),
                   selectInput(
-                    inputId = ns('fig2_add_text'),label = 'add_text', c("TRUE", "FALSE"),"FALSE",multiple = F
+                    inputId = ns('fig2_add_text'),label = 'add_text', c("TRUE", "FALSE"),"TRUE",multiple = F
                   ),
                   selectInput(
                     inputId = ns('fig2_text_for'),label = 'text_for', c("marker", "UP", "DOWM"),c("marker", "UP", "DOWM"),multiple = T
                   ),
                   radioButtons(
                     inputId = ns('fig2_text_from'),label = 'text_from',
-                    choices = c("variable_id","Compound.name")
+                    choices = c("variable_id","Compound.name"),selected = "Compound.name"
                   ),
                   materialSwitch(inputId = ns("fig2_data_clean_plt_format"),label = "Interactive plot", status = "primary")
                 ),
@@ -271,7 +275,7 @@ dam_ui <- function(id) {
         ),
         navset_card_tab(
           title = "DAM analysis result",
-          height = 400,
+          height = 500,
           full_screen = TRUE,
           nav_panel("Result overview", dataTableOutput(ns("All_compounds"))),
           nav_panel("DAMs", dataTableOutput(ns("DAMs_tbl")))
@@ -298,7 +302,7 @@ dam_ui <- function(id) {
 #' @param prj_init use project init variables.
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
-#' @param p2_af_filter reactivevalues anno filtering
+#' @param p3_dam reactivevalues p3 DAM analysis
 #' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
 
@@ -308,9 +312,8 @@ dam_server <-
            volumes,
            prj_init,
            data_import_rv,
-           data_clean_rv,
-           data_export_rv,
-           p2_af_filter) {
+           data_clean_rv,p3_dam,
+           data_export_rv) {
     moduleServer(id, function(input, output, session) {
       ns <- session$ns
 
@@ -385,49 +388,38 @@ dam_server <-
       observeEvent(
         input$activarte_compare_group,
         {
-          if(prj_init$steps == "DAM and rest") {
-            if (!is.null(prj_init$object_negative.init)) {
-              p2_af_filter$object_merge = prj_init$object_negative.init
-            } else if (!is.null(prj_init$object_positive.init)) {
-              p2_af_filter$object_merge = prj_init$object_positive.init
-            } else {
-              return()
-            }
+          if (!is.null(input$saved_obj)) {
+            p3_dam$object_final <- load_rdata(input$saved_obj$datapath)
           } else {
-            if (!is.null(data_clean_rv$object_neg.af)) {
-              p2_af_filter$object_merge = data_clean_rv$object_neg.af
-            } else if (!is.null(data_clean_rv$object_pos.af)) {
-              p2_af_filter$object_merge = data_clean_rv$object_pos.af
-            } else {
-              return()
-            }
+            p3_dam$object_final <- data_clean_rv$object_final
           }
-          p2_af_filter$sample_info <- p2_af_filter$object_merge %>% extract_sample_info()
+
+          p3_dam$sample_info <- p3_dam$object_final %>% extract_sample_info()
 
           # Get column indexes, excluding first three columns
-          p2_af_filter$temp_col_idx = colnames(p2_af_filter$sample_info)[-c(1:3)]
+          p3_dam$temp_col_idx = colnames(p3_dam$sample_info)[-c(1:3)]
 
-          # Only update the select inputs if p2_af_filter$temp_col_idx is not empty
-          if (length(p2_af_filter$temp_col_idx) > 0) {
-            updateSelectInput(session, "col_index", choices = p2_af_filter$temp_col_idx, selected = "group")
-            updateSelectInput(session, "fig1_color_by", choices = p2_af_filter$temp_col_idx, selected = "group")
-            updateSelectInput(session, "fig1_color_by_3d", choices = p2_af_filter$temp_col_idx, selected = "group")
+          # Only update the select inputs if p3_dam$temp_col_idx is not empty
+          if (length(p3_dam$temp_col_idx) > 0) {
+            updateSelectInput(session, "col_index", choices = p3_dam$temp_col_idx, selected = "group")
+            updateSelectInput(session, "fig1_color_by", choices = p3_dam$temp_col_idx, selected = "group")
+            updateSelectInput(session, "fig1_color_by_3d", choices = p3_dam$temp_col_idx, selected = "group")
           }
 
           # Fetch dam_para and update group_id
           dam_para = dam_para()
           if (!is.null(dam_para)) {
-            p2_af_filter$group_id = dam_para$col_index
+            p3_dam$group_id = dam_para$col_index
 
             # Ensure group_id is valid
-            if (!is.null(p2_af_filter$group_id)) {
-              p2_af_filter$sample_groups = p2_af_filter$sample_info %>%
-                pull(!!p2_af_filter$group_id)
+            if (!is.null(p3_dam$group_id)) {
+              p3_dam$sample_groups = p3_dam$sample_info %>%
+                pull(!!p3_dam$group_id)
 
               # Update select inputs for groups
-              if (!is.null(p2_af_filter$sample_groups)) {
-                updateSelectInput(session, "left", choices = p2_af_filter$sample_groups)
-                updateSelectInput(session, "right", choices = p2_af_filter$sample_groups)
+              if (!is.null(p3_dam$sample_groups)) {
+                updateSelectInput(session, "left", choices = p3_dam$sample_groups)
+                updateSelectInput(session, "right", choices = p3_dam$sample_groups)
               }
             }
           }
@@ -438,13 +430,13 @@ dam_server <-
       observeEvent(
         input$DAM_start,
         {
-          if(is.null(p2_af_filter$object_merge)){return()}
-          if(is.null(p2_af_filter$temp_col_idx)){return()}
+          if(is.null(p3_dam$object_final)){return()}
+          if(is.null(p3_dam$temp_col_idx)){return()}
           ##> import parameters
           dam_para = dam_para()
           if(isTRUE(dam_para$anno_level)) {
-            p2_af_filter$object_merge =
-              p2_af_filter$object_merge %>%
+            p3_dam$object_final =
+              p3_dam$object_final %>%
               activate_mass_dataset(what = "annotation_table") %>%
               filter(!is.na(Level)) %>%
               filter(Level == 1 | Level == 2) %>%
@@ -457,22 +449,33 @@ dam_server <-
           ## Calculate the fold changes.
 
           control_sample_id =
-            p2_af_filter$object_merge %>%
+            p3_dam$object_final %>%
             extract_sample_info() %>%
             dplyr::rename("tags" = dam_para$col_index) %>%
             dplyr::filter(tags == dam_para$left) %>%
             dplyr::pull(sample_id)
-          print(control_sample_id)
 
           case_sample_id =
-            p2_af_filter$object_merge %>%
+            p3_dam$object_final %>%
             extract_sample_info() %>%
             dplyr::rename("tags" = dam_para$col_index) %>%
             dplyr::filter(tags == dam_para$right) %>%
             dplyr::pull(sample_id)
-          print(case_sample_id)
+
+          problems <- character()
+          if (length(control_sample_id) < 3) {
+            problems <- c(problems, paste(dam_para$left," sample number: ", length(control_sample_id), " need at least 3 samples"))
+          }
+          if (length(case_sample_id) < 3) {
+            problems <- c(problems, paste(dam_para$left, " sample number: ",length(case_sample_id), "need at least 3 samples"))
+          }
+          if (length(problems) > 0) {
+            shinyalert(title = "Error", text = paste(problems, collapse = ". "), type = "error")
+            return()
+          }
+
           object <-
-            p2_af_filter$object_merge %>%
+            p3_dam$object_final %>%
             activate_mass_dataset('sample_info') %>%
             dplyr::filter(sample_id %in% c(control_sample_id,case_sample_id))
 
@@ -489,9 +492,6 @@ dam_server <-
               method = "t.test",
               p_adjust_methods = "BH"
             )
-
-
-
 
           # DAM analysis ------------------------------------------------------------
           DAM_tbl =
@@ -510,9 +510,6 @@ dam_server <-
             dplyr::filter(abs(log2(fc)) >= dam_para$log2fc) %>%
             dplyr::filter(p_value <= dam_para$pvalue) %>%
             dplyr::filter(p_value_adjust <= dam_para$FDR)
-
-
-
 
           output$All_compounds = renderDataTable_formated(
 
@@ -571,6 +568,50 @@ dam_server <-
                 z_axis = para$fig1_z_axis
               )
           })
+          output$fig1_download <- downloadHandler(
+            filename = function() {
+              dp <- download_para()
+              format <- dp$fig1_format
+              dam_p <- dam_para()
+              paste0(dam_p$left, '_vs_', dam_p$right, '_PCA_plot.', format)
+            },
+            content = function(file) {
+              if (is.null(p3_dam$object_final)) {
+                stop("No data available for plotting. Please run the analysis first.")
+              }
+              dp <- download_para()
+              width <- dp$fig1_width
+              height <- dp$fig1_height
+              format <- dp$fig1_format
+
+              if (format == "png") {
+                png(file, width = width, height = height, units = "in", res = 300)
+              } else if (format == "jpg") {
+                jpeg(file, width = width, height = height, units = "in", res = 300, quality = 100)
+              } else if (format == "pdf") {
+                pdf(file, width = width, height = height)
+              } else if (format == "tiff") {
+                tiff(file, width = width, height = height, units = "in", res = 300)
+              }
+
+              para <- plot1_para()
+              if (isTRUE(para$fig1_scale)) {
+                temp_obj <- p3_dam$object_final %>% +1 %>% log(2) %>% scale()
+              } else {
+                temp_obj <- p3_dam$object_final %>% +1 %>% log(2)
+              }
+              p <- temp_obj %>%
+                massqc::massqc_pca(
+                  color_by = para$fig1_color_by,
+                  point_alpha = para$fig1_point_alpha,
+                  frame = para$fig1_frame,
+                  line = para$fig1_line
+                )
+
+              print(p)
+              dev.off()
+            }
+          )
           ###> fig2 Voc =============
 
           output$fig2_corr_plt.pos <- renderUI({
@@ -651,6 +692,68 @@ dam_server <-
             }
             p %>% plotly::ggplotly()
           })
+          output$fig2_download <- downloadHandler(
+            filename = function() {
+              dp <- download_para()
+              format <- dp$fig2_format
+              dam_p <- dam_para()
+              paste0(dam_p$left, '_vs_', dam_p$right, '_Volcano_plot.', format)
+            },
+            content = function(file) {
+              if (is.null(p3_dam$object_final)) {
+                stop("No data available for plotting. Please run the analysis first.")
+              }
+              dp <- download_para()
+              width <- dp$fig2_width
+              height <- dp$fig2_height
+              format <- dp$fig2_format
+
+              if (format == "png") {
+                png(file, width = width, height = height, units = "in", res = 300)
+              } else if (format == "jpg") {
+                jpeg(file, width = width, height = height, units = "in", res = 300, quality = 100)
+              } else if (format == "pdf") {
+                pdf(file, width = width, height = height)
+              } else if (format == "tiff") {
+                tiff(file, width = width, height = height, units = "in", res = 300)
+              }
+              para = plot2_para()
+              dam_para = dam_para()
+              if(is.null(input$DAM_start)){return()}
+              if(is.null(object)){return()}
+              temp_voc_p =
+                object %>%
+                massstat::volcano_plot(
+                  fc_column_name = para$fig2_fc_column_name,
+                  log2_fc = para$fig2_log2_fc,
+                  p_value_column_name = para$fig2_p_value_column_name,
+                  labs_x = para$fig2_labs_x,
+                  labs_y = para$fig2_labs_y,
+                  fc_up_cutoff = 2^(dam_para$log2fc),
+                  fc_down_cutoff = 2^-(dam_para$log2fc),
+                  p_value_cutoff = dam_para$pvalue,
+                  line_color = para$fig2_line_color,
+                  up_color = para$fig2_up_color,
+                  down_color = para$fig2_down_color,
+                  no_color = para$fig2_no_color,
+                  point_size = para$fig2_point_size,
+                  point_alpha = para$fig2_point_alpha,
+                  point_size_scale = para$fig2_point_size_scale,
+                  line_type = para$fig2_line_type,
+                  add_text = para$fig2_add_text,
+                  text_for = para$fig2_text_for,
+                  text_from = para$fig2_text_from
+                )
+              if(para$fig2_xlim_max < 1000 & para$fig2_xlim_min > -1000) {
+                p = temp_voc_p + xlim(para$fig2_xlim_min,para$fig2_xlim_max)
+              } else {
+                p = temp_voc_p
+              }
+              print(p)
+              dev.off()
+            }
+          )
+
         }
       )
     })

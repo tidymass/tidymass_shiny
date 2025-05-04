@@ -62,7 +62,7 @@ enrichment_ui <- function(id) {
               ),
               "Do not exceed the maximum number of cores of the machine."
             ),
-            value = 5,
+            value = 1,
           ),
           selectInput(
             inputId = ns("enrich_method"),
@@ -88,7 +88,7 @@ enrichment_ui <- function(id) {
           card_header(
             "Enrichment table"
           ),
-          height = 400,
+          height = 500,
           full_screen = TRUE,
           layout_columns(
             col_widths = c(5,2,5),
@@ -99,9 +99,9 @@ enrichment_ui <- function(id) {
         ),
         layout_column_wrap(
           width = 1/2,
-          height = 400,
+          height = 500,
           navset_card_tab(
-            height = 400,
+            height = 500,
             full_screen = T,
             title = "Barplot",
             sidebar = accordion(
@@ -167,7 +167,7 @@ enrichment_ui <- function(id) {
             )
           ),
           navset_card_tab(
-            height = 400,
+            height = 500,
             full_screen = TRUE,
             title = 'Enrich scatter plot',
             sidebar = accordion(
@@ -345,6 +345,7 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
                 if(para$hsa_db_type == "KEGG (hsa)") {
                   data("kegg_hsa_pathway", package = "metpath")
                   diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
+                  data_enrich$diff_metabolites <- diff_metabolites
                   pathway_database = kegg_hsa_pathway
                   kegg_id <-
                     diff_metabolites$KEGG.ID
@@ -357,6 +358,7 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
                                   p_adjust_method = para$p_adjust_method,
                                   method = para$enrich_method,
                                   threads = 3)
+                  data_enrich$res <- res
 
                 } else if(para$hsa_db_type == "HMDA (hsa)") {
 
@@ -378,8 +380,8 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
         data_enrich$enrich_tbl = res@result %>% as.data.frame() %>%
           dplyr::filter(p_value < 0.05)
         if (nrow(data_enrich$enrich_tbl) == 0) {
-          showNotification("No significant enriched pathway", type = "warning")
-          return()  # 阻止后续代码执行
+          shinyalert(title = "Error",text = "No significant enriched pathway", type = "warning")
+          return()
         }
 
         output$enrich_tbl = renderDataTable_formated(
@@ -475,6 +477,8 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
           temp_scatter_plot %>% plotly::ggplotly()
         })
 
+
+
       }
     )
 
@@ -488,7 +492,7 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
       temp_pathway = data_enrich$enrich_tbl[enrich_row_idx, ] %>%
         pull(pathway_name)
       print(temp_pathway)
-      select_idx = diff_metabolites %>%
+      select_idx = data_enrich$diff_metabolites %>%
         dplyr::filter(KEGG.ID %in% enrich_row) %>%
         dplyr::select(variable_id,mz,rt,Compound.name,fc,p_value,p_value_adjust) %>%
         left_join(data_enrich$object_dam %>% extract_expression_data() %>%
@@ -500,6 +504,92 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
         tbl = select_idx
       )
     }
+    )
+
+
+
+    # At the top level of the server function, add the following download handlers:
+
+    output$fig1_download <- downloadHandler(
+      filename = function() {
+        dp <- download_para()
+        format <- dp$fig1_format
+        paste0("Enrichment_barplot.", format)
+      },
+      content = function(file) {
+        if (is.null(data_enrich$res)) {
+          stop("No enrichment results available. Please run the enrichment analysis first.")
+        }
+        dp <- download_para()
+        width <- dp$fig1_width
+        height <- dp$fig1_height
+        format <- dp$fig1_format
+
+        if (format == "png") {
+          png(file, width = width, height = height, units = "in", res = 300)
+        } else if (format == "jpg") {
+          jpeg(file, width = width, height = height, units = "in", res = 300, quality = 100)
+        } else if (format == "pdf") {
+          pdf(file, width = width, height = height)
+        } else if (format == "tiff") {
+          tiff(file, width = width, height = height, units = "in", res = 300)
+        }
+
+        para <- plot1_para()
+        p <- metpath::enrich_bar_plot(
+          object = data_enrich$res,
+          x_axis = para$fig1_x_axis,
+          cutoff = para$fig1_cutoff,
+          top = para$fig1_top,
+          axis.text.x.width = para$fig1_axis.text.x.width,
+          axis.text.y.width = para$fig1_axis.text.y.width
+        )
+
+        print(p)
+        dev.off()
+      }
+    )
+
+    output$fig2_download <- downloadHandler(
+      filename = function() {
+        dp <- download_para()
+        format <- dp$fig2_format
+        paste0("Enrichment_scatterplot.", format)
+      },
+      content = function(file) {
+        if (is.null(data_enrich$res)) {
+          stop("No enrichment results available. Please run the enrichment analysis first.")
+        }
+        dp <- download_para()
+        width <- dp$fig2_width
+        height <- dp$fig2_height
+        format <- dp$fig2_format
+
+        if (format == "png") {
+          png(file, width = width, height = height, units = "in", res = 300)
+        } else if (format == "jpg") {
+          jpeg(file, width = width, height = height, units = "in", res = 300, quality = 100)
+        } else if (format == "pdf") {
+          pdf(file, width = width, height = height)
+        } else if (format == "tiff") {
+          tiff(file, width = width, height = height, units = "in", res = 300)
+        }
+
+        para <- plot2_para()
+        p <- metpath::enrich_scatter_plot(
+          object = data_enrich$res,
+          x_axis = para$fig2_x_axis,
+          y_axis = para$fig2_y_axis,
+          point_size = para$fig2_point_size,
+          x_axis_cutoff = para$fig2_x_axis_cutoff,
+          y_axis_cutoff = para$fig2_y_axis_cutoff,
+          label = para$fig2_label,
+          label_size = para$fig2_label_size
+        )
+
+        print(p)
+        dev.off()
+      }
     )
 
   }

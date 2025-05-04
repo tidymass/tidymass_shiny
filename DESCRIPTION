@@ -1,6 +1,6 @@
 Package: tidymassshiny
 Title: An Amazing Shiny App
-Version: 0.0.0.92
+Version: 1.0.0
 Authors@R: c(
     person(given = "Xiao",
            family = "Wang",

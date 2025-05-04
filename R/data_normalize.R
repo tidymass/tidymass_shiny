@@ -935,7 +935,7 @@ data_normalize_server <- function(id,volumes,prj_init,data_import_rv,data_clean_
           }
         })
         # negative
-        output$rsd_before_neg <- renderUI({
+        output$rsd_before.neg <- renderUI({
           plot_type <- input$fig3_data_clean_plt_format
           if (plot_type) {
             plotlyOutput(outputId = ns("plotly_rsd_plt.neg"))

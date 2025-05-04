@@ -101,7 +101,6 @@ app_server <-
       data_anno = data_anno,
       data_export_rv = data_export_rv
     )
-
     p2_af_filter <- reactiveValues(data = NULL)
     annotation_filter_server(
       id = "annotation_filter_id",
@@ -112,22 +111,22 @@ app_server <-
       p2_af_filter = p2_af_filter,
       data_export_rv = data_export_rv
     )
-    merge_data_server(
-      id = "merge_data_id",
+
+    annotation_origin_server(
+      id = "annotation_origin_id",
       volumes = volumes,
       prj_init = prj_init,
       data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv,
-      p2_af_filter = p2_af_filter,
-      data_export_rv = data_export_rv
-    )
+      data_export_rv = data_export_rv)
+    p3_dam <- reactiveValues(data = NULL)
     dam_server(
       id = "dam_id",
       volumes = volumes,
       prj_init = prj_init,
       data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv,
-      p2_af_filter = p2_af_filter,
+      p3_dam = p3_dam,
       data_export_rv = data_export_rv
     )
     data_enrich <- reactiveValues(data = NULL)
@@ -141,8 +140,10 @@ app_server <-
       data_export_rv = data_export_rv
     )
     fpa_server(
-      id = "Feature-based_Pathway_Analysis_id",
-      volumes = volumes
+      id = "Feature-based_Pathway_Analysis_id"
+    )
+    database_server(
+      id = "database_id",volumes = volumes
     )
 
   }
