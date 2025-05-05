@@ -24,7 +24,10 @@ if (!require('tidymass')) {
   source("https://www.tidymass.org/tidymass-packages/install_tidymass.txt");
   install_tidymass(from = "tidymass.org")
 };
-
+if (!require('writexl')) install.packages("writexl");
+if (!require('hexbin')) install.packages('hexbin')
+if (!require('ComplexUpset'))install.packages('ComplexUpset');
+if (!require('shinyalert'))install.packages('shinyalert');
 if (!require('shinyFiles')) remotes::install_github('thomasp85/shinyFiles');
 if (!require('shinyWidgets')) remotes::install_github("dreamRs/shinyWidgets");
 if (!require('shiny')) install.packages('shiny');

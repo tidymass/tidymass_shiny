@@ -233,10 +233,9 @@ annotation_origin_ui <- function(id) {
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
 #' @param p2_af_filter reactivevalues anno filtering
-#' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
 annotation_origin_server <- function(id, volumes, prj_init, data_import_rv,
-                                     data_clean_rv, data_export_rv) {
+                                     data_clean_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 

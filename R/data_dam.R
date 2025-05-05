@@ -303,7 +303,6 @@ dam_ui <- function(id) {
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
 #' @param p3_dam reactivevalues p3 DAM analysis
-#' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
 
 
@@ -312,8 +311,8 @@ dam_server <-
            volumes,
            prj_init,
            data_import_rv,
-           data_clean_rv,p3_dam,
-           data_export_rv) {
+           data_clean_rv,p3_dam
+           ) {
     moduleServer(id, function(input, output, session) {
       ns <- session$ns
 

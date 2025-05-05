@@ -176,9 +176,8 @@ remove_noise_ui <- function(id) {
 #' @param volumes shinyFiles volumes configuration
 #' @param prj_init Project initialization object
 #' @param data_import_rv Reactive values for imported data
-#' @param data_export_rv Reactive values for exported data
 #' @noRd
-remove_noise_server <- function(id, volumes, prj_init, data_import_rv, data_export_rv) {
+remove_noise_server <- function(id, volumes, prj_init, data_import_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     p2_dataclean <- reactiveValues(data = NULL)

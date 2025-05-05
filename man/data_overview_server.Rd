@@ -5,7 +5,7 @@
 \title{import from tbl data of server
 The application server-side}
 \usage{
-data_overview_server(id, volumes, prj_init, data_import_rv, data_export_rv)
+data_overview_server(id, volumes, prj_init, data_import_rv)
 }
 \arguments{
 \item{id}{module of server}
@@ -14,9 +14,7 @@ data_overview_server(id, volumes, prj_init, data_import_rv, data_export_rv)
 
 \item{prj_init}{use project init variables.}
 
-\item{data_import_rv}{reactivevalues mass_dataset export}
-
-\item{data_export_rv}{reactivevalues mass_dataset export
+\item{data_import_rv}{reactivevalues mass_dataset export
 Reactive observer to dynamically update selectInput choices based on
 available data sources. Prioritizes user-uploaded raw data over initialized
 project data.

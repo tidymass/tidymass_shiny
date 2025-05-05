@@ -27,7 +27,7 @@ enrichment_ui <- function(id) {
           radioButtons(
             inputId = ns('hsa_db_type'),
             label = "Pathway data type",
-            choices = c("KEGG (hsa)", "HMDB (hsa)", "Wikipedia (hsa)", "Customized (any species)"),
+            choices = c("KEGG (hsa)", "HMDB (hsa)", "Customized (any species)"),
             selected = "KEGG (hsa)"
           )
         ),
@@ -35,14 +35,20 @@ enrichment_ui <- function(id) {
           id = ns("upload_panel"),
           title = "Upload custom database",
           icon = bsicons::bs_icon("folder"),
-          shinyFilesButton(
-            id = ns('pathway_db'),
-            buttonType = "default",
-            title = "load pathway database (option) ",
-            label = 'load database file ',
-            class = NULL,, multiple = FALSE,
-            icon = bsicons::bs_icon("folder")
-          )
+          fileInput(
+            inputId = ns("cuz_pathway_database"),
+            label = tooltip(
+              trigger = list(
+                "File upload (option)",
+                bsicons::bs_icon("info-circle")
+              ),
+              "Pathway database such kegg"
+            ),
+            multiple = FALSE,
+            buttonLabel = "Browse...",
+            placeholder = "No file selected",
+            accept = ".rda"
+          ),
         ),
         accordion_panel(
           title = "Enrichment parameters",
@@ -247,18 +253,16 @@ enrichment_ui <- function(id) {
 #' @importFrom massdataset activate_mass_dataset
 #' @importFrom plotly renderPlotly plotlyOutput
 #' @import metpath
-#' @import plantmdb
 #' @param id module of server
 #' @param volumes shinyFiles volumes
 #' @param prj_init use project init variables.
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
-#' @param data_export_rv reactivevalues mass_dataset export
 #' @param data_enrich reactivevalues data annotation
 #' @noRd
 
 
-enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_enrich,data_export_rv) {
+enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,data_enrich) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     p2_dataclean <- reactiveValues(data = NULL)
@@ -271,6 +275,7 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
         enrich_method = input$enrich_method %>% as.character()
       )
     })
+
     plot1_para = reactive({
       list(
         fig1_x_axis = input$fig1_x_axis %>% as.character(),
@@ -314,18 +319,6 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
       {
         if (!is.null(data_clean_rv$object_dam)) {
           data_enrich$object_dam = data_clean_rv$object_dam
-        } else {
-          if (prj_init$steps == "DAM and rest") {
-            if (!is.null(prj_init$object_negative.init)) {
-              data_enrich$object_dam = prj_init$object_negative.init
-            } else if (!is.null(prj_init$object_positive.init)) {
-              data_enrich$object_dam = prj_init$object_positive.init
-            } else {
-              return()
-            }
-          } else {
-            return()
-          }
         }
         ## > extract DAMs
 
@@ -357,14 +350,29 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
                                   p_cutoff = 0.05,
                                   p_adjust_method = para$p_adjust_method,
                                   method = para$enrich_method,
-                                  threads = 3)
+                                  threads = para$threads)
                   data_enrich$res <- res
 
-                } else if(para$hsa_db_type == "HMDA (hsa)") {
-
-                } else if(para$hsa_db_type == "Wikipedia (hsa)") {
+                } else if(para$hsa_db_type == "HMDB (hsa)") {
+                  data("hmdb_pathway", package = "metpath")
+                  diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
+                  data_enrich$diff_metabolites <- diff_metabolites
+                  pathway_database = hmdb_pathway
+                  kegg_id <-
+                    diff_metabolites$KEGG.ID
+                  kegg_id <-
+                    kegg_id[!is.na(kegg_id)]
+                  res = enrich_pathways(query_id = kegg_id,query_type = "compound",
+                                        id_type = "HMDB",
+                                        pathway_database = pathway_database,
+                                        p_cutoff = 0.05,
+                                        p_adjust_method = para$p_adjust_method,
+                                        method = para$enrich_method,
+                                        threads = para$threads)
+                  data_enrich$res <- res
 
                 } else if(para$hsa_db_type == "Customized (any species)") {
+
 
                 } else {
                   return()

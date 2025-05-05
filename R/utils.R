@@ -73,26 +73,6 @@ theme1 <- function(){
   return(temp)
 }
 
-#' website logo
-#'
-#' MetMiner logo.
-#' @return shinyDashboardLogoDIY object.
-#' @param version version of metminer
-#' @importFrom dashboardthemes shinyDashboardLogoDIY
-#' @noRd
-#'
-customLogo <- function(version) {
-  shinyDashboardLogoDIY(
-    boldText = "Zhang Lab",
-    mainText = "MetMiner",
-    textSize = 14,
-    badgeText = version,
-    badgeTextColor = "white",
-    badgeTextSize = 2,
-    badgeBackColor = "#40E0D0",
-    badgeBorderRadius = 3
-  )
-}
 
 #' adduct extract
 #'
@@ -157,70 +137,6 @@ selectInput_div = function(inputId,label,choices,selected,multiple,title) {
     ),
     title = title
   )
-}
-
-#' fetch kegg pathway via ont
-#'
-#' Get pathway id via KEGG API.
-#' @return A dataframe to get term2name.
-#' @param ont species id of KEGG database.
-#' @importFrom stringr str_replace str_extract
-#' @importFrom dplyr mutate
-#' @importFrom RCurl getURL
-#' @export
-#'
-
-get_kegg_pathway_ont <- function(ont) {
-  temp_t2n_url = getURL(paste0("https://rest.kegg.jp/list/pathway/",ont))
-  TERM2NAME = read.table(text = temp_t2n_url,sep = "\t",header = F)  |>
-    setNames(c("TERM","NAME")) |>
-    mutate(TERM = str_replace(TERM,ont,"map")) |>
-    mutate(NAME = str_extract(NAME, "^.*?(?= -)"))
-  return(TERM2NAME)
-}
-
-
-#' fetch kegg compound id belongs to corresponding pathway
-#'
-#' match kegg cid 2 pathway.
-#' @return A dataframe to get term2gene
-#' @param compound_id kegg cid.
-#' @importFrom stringr str_extract_all
-#' @importFrom RCurl getURL
-#' @export
-#'
-
-get_compound_info <- function(compound_id) {
-  base_url <- "https://rest.kegg.jp/get/cpd:"
-
-  url <- paste0(base_url, compound_id)
-
-
-  result <- tryCatch({
-    response <- RCurl::getURL(url)
-    pathways <- stringr::str_extract_all(response, "map[0-9]+")[[1]]
-
-    # check
-    if (length(pathways) == 0) {
-      stop("No pathways found")
-    }
-
-    TERM2GENE <- data.frame(
-      TERM = pathways,
-      GENE = compound_id
-    )
-
-    return(TERM2GENE)
-  }, error = function(e) {
-    # return NA
-    message("Error occurred: ", e$message)
-    return(data.frame(
-      TERM = NA,
-      GENE = compound_id
-    ))
-  })
-
-  return(result)
 }
 
 #' export data

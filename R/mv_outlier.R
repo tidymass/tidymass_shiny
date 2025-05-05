@@ -253,9 +253,8 @@ remove_outlier_ui <- function(id) {
 #' @param prj_init Project initialization object
 #' @param data_import_rv Reactive values for imported data
 #' @param data_clean_rv Reactive values for cleaned data
-#' @param data_export_rv Reactive values for exported data
 #' @noRd
-remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_clean_rv, data_export_rv) {
+remove_outlier_server <- function(id, volumes, prj_init, data_import_rv, data_clean_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     p2_dataclean <- reactiveValues(data = NULL)

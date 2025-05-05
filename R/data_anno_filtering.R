@@ -173,13 +173,13 @@ annotation_filter_ui <- function(id) {
 #' @importFrom dplyr select left_join
 #' @importFrom massdataset activate_mass_dataset
 #' @importFrom plotly renderPlotly plotlyOutput
+#' @importFrom shinyalert shinyalert
 #' @param id module of server
 #' @param volumes shinyFiles volumes
 #' @param prj_init use project init variables.
 #' @param data_import_rv reactivevalues mass_dataset export
 #' @param data_clean_rv reactivevalues p2 dataclean
 #' @param p2_af_filter reactivevalues anno filtering
-#' @param data_export_rv reactivevalues mass_dataset export
 #' @noRd
 annotation_filter_server <-
   function(id,
@@ -187,7 +187,6 @@ annotation_filter_server <-
            prj_init,
            data_import_rv,
            data_clean_rv,
-           data_export_rv,
            p2_af_filter) {
     moduleServer(id, function(input, output, session) {
       ns <- session$ns

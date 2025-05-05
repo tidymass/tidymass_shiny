@@ -214,7 +214,6 @@ data_import_raw_ui <- function(id) {
 #'   \item object_pos_raw - Raw positive mode mass_dataset object
 #'   \item object_neg_raw - Raw negative mode mass_dataset object
 #' }
-#' @param data_export_rv Reactive values for exported data
 #'
 #' @description Server module handling raw mass spectrometry data import and processing workflow.
 #' Includes functionality for:
@@ -227,7 +226,7 @@ data_import_raw_ui <- function(id) {
 #'
 #' @noRd
 
-data_import_raw_server <- function(id, volumes, prj_init, data_import_rv, data_export_rv) {
+data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     ## 3.3 Import from raw data ----------------------------------------------------
