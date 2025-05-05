@@ -117,26 +117,10 @@ database_ui <- function(id) {
           height = 500,
           full_screen = TRUE,
           title = "Construction Output",
-          sidebar = accordion(
-            accordion_panel(
-              title = "Download Options",
-              icon = bs_icon("download"),
-              textInput(
-                ns("db_filename"),
-                label = "File Name",
-                value = "metabolite_database"
-              ),
-              selectInput(
-                ns("db_format"),
-                label = "File Format",
-                choices = c("RDS", "RData"),
-                selected = "RDS"
-              )
-            )
-          ),
           nav_panel(
             title = "Build Log",
             icon = bs_icon("terminal"),
+            downloadButton(outputId = ns("download_db"),label = "download",icon = icon("download")),
             verbatimTextOutput(ns("build_log"))
           ),
           nav_panel(
