@@ -277,6 +277,7 @@ fpa_ui <- function(id) {
           ),
           nav_panel("Dysregulated metabolic network",
                     actionButton(inputId = ns("show_network_plot"),label = "Show network",width = "20%"),
+                    downloadButton(outputId = ns("download_res"),label = "Download fpa result",style = "width:20%",icon = icon("download")),
                     plotOutput(ns("network_plt"))
           )
         ),
@@ -479,6 +480,17 @@ fpa_server <- function(id) {
         shinyalert("Error", e$message, type = "error")
       })
     })
+
+    output$download_res <- downloadHandler(
+      filename = function() {
+        "fpa_analysis_result.rda"
+      },
+      content = function(file) {
+        req(fpa_values$fpa_result)
+        fpa_result <- fpa_values$fpa_result
+        save(list = fpa_result, file = file)
+      }
+    )
 
     observeEvent(input$show_network_plot, {
       req(fpa_values$fpa_result)

@@ -1,7 +1,6 @@
-#' database construction
+#' Database Construction UI
 #'
-#' @param request Internal parameter for `{shiny}`.
-#'     DO NOT REMOVE.
+#' @param id Module ID for Shiny.
 #' @import shiny
 #' @importFrom bsicons bs_icon
 #' @importFrom shinyjs useShinyjs
@@ -10,11 +9,10 @@
 #' @importFrom shinyWidgets materialSwitch
 #' @importFrom DT dataTableOutput
 #' @noRd
-
 database_ui <- function(id) {
   ns <- NS(id)
   nav_panel(
-    title = 'Database Construction',
+    title = 'Metabolite Database Construction',
     icon = bs_icon("database"),
     layout_sidebar(
       sidebar = accordion(
@@ -24,14 +22,14 @@ database_ui <- function(id) {
           shinyFilesButton(
             id = ns('metab_info_file'),
             buttonType = "default",
-            title = "choose ms1 info file",
+            title = "Choose MS1 info file",
             label = "File path",
-            class = NULL,, multiple = FALSE,
+            class = NULL,
+            multiple = FALSE,
             icon = bsicons::bs_icon("files")
           ),
-          tags$span(textOutput(outputId = ns("metab_info_path")), class = "text-wrap"),
+          tags$span(textOutput(outputId = ns("metab_info_path")), class = "text-wrap")
         ),
-
         accordion_panel(
           title = "Construction Parameters",
           icon = bs_icon("gear"),
@@ -111,48 +109,42 @@ database_ui <- function(id) {
           )
         )
       ),
-
       page_fluid(
-        navset_card_tab(
-          height = 500,
-          full_screen = TRUE,
-          title = "Construction Output",
-          nav_panel(
-            title = "Build Log",
-            icon = bs_icon("terminal"),
-            downloadButton(outputId = ns("download_db"),label = "download",icon = icon("download")),
-            verbatimTextOutput(ns("build_log"))
+        nav_panel(
+          title = "result",
+          icon = bs_icon("terminal"),
+          textInput(
+            ns("db_name"),
+            label = tooltip(
+              trigger = list("Database Name", bs_icon("info-circle")),
+              "The database name"
+            ),
+            value = "My_inhouse_ms_db_v1"
           ),
-          nav_panel(
-            title = "Database Summary",
-            icon = bs_icon("table"),
-            verbatimTextOutput(ns("db_summary"))
-          )
+          downloadButton(
+            outputId = ns("download_db"),
+            label = "Download Database",
+            icon = icon("download"),style = "width:20%",
+          ),
+          dataTableOutput(outputId = ns("db_summary"))
         )
       )
     )
   )
 }
 
-
-
-#' database construction
-#' The application server-side
+#' Database Construction Server
 #'
-#' @param input,output,session Internal parameters for {shiny}.
-#'     DO NOT REMOVE.
+#' @param id Module ID for Shiny.
+#' @param volumes ShinyFiles volumes.
 #' @import shiny
 #' @importFrom shinyjs toggle runjs useShinyjs
 #' @importFrom dplyr select left_join
 #' @importFrom massdataset activate_mass_dataset
 #' @importFrom shinyFiles shinyDirChoose parseDirPath getVolumes shinyFileChoose parseFilePaths
-#' @importFrom plotly renderPlotly plotlyOutput
 #' @import metpath
-#' @param id module of server
-#' @param volumes shinyFiles volumes
 #' @noRd
-
-database_server <- function(id,volumes) {
+database_server <- function(id, volumes) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     db_values <- reactiveValues(
@@ -162,29 +154,40 @@ database_server <- function(id,volumes) {
 
     observe({
       shinyFileChoose(input, "metab_info_file", roots = volumes, session = session)
-      if(!is.null(input$metab_info_file)){
-        # browser()
-        temp_file_text <-parseFilePaths(roots = volumes,  input$metab_info_file)
+      if (!is.null(input$metab_info_file)) {
+        temp_file_text <- parseFilePaths(roots = volumes, input$metab_info_file)
         output$metab_info_path <- renderText(temp_file_text$datapath)
-      }})
-
+      }
+    })
 
     observeEvent(input$build_db, {
       req(input$metab_info_file)
+      db_name <- as.character(input$db_name)
 
-      temp_file_text <-parseFilePaths(roots = volumes,  input$metab_info_file)
+      # Input validation for db_name
+      if (is.null(db_name) || db_name == "" || !grepl("^[a-zA-Z0-9_]+$", db_name)) {
+        showNotification("Please provide a valid database name (alphanumeric and underscores only).", type = "error")
+        return()
+      }
+
+      temp_file_text <- parseFilePaths(roots = volumes, input$metab_info_file)
       metab_info_file_path <- as.character(temp_file_text$datapath)
-      db_values$dir_path = dirname(metab_info_file_path)
-      db_values$file_name = basename(metab_info_file_path)
+      db_values$dir_path <- dirname(metab_info_file_path)
+      db_values$file_name <- basename(metab_info_file_path)
 
-
-      shinybusy::show_modal_progress_line(
-        text = "Constructing database...",
-        value = 0.2
-      )
+      # Show modal progress dialog
+      showModal(modalDialog(
+        title = tags$div(
+          tags$i(class = "fa fa-spinner fa-spin"),
+          "Constructing Database"
+        ),
+        "For MS2 level database construction, this may take a long time. Please be patient.",
+        easyClose = FALSE,
+        footer = NULL
+      ))
+      Sys.sleep(time = 15)
 
       tryCatch({
-
         db_values$database <- metid::construct_database(
           path = db_values$dir_path,
           metabolite.info.name = db_values$file_name,
@@ -192,39 +195,41 @@ database_server <- function(id,volumes) {
           source = input$source,
           creater = input$creater,
           email = input$email,
-          mz.tol = input$mz_tol %>% as.numeric(),
-          rt.tol = input$rt_tol %>% as.numeric(),
-          threads = input$threads %>% as.numeric(),
-          rt = input$rt %>% as.logical()
+          mz.tol = as.numeric(input$mz_tol),
+          rt.tol = as.numeric(input$rt_tol),
+          threads = as.numeric(input$threads),
+          rt = as.logical(input$rt)
         )
-
+        temp_obj = db_values$database
+        db_values$sapectra.info = temp_obj@spectra.info %>% as.data.frame()
         db_values$build_log <- capture.output(show(db_values$database))
+        assign(db_name, db_values$database, envir = .GlobalEnv)
 
-        shinybusy::update_modal_progress(0.9)
-        showNotification("Database built successfully!", type = "message")
-
+        output$db_summary <- renderDataTable_formated(
+          condition1 = db_values$sapectra.info,
+          filename.a = "spectra.info",
+          tbl = db_values$sapectra.info
+        )
+        shinyalert("Success","Database built successfully!", type = "success",timer = 5000)
       }, error = function(e) {
-        db_values$build_log <- paste("Error:", e$message)
-        showNotification(paste("Build failed:", e$message), type = "error")
+        shinyalert("Error",paste("Build failed:", e$message), type = "error",timer = 5000)
       }, finally = {
-        shinybusy::remove_modal_progress()
+        removeModal()
       })
     })
 
-
-    output$build_log <- renderText({
-      req(db_values$build_log)
-      paste(db_values$build_log, collapse = "\n")
-    })
-
-
+    # Download handler for .RData file
     output$download_db <- downloadHandler(
       filename = function() {
-        paste0(db_values$dir_path,"/metabolite-database_", input$version, ".rds")
+        paste0(input$db_name, ".rda")
       },
       content = function(file) {
         req(db_values$database)
-        save(db_values$database, file)
+        db_name <- as.character(input$db_name)
+        # Create a temporary environment to avoid polluting .GlobalEnv
+        temp_env <- new.env()
+        assign(db_name, db_values$database, envir = temp_env)
+        save(list = db_name, file = file, envir = temp_env)
       }
     )
   })
