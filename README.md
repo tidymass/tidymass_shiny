@@ -1,14 +1,12 @@
-![](inst/app/www/header_md.png)
+## `tidymass shiny`: A user-friendly shinyapp designed for metabolomics data analysis within the **tidymass** framework. <img src="inst/app/www" align="right" alt="" width="100" />
 
-[![R version](https://img.shields.io/badge/R-v4.3.3-salmon)](https://www.r-project.org)  [![license](https://img.shields.io/badge/license-MIT-red)](https://opensource.org/licenses/MIT)  [![Official](https://img.shields.io/badge/Blog-TidyMass-purple)](https://www.tidymass.org/)   
+[![R version](https://img.shields.io/badge/R-v4.3.3-salmon)](https://www.r-project.org)  [![license](https://img.shields.io/badge/license-MIT-red)](https://opensource.org/licenses/MIT)  [![Official](https://img.shields.io/badge/Homepage-TidyMass-purple)](https://www.tidymass.org/)   
 
+# **About**
 
-A user-friendly shinyapp designed for metabolomics data analysis within the **tidymass** framework.
+`tidymassshiny` is a part of [tidymass project](https://www.tidymass.org/).
 
-
-# Quick start
-
-## Install
+# **Installation**
 
 ```  r
 ##> for chinese users:
@@ -40,7 +38,7 @@ if (!require('massdbbuildin')) remotes::install_github('tidymass/massdbbuildin')
 if (!require('tidymassshiny')) remotes::install_github('tidymass/tidymass_shiny')
 ```
 
-# Start
+## Start
 
 ```r
 library(tidyverse)
@@ -49,9 +47,30 @@ library(tidymassshiny)
 run_tidymass_shiny()
 ```
 
-![](/inst/app/www/homepage.tiff)
+The following webpage pops up to indicate that `tidymass shiny` is installed successfully.
 
-# Reference
+![](/inst/app/www/homepage.png)
+
+# **Usage**
+
+Please see the [tidymassshiny-tutorial](https://www.tidymass.org/tidymassshiny-tutorial/) to get the instruction of `tidymass shiny`.
 
 
-# Citation
+# **Need help?**
+
+If you have any quesitions about `tidymass shiny`, please don’t hesitate to
+email me (<shawnwang2016@126.com>). 
+
+You can also initiate a question a or bug report in the `issue page`.
+
+
+
+# **Citation**
+
+If you use `tidymass shiny` in your publications, please cite this paper:
+
+Shen, X., Yan, H., Wang, C. et al. TidyMass an object-oriented reproducible analysis framework for LC–MS data. Nat Commun 13, 4365 (2022). 
+
+[Weblink](https://www.nature.com/articles/s41467-022-32155-w)
+
+Thanks very much!
