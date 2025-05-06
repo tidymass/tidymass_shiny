@@ -45,11 +45,10 @@ app_ui <- function(request) {
       nav_menu(
         title = 'Tidymass shiny toolkits', icon = bs_icon('person-vcard'),
         fpa_ui("Feature-based_Pathway_Analysis_id"),
-        database_ui("database_id")
+        database_ui("database_id"),
+        id_convert_ui("id_convert_id")
         # pathway_db_construction_ui("pathway_db_construction_id")
       ),
-      # # flexible tools
-      # footer = flexible_tools_ui("flexible_tools")
       )
       )
 

@@ -337,7 +337,7 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
 
                 if(para$hsa_db_type == "KEGG (hsa)") {
                   data("kegg_hsa_pathway", package = "metpath")
-                  diff_metabolites = data_enrich$object_dam %>% extract_annotation_table()
+                  diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
                   data_enrich$diff_metabolites <- diff_metabolites
                   pathway_database = kegg_hsa_pathway
                   kegg_id <-
@@ -355,7 +355,12 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
 
                 } else if(para$hsa_db_type == "HMDB (hsa)") {
                   data("hmdb_pathway", package = "metpath")
-                  diff_metabolites = data_enrich$object_dam %>% extract_annotation_table()
+                  temp_diff <- data_enrich$object_dam %>% extract_variable_info()
+                  anno_diff <- data_enrich$object_dam %>% extract_annotation_table() %>%
+                    group_by(variable_id) %>% slice_head(n = 1) %>% ungroup() %>%
+                    dplyr::select(variable_id,HMDB.ID)
+                  diff_metabolites =  left_join(temp_diff,anno_diff)
+
                   data_enrich$diff_metabolites <- diff_metabolites
                   pathway_database = hmdb_pathway
                   hmdb_id <-
