@@ -1,6 +1,7 @@
-# Shinyapp for tidymass
+![](inst/app/www/header_md.png)
 
-<-- logo -->
+[![R version](https://img.shields.io/badge/R-v4.3.3-salmon)](https://www.r-project.org)  [![license](https://img.shields.io/badge/license-MIT-red)](https://opensource.org/licenses/MIT)  [![Official](https://img.shields.io/badge/Blog-TidyMass-purple)](https://www.tidymass.org/)   
+
 
 A user-friendly shinyapp designed for metabolomics data analysis within the **tidymass** framework.
 
@@ -47,6 +48,8 @@ library(tidymass)
 library(tidymassshiny)
 run_tidymass_shiny()
 ```
+
+![](/inst/app/www/homepage.tiff)
 
 # Reference
 
