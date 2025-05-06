@@ -1,4 +1,4 @@
-## `tidymass shiny`: A user-friendly shinyapp designed for metabolomics data analysis within the **tidymass** framework. <img src="inst/app/www" align="right" alt="" width="100" />
+## `tidymass shiny`: A user-friendly shinyapp designed for metabolomics data analysis within the **tidymass** framework. <img src="inst/app/www/favicon.ico" align="right" alt="" width="100" />
 
 [![R version](https://img.shields.io/badge/R-v4.3.3-salmon)](https://www.r-project.org)  [![license](https://img.shields.io/badge/license-MIT-red)](https://opensource.org/licenses/MIT)  [![Official](https://img.shields.io/badge/Homepage-TidyMass-purple)](https://www.tidymass.org/)   
 
