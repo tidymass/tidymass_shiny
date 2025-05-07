@@ -46,9 +46,9 @@ app_ui <- function(request) {
         title = 'Tidymass shiny toolkits', icon = bs_icon('person-vcard'),
         fpa_ui("Feature-based_Pathway_Analysis_id"),
         database_ui("database_id"),
+        kegg_pathway_ui("kegg_pathway_id"),
         id_convert_ui("id_convert_id")
-        # pathway_db_construction_ui("pathway_db_construction_id")
-      ),
+      )
       )
       )
 

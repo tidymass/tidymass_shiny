@@ -377,6 +377,22 @@ enrichment_server <- function(id,volumes,prj_init,data_import_rv,data_clean_rv,d
                   data_enrich$res <- res
 
                 } else if(para$hsa_db_type == "Customized (any species)") {
+                  pathway_database <- load_rdata(path = input$cuz_pathway_database$datapath)
+                  diff_metabolites = data_enrich$object_dam %>% extract_variable_info()
+                  data_enrich$diff_metabolites <- diff_metabolites
+                  kegg_id <-
+                    diff_metabolites$KEGG.ID
+                  kegg_id <-
+                    kegg_id[!is.na(kegg_id)]
+                  res = enrich_pathways(query_id = kegg_id,query_type = "compound",
+                                        id_type = "KEGG",
+                                        pathway_database = pathway_database,
+                                        p_cutoff = 0.05,
+                                        p_adjust_method = para$p_adjust_method,
+                                        method = para$enrich_method,
+                                        threads = para$threads)
+                  data_enrich$res <- res
+
 
 
                 } else {

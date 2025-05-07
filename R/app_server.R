@@ -131,6 +131,9 @@ app_server <-
     database_server(
       id = "database_id",volumes = volumes
     )
+    kegg_pathway_server(
+      id = "kegg_pathway_id",volumes = volumes
+    )
     id_convert_server(
       id = "id_convert_id"
     )
