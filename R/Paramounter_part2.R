@@ -75,7 +75,7 @@ paramounter_part2 = function(
 
   #process function
   process_file <- function(file,q) {
-    ms1data <- readMSData(files = paste0(directory,file[q]), mode = "onDisk", msLevel. = 1)
+    ms1data <- readMSData(files = file.path(directory,file[q]), mode = "onDisk", msLevel. = 1)
     mzRange <- c(min(unlist(mz(ms1data))), max(unlist(mz(ms1data))))
     ROI <- seq(mzRange[1], mzRange[2], 0.05)
     mzData <- mz(ms1data)
