@@ -11,8 +11,16 @@ app_server <-
     # Your application server logic
     bslib::bs_themer()
     # Call module server functions
+    # Determine volumes based on system type
     if (Sys.info()["sysname"] == "Windows") {
       volumes = get_volumes_win()
+    } else if (Sys.info()["sysname"] == "Linux") {
+      # Set volumes to shiny user's home directory on Linux
+      shiny_home <- Sys.getenv("HOME", unset = "/home/shiny")
+      volumes = c(shiny_home = shiny_home)
+    } else if (Sys.info()["sysname"] == "Darwin") {  # macOS is identified as "Darwin"
+      user_home <- Sys.getenv("HOME")
+      volumes = c(home = user_home)
     } else {
       volumes = shinyFiles::getVolumes()()
     }
