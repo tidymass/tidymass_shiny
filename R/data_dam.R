@@ -451,19 +451,19 @@ dam_server <-
             p3_dam$object_final %>%
             extract_sample_info() %>%
             dplyr::rename("tags" = dam_para$col_index) %>%
-            dplyr::filter(tags == dam_para$left) %>%
+            dplyr::filter(tags == dam_para$right) %>%
             dplyr::pull(sample_id)
 
           case_sample_id =
             p3_dam$object_final %>%
             extract_sample_info() %>%
             dplyr::rename("tags" = dam_para$col_index) %>%
-            dplyr::filter(tags == dam_para$right) %>%
+            dplyr::filter(tags == dam_para$left) %>%
             dplyr::pull(sample_id)
 
           problems <- character()
           if (length(control_sample_id) < 3) {
-            problems <- c(problems, paste(dam_para$left," sample number: ", length(control_sample_id), " need at least 3 samples"))
+            problems <- c(problems, paste(dam_para$right," sample number: ", length(control_sample_id), " need at least 3 samples"))
           }
           if (length(case_sample_id) < 3) {
             problems <- c(problems, paste(dam_para$left, " sample number: ",length(case_sample_id), "need at least 3 samples"))
