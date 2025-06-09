@@ -31,7 +31,7 @@ proxy_module_ui <- function(id) {
 
 #' Proxy Module Server
 #'
-#' @param id 模块命名空间 ID
+#' @param id module id
 #' @export
 #'
 #' @importFrom shiny moduleServer NS observeEvent textInput icon actionButton reactiveValues
@@ -41,33 +41,32 @@ proxy_module_ui <- function(id) {
 #' @noRd
 proxy_module_server <- function(id) {
   moduleServer(id, function(input, output, session) {
-    # 代理状态响应式值
+    # reaction values
     proxy_status <- reactiveValues(
       http = "",
       https = "",
       socks5 = "",
       active = FALSE,
       test_result = "Proxy not configured",
-      # 添加初始化标志，防止启动时显示通知
       initialized = FALSE
     )
 
-    # 添加一个标志来跟踪是否是第一次打开开关
+    # Add a flag to track whether the switch is turned on for the first time
     first_time_open <- reactiveVal(TRUE)
 
-    # 观察代理开关状态变化
+    # Observe the change in the state of the agent switch
     observeEvent(input$proxy_switch, {
       if (input$proxy_switch) {
-        # 当开关打开时，弹出代理设置窗口
+        # When the switch is turned on, the proxy settings window pops up
         show_proxy_settings_modal()
-        first_time_open(FALSE)  # 标记为已打开过
+        first_time_open(FALSE)
       } else {
-        # 当开关关闭时，清除代理设置
+        # Clear proxy settings when the switch is turned off
         clear_proxy_settings()
         proxy_status$active <- FALSE
         proxy_status$test_result <- "Proxy disabled"
 
-        # 仅在用户操作后显示通知，而不是在初始化时
+        # Notifications are displayed only after user action, not at initialization
         if (proxy_status$initialized) {
           shinyalert::shinyalert(
             title = "Proxy Disabled",
@@ -77,15 +76,15 @@ proxy_module_server <- function(id) {
         }
       }
 
-      # 标记为已初始化
+      # Mark as initialized
       proxy_status$initialized <- TRUE
-    }, ignoreInit = TRUE)  # 忽略初始化时的触发
+    }, ignoreInit = TRUE)
 
-    # 显示代理设置模态框
+    # Show Proxy Settings Modal Box
     show_proxy_settings_modal <- function() {
       ns <- session$ns
 
-      # 如果是第一次打开，显示默认值，否则显示上次设置的值
+      # If it is the first time, the default value will be displayed, otherwise the value set last time will be displayed.
       if (first_time_open()) {
         initial_values <- list(
           http = "127.0.0.1:7897",
@@ -129,34 +128,32 @@ proxy_module_server <- function(id) {
         cancelButtonText = "Cancel",
         callbackR = function(value) {
           if (value) {
-            # 用户点击了保存按钮
             save_and_test_proxy()
           } else {
-            # 用户点击了取消按钮，重置开关状态
             shinyWidgets::updateSwitchInput(session, "proxy_switch", value = FALSE)
           }
         }
       )
     }
 
-    # 保存并测试代理设置
+    # Save and test proxy settings
     save_and_test_proxy <- function() {
-      # 保存代理设置
+      # # Save proxy settings
       proxy_status$http <- input$http_proxy_input
       proxy_status$https <- input$https_proxy_input
       proxy_status$socks5 <- input$socks5_proxy_input
 
-      # 设置环境变量
+      # Set environment variables
       set_proxy_env_vars()
 
-      # 测试代理连接
+      # Test the proxy connection
       test_result <- test_proxy_connection()
 
-      # 更新代理状态
+      # Update proxy status
       proxy_status$active <- test_result$success
       proxy_status$test_result <- test_result$message
 
-      # 显示测试结果
+      # Display test results
       if (test_result$success) {
         shinyalert::shinyalert(
           title = "Proxy Test Successful",
@@ -164,28 +161,28 @@ proxy_module_server <- function(id) {
           type = "success"
         )
       } else {
-        # 如果测试失败，重置开关状态并清除代理设置
+        # If the test fails, reset the switch status and clear the proxy settings
         shinyWidgets::updateSwitchInput(session, "proxy_switch", value = FALSE)
         clear_proxy_settings()
 
         shinyalert::shinyalert(
           title = "Proxy Test Failed",
-          text = paste(
+          text = HTML(paste(
             test_result$message,
             "<br><br><b>Warning:</b> Some modules requiring internet access (e.g., ID conversion and KEGG pathway construction) may not function properly."
-          ),
+          )),
           type = "error",
           html = TRUE
         )
+
       }
     }
 
-    # 设置环境变量
+    # Set environment variable
     set_proxy_env_vars <- function() {
-      # 清除现有设置
       clear_proxy_settings()
 
-      # 设置 HTTP 代理
+      # Set up HTTP proxy
       if (!is.null(proxy_status$http) && proxy_status$http != "") {
         parts <- strsplit(proxy_status$http, ":")[[1]]
         if (length(parts) == 2) {
@@ -196,7 +193,7 @@ proxy_module_server <- function(id) {
         }
       }
 
-      # 设置 HTTPS 代理
+      # Set up HTTPS proxy
       if (!is.null(proxy_status$https) && proxy_status$https != "") {
         parts <- strsplit(proxy_status$https, ":")[[1]]
         if (length(parts) == 2) {
@@ -207,7 +204,7 @@ proxy_module_server <- function(id) {
         }
       }
 
-      # 设置 SOCKS5 代理
+      # Set up SOCKS5 proxy
       if (!is.null(proxy_status$socks5) && proxy_status$socks5 != "") {
         parts <- strsplit(proxy_status$socks5, ":")[[1]]
         if (length(parts) == 2) {
@@ -219,9 +216,9 @@ proxy_module_server <- function(id) {
       }
     }
 
-    # 清除代理设置
+    # Clear proxy settings
     clear_proxy_settings <- function() {
-      # 清除环境变量
+      # Clear environmental variables
       Sys.unsetenv("http_proxy")
       Sys.unsetenv("HTTP_PROXY")
       Sys.unsetenv("https_proxy")
@@ -230,7 +227,7 @@ proxy_module_server <- function(id) {
       Sys.unsetenv("ALL_PROXY")
     }
 
-    # 测试代理连接
+    # Test the proxy connection
     test_proxy_connection <- function() {
       test_urls <- c(
         "https://rest.kegg.jp/list/pathway/hsa",  # KEGG API
@@ -242,7 +239,7 @@ proxy_module_server <- function(id) {
 
       for (test_url in test_urls) {
         tryCatch({
-          # 使用 httr 测试连接
+          # Test the connection with httr
           response <- httr::GET(test_url,httr::timeout(10))
 
           if (httr::status_code(response) == 200) {
@@ -267,7 +264,7 @@ proxy_module_server <- function(id) {
       }
     }
 
-    # 返回代理状态给外部使用
+    # Return the proxy status for external use
     reactive({
       list(
         active = proxy_status$active,
