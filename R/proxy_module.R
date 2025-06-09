@@ -157,7 +157,7 @@ proxy_module_server <- function(id) {
       if (test_result$success) {
         shinyalert::shinyalert(
           title = "Proxy Test Successful",
-          text = test_result$message,
+          text = HTML(test_result$message),
           type = "success"
         )
       } else {
