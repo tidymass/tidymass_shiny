@@ -48,7 +48,8 @@ app_ui <- function(request) {
         database_ui("database_id"),
         kegg_pathway_ui("kegg_pathway_id"),
         id_convert_ui("id_convert_id")
-      )
+      ),
+      nav_item(proxy_module_ui("proxy"))
       )
       )
 
@@ -74,7 +75,31 @@ golem_add_external_resources <- function() {
     bundle_resources(
       path = app_sys("app/www"),
       app_title = "TidyMass"
-    )
+    ),
+
+    tags$style(HTML("
+      .proxy-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 10px;
+      }
+      .proxy-status {
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .proxy-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .proxy-failure {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+    "))
     # Add here other external resources
     # for example, you can add shinyalert::useShinyalert()
 

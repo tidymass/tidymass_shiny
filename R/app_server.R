@@ -145,5 +145,6 @@ app_server <-
     id_convert_server(
       id = "id_convert_id"
     )
+    proxy_status <- proxy_module_server("proxy")
 
   }
