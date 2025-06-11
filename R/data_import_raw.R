@@ -472,9 +472,9 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
         if (dir_neg) {
           temp_qc_num.neg <- length(para_data_check$QC_number.n)
           temp_dir_path.neg <- if (temp_qc_num.neg == 0) {
-            file.path(para_data_check$MS1_path, "neg", "Subject/")
+            file.path(para_data_check$MS1_path, "NEG", "Subject/")
           } else {
-            file.path(para_data_check$MS1_path, "neg", "QC/")
+            file.path(para_data_check$MS1_path, "NEG", "QC/")
           }
 
           para_opt_steps = c("find best ppmcut off","find best peak picking prarmeter","Finish")
@@ -541,7 +541,7 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
                                    return(NULL)
                                  })
                              }
-                             writexl::write_xlsx(data_para_opt$step2.n,paste0(temp_dir_path.neg,"parameters.xlsx"))
+                             writexl::write_xlsx(data_para_opt$step2.n,file.path(temp_dir_path.neg,"parameters.xlsx"))
                            } else if (i == 3) {
                              shinyalert("Success","negative model parameters optimized finish:", type = "success")
                            }
