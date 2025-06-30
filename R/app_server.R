@@ -146,5 +146,6 @@ app_server <-
       id = "id_convert_id"
     )
     proxy_status <- proxy_module_server("proxy")
+    flexible_download_widget_server("download_widget", prj_init)
 
   }

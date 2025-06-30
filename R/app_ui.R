@@ -49,8 +49,10 @@ app_ui <- function(request) {
         kegg_pathway_ui("kegg_pathway_id"),
         id_convert_ui("id_convert_id")
       ),
-      nav_item(proxy_module_ui("proxy"))
+      nav_item(proxy_module_ui("proxy")),
+      footer = flexible_download_widget_ui("download_widget")
       )
+
       )
 
 }
@@ -78,6 +80,7 @@ golem_add_external_resources <- function() {
     ),
 
     tags$style(HTML("
+      /* 代理模块样式 */
       .proxy-control {
         display: flex;
         align-items: center;

@@ -5,10 +5,8 @@
 #' @import shiny
 #' @importFrom bsicons bs_icon
 #' @importFrom shinyjs useShinyjs
-#' @importFrom shinyFiles shinyDirButton
 #' @importFrom DT dataTableOutput
 #' @noRd
-
 
 data_import_raw_ui <- function(id) {
   ns <- NS(id)
@@ -21,13 +19,55 @@ data_import_raw_ui <- function(id) {
         accordion_panel(
           title = "MS files",
           icon = bsicons::bs_icon("menu-app"),
-          shinyDirButton(id = ns("MS1"), label = "Select MS1 folder" ,
-                         title = "The MS1 file folder:",
-                         buttonType = "default", class = NULL,
-                         icon = bs_icon("folder"), multiple = FALSE),
-          tags$span(textOutput(outputId = ns("MS1_path")), class = "text-wrap"),
+          # 文件来源选择
+          radioButtons(
+            inputId = ns("ms1_source"),
+            label = "Select MS1 source:",
+            choices = c("Upload ZIP file" = "upload", "Download from URL" = "url"),
+            selected = "upload"
+          ),
+
+          # 文件上传区域
+          conditionalPanel(
+            condition = "input.ms1_source == 'upload'",
+            ns = ns,
+            fileInput(
+              inputId = ns('ms1_zip'),
+              label = 'Upload MS1 ZIP file',
+              multiple = FALSE,
+              accept = '.zip',
+              buttonLabel = "Browse...",
+              placeholder = "No file selected"
+            )
+          ),
+
+          # URL 输入区域
+          conditionalPanel(
+            condition = "input.ms1_source == 'url'",
+            ns = ns,
+            textInput(
+              inputId = ns('ms1_url'),
+              label = 'Enter MS1 ZIP URL:',
+              placeholder = "https://example.com/data.zip"
+            ),
+            helpText("URL must point to a .zip file")
+          ),
+
+          # 处理按钮
+          actionButton(
+            inputId = ns("process_ms1"),
+            label = "Process MS1 Files",
+            icon = icon("gear"),
+            class = "btn-primary",
+            width = "100%"
+          ),
+
+          # 状态和路径显示
+          uiOutput(ns("ms1_status")),
+          verbatimTextOutput(outputId = ns("MS1_path")),
+
           hr_head(),
-          actionButton(inputId = ns("action1"),label = "check input file",icon = icon("computer-mouse"))
+          actionButton(inputId = ns("action1"),label = "check input file",icon = icon("computer-mouse"), width = "100%")
         ),
         accordion_panel(
           title = "Peak picking parameters",
@@ -181,12 +221,10 @@ data_import_raw_ui <- function(id) {
     )
   )
 }
-
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @importFrom shinyjs toggle runjs useShinyjs
-#' @importFrom shinyFiles shinyDirChoose parseDirPath parseFilePaths
 #' @importFrom shinyalert shinyalert
 #' @importFrom massprocesser process_data
 #' @importFrom massdataset activate_mass_dataset mutate_ms2
@@ -218,10 +256,11 @@ data_import_raw_ui <- function(id) {
 #' @description Server module handling raw mass spectrometry data import and processing workflow.
 #' Includes functionality for:
 #' \itemize{
+#'   \item ZIP file upload and URL download
 #'   \item Directory structure validation
 #'   \item Parameter optimization
 #'   \item Peak picking processing
-#'   \�item Quality control checks
+#'   \item Quality control checks
 #' }
 #'
 #' @noRd
@@ -229,30 +268,187 @@ data_import_raw_ui <- function(id) {
 data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
     ## 3.3 Import from raw data ----------------------------------------------------
-    observe({
-      shinyDirChoose(input = input, id = "MS1", roots = volumes, session = session)
-      if (!is.null(input$MS1)) {
-        ms1_folder_selected <- parseDirPath(roots = volumes, input$MS1)
-        output$MS1_path <- renderText(ms1_folder_selected)
+    # 存储MS1路径和处理状态
+    ms1_path <- reactiveVal(NULL)
+    processing_status <- reactiveVal("idle")  # idle, processing, success, error
+
+    # 显示处理状态
+    output$ms1_status <- renderUI({
+      status <- processing_status()
+      path <- ms1_path()
+
+      if (status == "idle") {
+        tags$div(
+          class = "alert alert-info",
+          bsicons::bs_icon("info-circle"),
+          " Please process MS1 files first"
+        )
+      } else if (status == "processing") {
+        tags$div(
+          class = "alert alert-warning",
+          bsicons::bs_icon("hourglass-split"),
+          " Processing MS1 files..."
+        )
+      } else if (status == "success" && !is.null(path)) {
+        tags$div(
+          class = "alert alert-success",
+          bsicons::bs_icon("check-circle-fill"),
+          " MS1 files processed successfully"
+        )
+      } else if (status == "error") {
+        tags$div(
+          class = "alert alert-danger",
+          bsicons::bs_icon("exclamation-triangle-fill"),
+          " Error processing MS1 files"
+        )
       }
     })
 
+    # 显示MS1路径
+    output$MS1_path <- renderText({
+      path <- ms1_path()
+      if (is.null(path)) {
+        "MS1 path not set yet"
+      } else {
+        path
+      }
+    })
+
+    # 处理MS1文件
+    observeEvent(input$process_ms1, {
+      tryCatch({
+        # 验证项目是否已初始化
+        if (is.null(prj_init$wd) || !dir.exists(prj_init$wd)) {
+          shinyalert("Error", "Project not initialized. Please initialize project first.", type = "error")
+          return()
+        }
+
+        # 设置处理状态
+        processing_status("processing")
+
+        # 目标目录
+        target_dir <- file.path(prj_init$wd, "MS1")
+
+        # 删除已存在的 "MS1" 目录（如果存在）
+        if (dir.exists(target_dir)) {
+          unlink(target_dir, recursive = TRUE)
+        }
+
+        # 创建 "MS1" 目录
+        dir.create(target_dir, showWarnings = FALSE, recursive = TRUE)
+
+        # 创建临时目录
+        temp_dir <- file.path(prj_init$wd, "temp_MS1")
+        if (dir.exists(temp_dir)) {
+          unlink(temp_dir, recursive = TRUE)
+        }
+        dir.create(temp_dir, showWarnings = FALSE, recursive = TRUE)
+
+        # 处理上传的 ZIP 文件
+        req(input$ms1_zip)
+        zip_file <- input$ms1_zip$datapath
+
+        # 验证文件类型
+        if (!grepl("\\.zip$", input$ms1_zip$name, ignore.case = TRUE)) {
+          shinyalert("Error", "Please upload a ZIP file", type = "error")
+          processing_status("error")
+          return()
+        }
+
+        # 解压文件到临时目录
+        withProgress(
+          message = 'Extracting ZIP file',
+          detail = 'This may take a while...',
+          value = 0.5,
+          {
+            unzip(zip_file, exdir = temp_dir)
+          }
+        )
+
+        # 删除 "_MACOSX" 文件夹（如果存在）
+        macosx_dir <- file.path(temp_dir, "_MACOSX")
+        if (dir.exists(macosx_dir)) {
+          unlink(macosx_dir, recursive = TRUE)
+          shinyalert("Info", "Removed '_MACOSX' folder", type = "info")
+        }
+
+        # 查找包含 "POS" 和 "NEG" 子目录的文件夹
+        pos_dirs <- list.dirs(temp_dir, full.names = TRUE)[sapply(list.dirs(temp_dir, full.names = TRUE), function(x) dir.exists(file.path(x, "POS")))]
+        neg_dirs <- list.dirs(temp_dir, full.names = TRUE)[sapply(list.dirs(temp_dir, full.names = TRUE), function(x) dir.exists(file.path(x, "NEG")))]
+
+        # 移动 "POS" 和 "NEG" 目录到 "MS1"
+        if (length(pos_dirs) > 0) {
+          for (pos_dir in pos_dirs) {
+            file.rename(file.path(pos_dir, "POS"), file.path(target_dir, "POS"))
+          }
+        }
+        if (length(neg_dirs) > 0) {
+          for (neg_dir in neg_dirs) {
+            file.rename(file.path(neg_dir, "NEG"), file.path(target_dir, "NEG"))
+          }
+        }
+
+        # 删除临时目录
+        unlink(temp_dir, recursive = TRUE)
+
+        # 设置 MS1 路径
+        ms1_path(target_dir)
+        processing_status("success")
+
+        # 显示成功消息
+        shinyalert("Success", "MS1 files processed successfully", type = "success")
+
+      }, error = function(e) {
+        shinyalert("Error", paste("Failed to process MS1 files:", e$message), type = "error")
+        processing_status("error")
+      })
+    })
+
+    # 处理解压后的目录
+    handle_extracted_dirs <- function(extract_dir, target_dir) {
+      # 获取解压后的所有目录
+      extracted_dirs <- list.dirs(extract_dir, full.names = TRUE, recursive = FALSE)
+
+      # 移除 "_MACOSX" 文件夹（如果存在）
+      macosx_dir <- file.path(extract_dir, "_MACOSX")
+      if (dir.exists(macosx_dir)) {
+        unlink(macosx_dir, recursive = TRUE)
+        shinyalert("Info", "Removed '_MACOSX' folder", type = "info")
+      }
+
+      # 重新获取解压后的目录（排除 "_MACOSX"）
+      extracted_dirs <- list.dirs(extract_dir, full.names = TRUE, recursive = FALSE)
+
+      # 检查是否只有一个顶层目录
+      if (length(extracted_dirs) == 1) {
+        top_level_dir <- extracted_dirs[1]
+        # 移动顶层目录到目标目录并重命名为MS1
+        file.rename(top_level_dir, target_dir)
+        shinyalert("Success", "ZIP file extracted and renamed to MS1", type = "success")
+      } else {
+        shinyalert("Error", "ZIP file must contain a single top-level directory", type = "error")
+        processing_status("error")
+        return()
+      }
+    }
+
+    # 存储文件检查结果
     para_data_check <- reactiveValues(data = NULL)
 
-    # input file check --------------------------------------------------------
-
-    # Main file processing observer
+    # 文件检查逻辑
     observeEvent(input$action1, {
       tryCatch({
-        req(input$MS1)
+        # 使用新的路径变量
+        req(ms1_path())
         req(prj_init$sample_info)
 
-        # Get selected directory
-        para_data_check$ms1_folder_selected <- parseDirPath(volumes, input$MS1)
-        para_data_check$MS1_path <- as.character(para_data_check$ms1_folder_selected)
+        # 更新路径变量
+        para_data_check$ms1_folder_selected <- ms1_path()
+        para_data_check$MS1_path <- ms1_path()
 
-        # Check directory existence
+        # 检查目录结构
         dir_pos <- dir.exists(file.path(para_data_check$MS1_path, "POS"))
         dir_neg <- dir.exists(file.path(para_data_check$MS1_path, "NEG"))
 
@@ -281,13 +477,13 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
           subj_pos_path <- file.path(para_data_check$MS1_path, "POS", "Subject")
 
           if (dir.exists(qc_pos_path)) {
-            para_data_check$QC_number.p <- list.files(qc_pos_path,pattern = ".mzXML$")
+            para_data_check$QC_number.p <- list.files(qc_pos_path, pattern = ".mzXML$")
           } else {
             shinyalert("Information", "No QC directory found in POS mode", type = "info")
           }
 
           if (dir.exists(subj_pos_path)) {
-            para_data_check$S_number.p <- list.files(subj_pos_path,pattern = ".mzXML$")
+            para_data_check$S_number.p <- list.files(subj_pos_path, pattern = ".mzXML$")
           } else {
             shinyalert("Information", "No Subject directory found in POS mode", type = "info")
           }
@@ -299,13 +495,13 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
           subj_neg_path <- file.path(para_data_check$MS1_path, "NEG", "Subject")
 
           if (dir.exists(qc_neg_path)) {
-            para_data_check$QC_number.n <- list.files(qc_neg_path,pattern = ".mzXML$")
+            para_data_check$QC_number.n <- list.files(qc_neg_path, pattern = ".mzXML$")
           } else {
             shinyalert("Information", "No QC directory found in NEG mode", type = "info")
           }
 
           if (dir.exists(subj_neg_path)) {
-            para_data_check$S_number.n <- list.files(subj_neg_path,pattern = ".mzXML$")
+            para_data_check$S_number.n <- list.files(subj_neg_path, pattern = ".mzXML$")
           } else {
             shinyalert("Information", "No Subject directory found in NEG mode", type = "info")
           }
@@ -377,10 +573,9 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
       )
     })
 
-
     observeEvent(input$action3, {
       tryCatch({
-        req(input$MS1)
+        req(ms1_path())
         req(para_data_check$MS1_path)
 
         dir_pos <- dir.exists(file.path(para_data_check$MS1_path, "POS"))
@@ -468,7 +663,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
         }
 
         # NEG mode processing
-
         if (dir_neg) {
           temp_qc_num.neg <- length(para_data_check$QC_number.n)
           temp_dir_path.neg <- if (temp_qc_num.neg == 0) {
@@ -582,7 +776,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
           }
         })
 
-
         if(dir_pos && !is.null(data_para_opt$step2.p)) {
           data_para_opt$out_tbl = data_para_opt$step2.p
         }
@@ -592,7 +785,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
         if(dir_neg && !is.null(data_para_opt$step2.n) && dir_pos && !is.null(data_para_opt$step2.p)) {
           data_para_opt$out_tbl = left_join(data_para_opt$step2.p,data_para_opt$step2.n)
         }
-
 
         # output parameters
         output$parameters_opt = renderDataTable_formated(
@@ -613,7 +805,7 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
     ## Data processing ------------------------------------------------------------
     observeEvent(input$action2, {
       tryCatch({
-        req(input$MS1)
+        req(ms1_path())
         req(para_data_check$MS1_path)
         para_choise = para_choise()
 
@@ -634,7 +826,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
 
         if(para_choise == "yes" && !is.null(data_para_opt$out_tbl)) {
           available_modes <- intersect(c("Positive", "Negative"), names(data_para_opt$out_tbl))
-
 
           para_data_check$parameters <- para_data_check$parameters %>%
             dplyr::mutate(
@@ -661,7 +852,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
               dplyr::select(-ends_with("_old"))
           }
 
-
           para_data_check$parameters <- para_data_check$parameters %>%
             dplyr::select(para, desc, default, any_of(c("Positive", "Negative"))) %>%
             dplyr::mutate(
@@ -670,9 +860,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
               Negative = if(exists("Negative", where = .)) Negative else default
             )
         }
-
-
-
 
         # Process data function
         process_data_fun <- function(path, polarity, parameters) {
@@ -819,4 +1006,3 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
 
   })
 }
-

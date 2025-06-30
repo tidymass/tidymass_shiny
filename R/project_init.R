@@ -19,12 +19,6 @@ project_init_ui <- function(id) {
         accordion_panel(
           title = "Working directory",
           icon = bsicons::bs_icon("menu-app"),
-          shinyDirButton(id = ns("prj_wd"),
-                         label = "Set working directory" ,
-                         title = "Set working directory:",
-                         buttonType = "default", class = NULL,
-                         icon = bsicons::bs_icon("folder"), multiple = FALSE),
-          tags$span(textOutput(outputId = ns("raw_wd_path")), class = "text-wrap"),
 
           fileInput(
             inputId = ns('SampleInfo'),
@@ -97,6 +91,11 @@ project_init_ui <- function(id) {
           title = "Setting working directory",
           icon = bsicons::bs_icon("power"),
           actionButton(inputId = ns('action_init'),'Initialize project',icon = icon("play"), style = "width: 200px;"),
+          tags$h4("Generated working directory:"),
+          verbatimTextOutput(ns("generated_wd_path")),
+          tags$br(),
+          uiOutput(ns("wd_status")),
+          tags$br(),
           tags$h3("Summary of input file",style = 'color: black'),
           hr_head(),
 
@@ -145,7 +144,6 @@ project_init_ui <- function(id) {
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @importFrom shinyjs toggle runjs useShinyjs
-#' @importFrom shinyFiles shinyDirChoose parseDirPath getVolumes shinyFileChoose
 #' @importFrom shinyalert shinyalert
 #' @importFrom massprocesser process_data
 #' @importFrom massdataset mutate_ms2
@@ -154,20 +152,61 @@ project_init_ui <- function(id) {
 #' @param prj_init reactivevalues of project init.
 #' @noRd
 
-
-project_init_server <- function(id,volumes,prj_init) {
+project_init_server <- function(id, volumes, prj_init) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    #> set working directory and import sample information
 
-    observe({
-      shinyDirChoose(input = input,id = "prj_wd", roots =  volumes, session = session)
-      if(!is.null(input$prj_wd)){
-        # browser()
-        ms1_folder_selected<- parseDirPath(roots = volumes, input$prj_wd)
-        output$raw_wd_path <- renderText(ms1_folder_selected)
+    # 添加状态管理变量
+    wd_generated <- reactiveVal(FALSE)  # 标记路径是否已生成
+    generated_wd <- reactiveVal(NULL)   # 存储生成的路径
 
-      }})
+    # 生成随机目录的函数
+    generate_random_dir <- function() {
+      base_dir <- "~/tidymass_results/init"
+
+      # 生成随机字符串（字母+数字，3-10位）
+      generate_random_string <- function(length = sample(3:10, 1)) {
+        chars <- c(letters, LETTERS, 0:9)
+        paste0(sample(chars, length, replace = TRUE), collapse = "")
+      }
+
+      # 检查并生成唯一路径
+      while (TRUE) {
+        rand_string <- generate_random_string()
+        new_path <- file.path(base_dir, rand_string)
+
+        # 如果路径不存在，则使用该路径
+        if (!dir.exists(new_path)) {
+          return(new_path)
+        }
+      }
+    }
+
+    # 显示工作目录状态
+    output$wd_status <- renderUI({
+      if (wd_generated()) {
+        tags$div(
+          style = "color: #4CAF50; font-weight: bold;",
+          bsicons::bs_icon("check-circle-fill"),
+          " Working directory has been initialized. Re-initialization disabled."
+        )
+      } else {
+        tags$div(
+          style = "color: #FF9800;",
+          bsicons::bs_icon("info-circle"),
+          " Ready to initialize project"
+        )
+      }
+    })
+
+    # 显示生成的路径（如果已生成）
+    output$generated_wd_path <- renderText({
+      if (wd_generated()) {
+        generated_wd()
+      } else {
+        "Working directory will be generated after initialization"
+      }
+    })
 
     #> Import sample info from raw file
     sample_info_raw <- reactive({
@@ -176,39 +215,51 @@ project_init_server <- function(id,volumes,prj_init) {
       read.csv(file = file1$datapath,
                sep=",",header = T,stringsAsFactors = F)
     })
-    #> update selectInput contents by read sample infomation table.
 
+    #> update selectInput contents by read sample infomation table.
     sample_info_col = reactive({
       colnames(sample_info_raw() |> as.data.frame())
     })
 
     observe({
-      updateSelectInput(session, "sample_id_raw",choices = sample_info_col(),selected = sample_info_col()[1])
-      updateSelectInput(session, "injection.order_raw",choices = sample_info_col(),selected = sample_info_col()[2])
-      updateSelectInput(session, "class_raw",choices = sample_info_col(),selected = sample_info_col()[3])
-      updateSelectInput(session, "group_raw",choices = sample_info_col(),selected = sample_info_col()[4])
-      updateSelectInput(session, "batch_raw",choices = sample_info_col(),selected = sample_info_col()[5])
+      if (!is.null(sample_info_col())) {
+        updateSelectInput(session, "sample_id_raw", choices = sample_info_col(), selected = sample_info_col()[1])
+        updateSelectInput(session, "injection.order_raw", choices = sample_info_col(), selected = sample_info_col()[2])
+        updateSelectInput(session, "class_raw", choices = sample_info_col(), selected = sample_info_col()[3])
+        updateSelectInput(session, "group_raw", choices = sample_info_col(), selected = sample_info_col()[4])
+        updateSelectInput(session, "batch_raw", choices = sample_info_col(), selected = sample_info_col()[5])
+      }
     })
 
-    observeEvent(
-      input$action_init,
-      {
-        # Check basic setup
-        if(is.null(input$prj_wd)){
-          shinyalert::shinyalert("Error!", "Please choose working directory", type = "error")
-          return()
-        }
-        if(is.null(input$SampleInfo)){
-          shinyalert::shinyalert("Error!", "Please upload sample information file", type = "error")
-          return()
-        }
+    observeEvent(input$action_init, {
+      # 如果路径已生成，则阻止重新生成
+      if (wd_generated()) {
+        shinyalert::shinyalert(
+          "Already Initialized",
+          "Project has already been initialized. Please refresh the app to start a new project.",
+          type = "warning"
+        )
+        return()
+      }
 
-        # Parameters
-        prj_init$wd_path <- parseDirPath(volumes, input$prj_wd)
-        prj_init$wd <- as.character(prj_init$wd_path)
+      # 检查样本信息文件
+      if(is.null(input$SampleInfo)){
+        shinyalert::shinyalert("Error!", "Please upload sample information file", type = "error")
+        return()
+      }
 
-        # result files
+      tryCatch({
+        # 生成随机工作目录
+        new_wd <- generate_random_dir()
+        generated_wd(new_wd)  # 存储生成的路径
+        wd_generated(TRUE)    # 标记路径已生成
 
+        # 设置项目参数
+        prj_init$wd_path <- new_wd
+        prj_init$wd <- new_wd
+
+        # 创建目录结构
+        dir.create(prj_init$wd, showWarnings = FALSE, recursive = TRUE)
         prj_init$mass_dataset_dir <- file.path(prj_init$wd, "mass_dataset")
         dir.create(prj_init$mass_dataset_dir, showWarnings = FALSE, recursive = TRUE)
         prj_init$data_export_dir <- file.path(prj_init$wd, "data_export")
@@ -276,8 +327,8 @@ project_init_server <- function(id,volumes,prj_init) {
         # Validate positive file
         if (prj_init$steps == "Annotation filtering" & !is.null(saved_dblist)) {
 
-            obj_saved_dblist = load(saved_dblist)
-            prj_init$dblist <- get(obj_saved_dblist)
+          obj_saved_dblist = load(saved_dblist)
+          prj_init$dblist <- get(obj_saved_dblist)
 
         }
 
@@ -345,10 +396,29 @@ project_init_server <- function(id,volumes,prj_init) {
           object = prj_init$object_negative.init,
           mode = "negative"
         )
-      }
-    )
+
+        # 成功提示（覆盖之前的提示）
+        shinyalert::shinyalert(
+          title = "Project Initialized!",
+          text = paste(
+            "Working directory created:",
+            tags$code(new_wd),
+            tags$br(),
+            "You can now proceed with the analysis."
+          ),
+          html = TRUE,
+          type = "success"
+        )
+
+      }, error = function(e) {
+        shinyalert::shinyalert("Initialization Failed",
+                               paste("Error:", e$message),
+                               type = "error")
+      })
+    })
   })
 }
+
 
 
 
