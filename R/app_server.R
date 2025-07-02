@@ -14,9 +14,20 @@ app_server <-
     # Determine volumes based on system type
 
     # Check run in docker
-    in_docker <- Sys.getenv("IN_DOCKER", "false") == "true"
+    in_docker <- function() {
+      # 方法1: 检查.dockerenv标志文件
+      if (file.exists("/.dockerenv")) return(TRUE)
 
-    if (in_docker) {
+      # 方法2: 检查cgroup信息
+      if (file.exists("/proc/self/cgroup")) {
+        cgroup <- readLines("/proc/self/cgroup", warn = FALSE)
+        if (any(grepl("docker", cgroup))) return(TRUE)
+        if (any(grepl("kubepods", cgroup))) return(TRUE)  # Kubernetes环境
+        }
+      return(FALSE)
+      }
+
+    if (in_docker()) {
       volumes <- shinyFiles::getVolumes()()
     } else if (Sys.info()["sysname"] == "Windows") {
       volumes <- get_volumes_win()
