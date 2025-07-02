@@ -12,18 +12,25 @@ app_server <-
     bslib::bs_themer()
     # Call module server functions
     # Determine volumes based on system type
-    if (Sys.info()["sysname"] == "Windows") {
-      volumes = get_volumes_win()
+
+    # Check run in docker
+    in_docker <- Sys.getenv("IN_DOCKER", "false") == "true"
+
+    if (in_docker) {
+      volumes <- shinyFiles::getVolumes()()
+    } else if (Sys.info()["sysname"] == "Windows") {
+      volumes <- get_volumes_win()
     } else if (Sys.info()["sysname"] == "Linux") {
-      # Set volumes to shiny user's home directory on Linux
+      # 非 Docker 的 Linux 环境
       shiny_home <- Sys.getenv("HOME", unset = "/home/shiny")
-      volumes = c(shiny_home = shiny_home)
-    } else if (Sys.info()["sysname"] == "Darwin") {  # macOS is identified as "Darwin"
+      volumes <- c(shiny_home = shiny_home)
+    } else if (Sys.info()["sysname"] == "Darwin") {
       user_home <- Sys.getenv("HOME")
-      volumes = c(home = user_home)
+      volumes <- c(home = user_home)
     } else {
-      volumes = shinyFiles::getVolumes()()
+      volumes <- shinyFiles::getVolumes()()
     }
+
     #> project init
     prj_init <- reactiveValues(data = NULL) # project init
     project_init_server(id = "project_init_id", volumes = volumes, prj_init)
