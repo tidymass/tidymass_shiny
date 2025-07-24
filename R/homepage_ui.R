@@ -1,102 +1,163 @@
-#' homepage of UI
+#' Homepage UI Module
 #'
-#' @param request Internal parameter for `{shiny}`.
-#'     DO NOT REMOVE.
-#' @import shiny
-#' @importFrom bsicons bs_icon
-#' @noRd
-
-## Part1.1 home page ---------------------------------------------------------------
-
+#' Creates the homepage interface for tidymassShiny
+#'
+#' @param id module id
+#'
+#' @return UI tagList
+#' @export
 homepage_ui <- function(id) {
   ns <- NS(id)
 
-  tabPanel(
-    title = 'Home page',
-    icon = bs_icon('house'),
-
-    # 使用fluidRow和column来组织内容，增加间距和视觉层次
-    fluidRow(
-
-      # # logo和欢迎信息区域
-      # column(
-      #   width = 4, offset = 4,
-      #   style = "margin-top: 20px;",
-      #   align="center",
-      #   tags$div(
-      #     tags$img(src = "www/MetMiner.jpg", style = "max-width: 85%; height: auto;")
-      #
-      #   )
-      # ),
-      #
-      # # 描述文本区域
-      # column(
-      #   width = 8, offset = 2,
-      #   style = "border: 2px dashed rgba(0, 128, 128, 0.5); border-radius: 10px; padding: 20px;",
-      #   align="justify",
-      #   tags$style(type="text/css", "
-      #     body { font-size: 16px; line-height: 1.5; }
-      #     footer { font-size: 12px; }
-      #   "),
-      #   HTML(
-      #     paste(
-      #       "<h2>Introduction</h2>",
-      #       "<hr style='border-top: 6px double #008080; border-bottom: 3px solid #008080;'>",
-      #       "<p><strong style='color: #008080;font-size: larger;'>MetMiner</strong> is a <strong style='color: blue;'>user-friendly</strong> R-Shiny-based workflow designed for processing and mining non-targeted metabolomics data. Tailored for wet-lab biologists, it enables rapid mastery of non-targeted metabolomic analysis and can be deployed on servers or clusters to process <strong style='color: blue;'>large-scale metabolomics data</strong>.</p>",
-      #       "<p>The integration of the <a href='https://github.com/tidymass' target='_blank'><strong style='color: blue;'>TidyMass project<sup id='ref1'>1</sup></strong></a> introduces the mass_dataset class, an advanced mass spectrometry data management format that supports flexible data input and output. This format accommodates both raw data and peak-picked results from other software, and it meticulously logs data cleaning and metabolite annotation to ensure reproducibility, traceability, and transparency.</p>",
-      #       "<p>We have developed the <a href='https://github.com/ShawnWx2019/MDAtoolkits' target='_blank'><strong style='color: blue;'>Metabolomics Downstream Analysis toolkits (MDAtoolkits)</strong></a>, which assist in metabolite classification, multivariate and univariate statistical analyses, and enrichment analysis. We also provide a collection of plant-specific metabolic databases, optimized for plant metabolomics annotations.</p>",
-      #       "<p>The MetMiner shiny app features an array of <strong style='color: blue;'>graphical interactive operations</strong> that enable various data linkages, allowing users to engage deeply with data analysis and mining processes.</p>",
-      #       "<p>The metMiner shiny app has been packaged into a TBtools<sup id='ref1'>2</sup> plugin, which can be downloaded and installed through the <strong style='color: blue;'>TBtools plugin store</strong>. Thanks to TBtools for providing a convenient dependency resolution solution. </p>"
-      #     )
-      #   ),
-      #
-      #   # 图片区域
-      #   tags$div(
-      #     align="center",
-      #     tags$img(src = "www/Fig1.StructureAndStrategy.webp", style = "max-width: 80%; height: auto;")
-      #   ),
-      #
-      #   # 说明书
-      #   HTML(
-      #     paste(
-      #       "<h2>Cookbook</h2>",
-      #       "<hr style='border-top: 6px double #008080; border-bottom: 3px solid #008080;'>",
-      #       "Step by step users manual:<a href='https://shawnwx2019.github.io/metminer-cookbook/' target='_blank'> https://shawnwx2019.github.io/metminer-cookbook/</a></p>"
-      #     )
-      #   ),
-      #
-      #   # 引用信息区域
-      #   HTML(
-      #     paste(
-      #       "<h2>How to cite</h2>",
-      #       "<hr style='border-top: 6px double #008080; border-bottom: 3px solid #008080;'>",
-      #       "<p>If you have used this app for metabolomics analysis in your publication, please cite the following papers:</p>",
-      #       "<ul>",
-      #       "<li>MetMiner: A user-friendly pipeline for large-scale plant metabolomics data</li>",
-      #       "<li>TidyMass: Shen X, et al. (2022). TidyMass an object-oriented reproducible analysis framework for LC-MS data. Nat Commun. 13(1):4365. <a href='https://www.nature.com/articles/s41467-022-32155-w' target='_blank'>doi:10.1038/s41467-022-32155-w.</a></li>",
-      #       "<p>If you installed metMiner from TBtools plugin store, please cite:</p>",
-      #       "<li>TBtools: Chen, et al. (2023). TBtools-II: 'A one for all, all for one' bioinformatics platform for biological big-data mining. Molecular Plant 16(11): 1733-1742. <a href='10.1016/j.molp.2023.09.010' target='_blank'>doi:10.1016/j.molp.2023.09.010</a></li>",
-      #       "</ul>",
-      #       "<p>Thank you!</p>"
-      #     )
-      #   ),
-      #   # 参考文献
-      #   HTML(
-      #     paste(
-      #       "<h2>Reference</h2>",
-      #       "<hr style='border-top: 6px double #008080; border-bottom: 3px solid #008080;'>",
-      #       "<p><sup>1</sup>TidyMass: Shen X, et al. (2022). TidyMass an object-oriented reproducible analysis framework for LC-MS data. Nat Commun. 13(1):4365. <a href='https://www.nature.com/articles/s41467-022-32155-w' target='_blank'>doi:10.1038/s41467-022-32155-w.</a></p>",
-      #       "<p><sup>2</sup>TBtools: Chen, et al. (2023). TBtools-II: 'A one for all, all for one' bioinformatics platform for biological big-data mining. Molecular Plant 16(11): 1733-1742. <a href='10.1016/j.molp.2023.09.010' target='_blank'>doi:10.1016/j.molp.2023.09.010</a></p>"
-      #
-      #     )
-      #   ),
-      # )
+  tagList(
+    useShinyjs(),
+    div(class = "homepage-header",
+        div(class = "container",
+            img(src = "www/homepage.ico.png", height = "100px", style = "margin-bottom: 20px;"),
+            h1("TidyMass Shiny (Online service)", style = "font-weight: 700;"),
+            p("An object-oriented, reproducible analysis framework for LC-MS data",
+              style = "font-size: 1.2em; max-width: 800px; margin: 0 auto;"),
+            br(),
+            actionButton(ns("start_btn"), "Get Started",
+                         class = "btn-action", icon = icon("play")),
+            actionButton(ns("docs_btn"), "Documentation",
+                         class = "btn-action", icon = icon("book"))
+        )
     ),
 
-    # add Footer
-    hr_head(),
-    tags$footer(style="text-align:center; margin-top: 20px;",
-                "")
-  )
-}
+    div(class = "container",
+        fluidRow(
+          column(8, offset = 2,
+                 h3("Streamlined LC-MS Data Analysis", align = "center"),
+                 p("TidyMass provides a comprehensive, reproducible workflow for metabolomics and lipidomics data processing,
+                   from raw data to biological insights.", align = "center"),
+                 br()
+          )
+        ),
 
+        # Key features section
+        h2("Key Features", align = "center"),
+        fluidRow(
+          column(4,
+                 div(class = "feature-card card",
+                     div(class = "card-body",
+                         h4(icon("object-group"), "Object-Oriented Framework"),
+                         p("Structured data representation ensuring reproducibility and traceability throughout the analysis workflow.")
+                     )
+                 )
+          ),
+          column(4,
+                 div(class = "feature-card card",
+                     div(class = "card-body",
+                         h4(icon("bezier-curve"), "Comprehensive Workflow"),
+                         p("From raw data processing to statistical analysis and biological interpretation in one integrated environment.")
+                     )
+                 )
+          ),
+          column(4,
+                 div(class = "feature-card card",
+                     div(class = "card-body",
+                         h4(icon("code-branch"), "Reproducible Research"),
+                         p("Complete analysis provenance tracking with version control for all processing steps and parameters.")
+                     )
+                 )
+          )
+        ),
+        br(), br(),
+
+        # Concept and Workflow
+        h2("Concept & Workflow", align = "center"),
+        fluidRow(
+          column(6,
+                 div(class = "img-container",
+                     h4("TidyMass Conceptual Framework"),
+                     img(src = "www/Fig1.Concept.webp", style = "max-height: 400px;"),
+                     p("Comprehensive metabolomics data processing framework", style = "font-style: italic;")
+                 )
+          ),
+          column(6,
+                 div(class = "img-container",
+                     h4("Analysis Workflow"),
+                     img(src = "www/Fig3.Workflow.webp", style = "max-height: 400px;"),
+                     p("End-to-end LC-MS data processing workflow", style = "font-style: italic;")
+                 )
+          )
+        ),
+        br(), br(),
+
+        # TidyMass2 New Features - 新增部分
+        h2("TidyMass2 New Features", align = "center"),
+        fluidRow(
+          column(10, offset = 1,
+                 div(class = "img-container",
+                     img(src = "www/Fig2.TidyMass2New.png",
+                         style = "max-height: 1000px; border: 1px solid #e0e0e0;"),
+                     p("Advanced features in TidyMass2: Metabolite origin inference and metabolic feature-based functional module analysis",
+                       style = "font-style: italic; text-align: center; margin-top: 15px;")
+                 ),
+                 div(style = "padding: 20px; background-color: #f9f9f9; border-radius: 8px; margin-top: 20px;",
+                     h4("Key Innovations in TidyMass2:", style = "color: #2c3e50;"),
+                     tags$ul(
+                       tags$li(tags$strong("Cross-Platform Identifier Conversion:"),
+                               "Comprehensive chemical identifier conversion system operating across multiple metabolite ID systems."),
+
+                       tags$li(tags$strong("Web-Based Analysis Interface:"),
+                               "TidyMassShiny package providing a user-friendly web interface for all TidyMass2 functions."),
+
+                       tags$li(tags$strong("Metabolite Origin Inference:"),
+                               "Integration of 11 databases into MetOriginDB for precise metabolite source categorization across 7 origin categories."),
+
+                       tags$li(tags$strong("Origin-Annotation Integration:"),
+                               "Seamless connection between metabolite source information and MS2 spectral libraries for enhanced biological interpretation."),
+
+                       tags$li(tags$strong("Feature-Based Functional Module Analysis:"),
+                               "Novel network approach identifying biologically relevant metabolic modules without relying solely on MS2 annotation."),
+
+                       tags$li(tags$strong("Comprehensive Metabolic Network:"),
+                               "Human metabolic network with 9,630 metabolites and 30,196 connections for functional module detection.")
+                     )
+                 ),
+          )
+        ),
+        br(), br(),
+        # Citation
+        h2("Citation", align = "center"),
+        div(class = "citation-box",
+            p("If you use TidyMass in your publications, please cite:"),
+            p("Shen, X., Yan, H., Wang, C. et al. TidyMass an object-oriented reproducible analysis framework for LC–MS data.
+              Nat Commun 13, 4365 (2022).", style = "font-weight: bold;"),
+            p("Wang, X., Liu, Y., Jiang, C. et al. TidyMass2: Advancing LC-MS Untargeted Metabolomics Through Metabolite Origin
+              Inference and Metabolic Feature-based Functional Module Analysis.")
+        ),
+        br(),
+
+        # Resources
+        h2("Resources", align = "center"),
+        fluidRow(
+          column(3,
+                 a(class = "resource-link", href = "https://www.tidymass.org/", target = "_blank",
+                   div(icon("globe"), "Official Website")
+                 )),
+          column(3,
+                 a(class = "resource-link", href = "https://www.tidymass.org/tidymassshiny-tutorial/", target = "_blank",
+                   div(icon("book-open"), "User Manual")
+                   )
+                 ),
+          column(3,
+                 a(class = "resource-link", href = "https://github.com/tidymass", target = "_blank",
+                   div(icon("github"), "GitHub Repository")
+                   )
+                 ),
+          column(3,
+                 a(class = "resource-link", href = "https://www.shen-lab.org/", target = "_blank",
+                   div(icon("university"), "Shen Lab")
+                   )
+                 ),
+          br(), br(),
+          # Footer
+          hr(),
+          p(style = "text-align: center; color: #6c757d;","TidyMass Shiny | © ", format(Sys.Date(), "%Y"), " Shen Lab")
+          )
+        )
+  )
+  }

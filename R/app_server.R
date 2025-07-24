@@ -21,9 +21,14 @@ app_server <-
     } else {
       volumes = shinyFiles::getVolumes()()
     }
+
+    #> Homepage module - new addition
+    homepage_server(id = "homepage_id")
+
     #> project init
     prj_init <- reactiveValues(data = NULL) # project init
     project_init_server(id = "project_init_id", volumes = volumes, prj_init)
+
     #> data import
     data_import_rv <- reactiveValues(data = NULL)
     data_import_raw_server(
@@ -40,7 +45,7 @@ app_server <-
       data_import_rv = data_import_rv
     )
 
-    ##> from peak picking table
+    ##> from massdataset object
     data_import_massdataset_server(
       id = "data_import_massdataset_id",
       volumes = volumes,
@@ -86,6 +91,7 @@ app_server <-
       data_import_rv = data_import_rv,
       data_clean_rv = data_clean_rv
     )
+
     ## data_anno
     data_anno <- reactiveValues(data = NULL)
     feature_annotation_server(
@@ -144,4 +150,6 @@ app_server <-
     )
     flexible_download_widget_server("download_widget", prj_init)
 
+    # Set homepage as default tab
+    updateNavbarPage(session, "main_navbar", selected = "home")
   }
