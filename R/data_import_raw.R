@@ -23,7 +23,7 @@ data_import_raw_ui <- function(id) {
           radioButtons(
             inputId = ns("ms1_source"),
             label = "Select MS1 source:",
-            choices = c("Upload ZIP file" = "upload", "Download from URL" = "url"),
+            choices = c("Upload ZIP file" = "upload"),
             selected = "upload"
           ),
 
@@ -367,31 +367,48 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
           }
         )
 
-        # 删除 "_MACOSX" 文件夹（如果存在）
-        macosx_dir <- file.path(temp_dir, "_MACOSX")
-        if (dir.exists(macosx_dir)) {
-          unlink(macosx_dir, recursive = TRUE)
-          shinyalert("Info", "Removed '_MACOSX' folder", type = "info")
+        # 查找实际的MS1数据目录（处理不同压缩结构）
+        extracted_dirs <- list.dirs(temp_dir, full.names = TRUE, recursive = FALSE)
+
+        # 情况1：直接包含POS/NEG目录
+        if (all(c("POS", "NEG") %in% basename(extracted_dirs))) {
+          data_dir <- temp_dir
         }
+        # 情况2：包含一个子目录（如MS1）里面有POS/NEG
+        else {
+          # 获取所有一级子目录
+          sub_dirs <- list.dirs(temp_dir, full.names = TRUE, recursive = FALSE)
 
-        # 查找包含 "POS" 和 "NEG" 子目录的文件夹
-        pos_dirs <- list.dirs(temp_dir, full.names = TRUE)[sapply(list.dirs(temp_dir, full.names = TRUE), function(x) dir.exists(file.path(x, "POS")))]
-        neg_dirs <- list.dirs(temp_dir, full.names = TRUE)[sapply(list.dirs(temp_dir, full.names = TRUE), function(x) dir.exists(file.path(x, "NEG")))]
+          # 查找包含POS/NEG的目录
+          data_dir_candidates <- sub_dirs[
+            sapply(sub_dirs, function(x) {
+              dirs_in_x <- list.dirs(x, full.names = FALSE, recursive = FALSE)
+              all(c("POS", "NEG") %in% dirs_in_x)
+            })
+          ]
 
-        # 移动 "POS" 和 "NEG" 目录到 "MS1"
-        if (length(pos_dirs) > 0) {
-          for (pos_dir in pos_dirs) {
-            file.rename(file.path(pos_dir, "POS"), file.path(target_dir, "POS"))
+          if (length(data_dir_candidates) > 0) {
+            data_dir <- data_dir_candidates[1]
+          } else {
+            stop("找不到包含POS/NEG目录的有效数据文件夹")
           }
         }
-        if (length(neg_dirs) > 0) {
-          for (neg_dir in neg_dirs) {
-            file.rename(file.path(neg_dir, "NEG"), file.path(target_dir, "NEG"))
-          }
+
+        # 移动POS/NEG目录到目标位置
+        if (dir.exists(file.path(data_dir, "POS"))) {
+          file.rename(file.path(data_dir, "POS"), file.path(target_dir, "POS"))
+        }
+        if (dir.exists(file.path(data_dir, "NEG"))) {
+          file.rename(file.path(data_dir, "NEG"), file.path(target_dir, "NEG"))
         }
 
-        # 删除临时目录
-        unlink(temp_dir, recursive = TRUE)
+        # 删除_MACOSX文件夹（如果存在）
+        macosx_dirs <- list.dirs(temp_dir, recursive = TRUE)[
+          grepl("__MACOSX", list.dirs(temp_dir, recursive = TRUE))
+        ]
+        if (length(macosx_dirs) > 0) {
+          unlink(macosx_dirs, recursive = TRUE)
+        }
 
         # 设置 MS1 路径
         ms1_path(target_dir)
@@ -406,33 +423,6 @@ data_import_raw_server <- function(id, volumes, prj_init, data_import_rv) {
       })
     })
 
-    # 处理解压后的目录
-    handle_extracted_dirs <- function(extract_dir, target_dir) {
-      # 获取解压后的所有目录
-      extracted_dirs <- list.dirs(extract_dir, full.names = TRUE, recursive = FALSE)
-
-      # 移除 "_MACOSX" 文件夹（如果存在）
-      macosx_dir <- file.path(extract_dir, "_MACOSX")
-      if (dir.exists(macosx_dir)) {
-        unlink(macosx_dir, recursive = TRUE)
-        shinyalert("Info", "Removed '_MACOSX' folder", type = "info")
-      }
-
-      # 重新获取解压后的目录（排除 "_MACOSX"）
-      extracted_dirs <- list.dirs(extract_dir, full.names = TRUE, recursive = FALSE)
-
-      # 检查是否只有一个顶层目录
-      if (length(extracted_dirs) == 1) {
-        top_level_dir <- extracted_dirs[1]
-        # 移动顶层目录到目标目录并重命名为MS1
-        file.rename(top_level_dir, target_dir)
-        shinyalert("Success", "ZIP file extracted and renamed to MS1", type = "success")
-      } else {
-        shinyalert("Error", "ZIP file must contain a single top-level directory", type = "error")
-        processing_status("error")
-        return()
-      }
-    }
 
     # 存储文件检查结果
     para_data_check <- reactiveValues(data = NULL)

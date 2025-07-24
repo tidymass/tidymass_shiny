@@ -26,7 +26,7 @@ feature_annotation_ui <- function(id) {
           radioButtons(
             inputId = ns("ms2_source"),
             label = "Select MS2 source:",
-            choices = c("Upload ZIP file" = "upload", "Download from URL" = "url"),
+            choices = c("Upload ZIP file" = "upload"),
             selected = "upload"
           ),
 
@@ -178,20 +178,19 @@ feature_annotation_ui <- function(id) {
             multiple = TRUE,
             title = "Select database"
           ),
-          shinyDirButton(
-            id = ns("norm_customized_db"),
-            label = "Choose folder",
-            title = "Customized database path:",
-            buttonType = "default",
-            class = NULL,
-            icon = bs_icon("folder"),
-            multiple = FALSE
+
+          # 改为ZIP文件上传
+          fileInput(
+            inputId = ns('cuz_db_zip'),
+            label = 'Upload Customized Database ZIP',
+            multiple = FALSE,
+            accept = '.zip',
+            buttonLabel = "Browse...",
+            placeholder = "No file selected"
           ),
-          # 显示选择的路径（添加class确保换行）
-          tags$div(
-            class = "text-wrap",
-            textOutput(outputId = ns("ms_db_folder_selected"))
-          ),
+
+          # 状态显示
+          uiOutput(ns("cuz_db_status")),
           br(),
           actionButton(
             inputId = ns('anno_start'),
@@ -267,11 +266,12 @@ feature_annotation_server <- function(id, volumes, prj_init, data_import_rv, dat
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # 存储MS2路径和处理状态
+    # 1. MS2 File Handling -----------------------------------------------------
+    # Store MS2 path and processing status
     ms2_path <- reactiveVal(NULL)
     ms2_processing_status <- reactiveVal("idle")  # idle, processing, success, error
 
-    # 显示MS2处理状态
+    # UI for MS2 status display
     output$ms2_status <- renderUI({
       status <- ms2_processing_status()
       path <- ms2_path()
@@ -303,54 +303,43 @@ feature_annotation_server <- function(id, volumes, prj_init, data_import_rv, dat
       }
     })
 
-    # 显示MS2路径
+    # Display MS2 path
     output$MS2_path <- renderText({
       path <- ms2_path()
-      if (is.null(path)) {
-        "MS2 path not set yet"
-      } else {
-        path
-      }
+      if (is.null(path)) "MS2 path not set yet" else path
     })
 
-    # 处理MS2文件
-    # 处理MS2文件
+    # Process MS2 files
     observeEvent(input$process_ms2, {
       tryCatch({
-        # 验证项目是否已初始化
+        # Validate project initialization
         if (is.null(prj_init$wd) || !dir.exists(prj_init$wd)) {
           shinyalert("Error", "Project not initialized. Please initialize project first.", type = "error")
           return()
         }
 
-        # 设置处理状态
+        # Set processing status
         ms2_processing_status("processing")
 
-        # 目标目录
+        # Target directory
         target_dir <- file.path(prj_init$wd, "MS2")
 
-        # 删除已存在的目录
-        if (dir.exists(target_dir)) {
-          unlink(target_dir, recursive = TRUE)
-        }
-
-        # 创建目录
+        # Clean existing directory
+        if (dir.exists(target_dir)) unlink(target_dir, recursive = TRUE)
         dir.create(target_dir, showWarnings = FALSE, recursive = TRUE)
 
-        # 创建临时目录
+        # Create temp directory
         temp_dir <- file.path(prj_init$wd, "temp_MS2")
-        if (dir.exists(temp_dir)) {
-          unlink(temp_dir, recursive = TRUE)
-        }
+        if (dir.exists(temp_dir)) unlink(temp_dir, recursive = TRUE)
         dir.create(temp_dir, showWarnings = FALSE, recursive = TRUE)
 
-        # 确定ZIP文件路径
+        # Get ZIP file path
         zip_file <- NULL
         if (input$ms2_source == "upload") {
           req(input$ms2_zip)
           zip_file <- input$ms2_zip$datapath
 
-          # 验证文件类型
+          # Validate file type
           if (!grepl("\\.zip$", input$ms2_zip$name, ignore.case = TRUE)) {
             shinyalert("Error", "Please upload a ZIP file", type = "error")
             ms2_processing_status("error")
@@ -360,13 +349,14 @@ feature_annotation_server <- function(id, volumes, prj_init, data_import_rv, dat
           req(input$ms2_url)
           zip_file <- file.path(temp_dir, "downloaded_ms2.zip")
 
-          # 验证URL格式
+          # Validate URL
           if (!grepl("^https?://", input$ms2_url)) {
             shinyalert("Invalid URL", "URL must start with http:// or https://", type = "error")
             ms2_processing_status("error")
             return()
           }
 
+          # Download file
           withProgress(
             message = 'Downloading MS2 files',
             detail = 'This may take a while...',
@@ -383,7 +373,7 @@ feature_annotation_server <- function(id, volumes, prj_init, data_import_rv, dat
           )
         }
 
-        # 解压文件
+        # Extract files
         withProgress(
           message = 'Extracting ZIP file',
           detail = 'This may take a while...',
@@ -399,232 +389,352 @@ feature_annotation_server <- function(id, volumes, prj_init, data_import_rv, dat
           }
         )
 
-        # 删除_MACOSX文件夹（如果存在） - 注意名称可能是"_MACOSX"或"__MACOSX"
-        macosx_dir1 <- file.path(temp_dir, "_MACOSX")
-        macosx_dir2 <- file.path(temp_dir, "__MACOSX")
-        if (dir.exists(macosx_dir1)) {
-          unlink(macosx_dir1, recursive = TRUE)
+        # Find actual MS2 data directory
+        extracted_dirs <- list.dirs(temp_dir, full.names = TRUE, recursive = FALSE)
+
+        # Case 1: Directly contains POS/NEG
+        if (all(c("POS", "NEG") %in% basename(extracted_dirs))) {
+          data_dir <- temp_dir
         }
-        if (dir.exists(macosx_dir2)) {
-          unlink(macosx_dir2, recursive = TRUE)
-        }
+        # Case 2: Contains subdirectory with POS/NEG
+        else {
+          sub_dirs <- list.dirs(temp_dir, full.names = TRUE, recursive = FALSE)
 
-        # 查找包含 "POS" 和 "NEG" 子目录的文件夹 - 参考MS1处理方式
-        pos_dirs <- list.dirs(temp_dir, full.names = TRUE)[
-          sapply(list.dirs(temp_dir, full.names = TRUE),
-                 function(x) dir.exists(file.path(x, "POS")))
-        ]
+          # Find directories containing POS/NEG
+          data_dir_candidates <- sub_dirs[
+            sapply(sub_dirs, function(x) {
+              dirs_in_x <- list.dirs(x, full.names = FALSE, recursive = FALSE)
+              all(c("POS", "NEG") %in% dirs_in_x)
+            })
+          ]
 
-        neg_dirs <- list.dirs(temp_dir, full.names = TRUE)[
-          sapply(list.dirs(temp_dir, full.names = TRUE),
-                 function(x) dir.exists(file.path(x, "NEG")))
-        ]
+          if (length(data_dir_candidates)) {
+            data_dir <- data_dir_candidates[1]
+          } else {
+            # Try recursive search for POS/NEG
+            pos_dirs <- list.dirs(temp_dir, recursive = TRUE)[
+              grepl("POS$", list.dirs(temp_dir, recursive = TRUE))
+            ]
+            neg_dirs <- list.dirs(temp_dir, recursive = TRUE)[
+              grepl("NEG$", list.dirs(temp_dir, recursive = TRUE))
+            ]
 
-        # 移动 "POS" 和 "NEG" 目录到 "MS2"
-        if (length(pos_dirs) > 0) {
-          for (pos_dir in pos_dirs) {
-            # 确保我们移动的是POS目录本身，而不是它的父目录
-            if (basename(pos_dir) != "POS") {
-              pos_source <- file.path(pos_dir, "POS")
+            if (length(pos_dirs) && length(neg_dirs)) {
+              common_parent <- dirname(common_path(c(pos_dirs[1], neg_dirs[1])))
+              data_dir <- common_parent
             } else {
-              pos_source <- pos_dir
-            }
-
-            if (dir.exists(pos_source)) {
-              file.rename(pos_source, file.path(target_dir, "POS"))
+              stop("No valid directory containing POS/NEG found")
             }
           }
-        }
-
-        if (length(neg_dirs) > 0) {
-          for (neg_dir in neg_dirs) {
-            # 确保我们移动的是NEG目录本身，而不是它的父目录
-            if (basename(neg_dir) != "NEG") {
-              neg_source <- file.path(neg_dir, "NEG")
-            } else {
-              neg_source <- neg_dir
-            }
-
-            if (dir.exists(neg_source)) {
-              file.rename(neg_source, file.path(target_dir, "NEG"))
-            }
           }
+
+        # Move POS/NEG to target
+        if (dir.exists(file.path(data_dir, "POS"))) {
+          file.rename(file.path(data_dir, "POS"), file.path(target_dir, "POS"))
+        }
+        if (dir.exists(file.path(data_dir, "NEG"))) {
+          file.rename(file.path(data_dir, "NEG"), file.path(target_dir, "NEG"))
         }
 
-        # 验证是否成功移动了POS或NEG目录
+        # Remove macOS artifacts
+        macosx_dirs <- list.dirs(temp_dir, recursive = TRUE)[
+          grepl("__MACOSX|_MACOSX", list.dirs(temp_dir, recursive = TRUE))
+        ]
+        if (length(macosx_dirs)) unlink(macosx_dirs, recursive = TRUE)
+
+        # Remove hidden files (starting with .)
+        hidden_files <- list.files(temp_dir, all.files = TRUE, full.names = TRUE, recursive = TRUE)
+        hidden_files <- hidden_files[grepl("/\\.", hidden_files)]
+        if (length(hidden_files)) file.remove(hidden_files)
+
+        # Verify directory structure
         pos_exists <- dir.exists(file.path(target_dir, "POS"))
         neg_exists <- dir.exists(file.path(target_dir, "NEG"))
-
         if (!pos_exists && !neg_exists) {
           shinyalert("Error", "ZIP must contain POS and/or NEG directories", type = "error")
           ms2_processing_status("error")
-
-          # 提供调试信息
-          cat("Debug: Contents of temp_dir:\n")
-          print(list.dirs(temp_dir, recursive = FALSE))
-          cat("Found POS dirs:", pos_dirs, "\n")
-          cat("Found NEG dirs:", neg_dirs, "\n")
-
           return()
         }
 
-        # 清理临时目录
+        # Clean temp directory
         unlink(temp_dir, recursive = TRUE)
 
-        # 更新状态
+        # Update status
         ms2_path(target_dir)
         ms2_processing_status("success")
         shinyalert("Success", "MS2 files processed successfully", type = "success")
 
-      }, error = function(e) {
-        shinyalert("Error", paste("Failed to process MS2 files:", e$message), type = "error")
-        ms2_processing_status("error")
-      })
-    })
-
-
-    # 自定义数据库路径选择
-    observe({
-      shinyDirChoose(input = input, id = "norm_customized_db", roots = volumes, session = session)
-      if (!is.null(input$norm_customized_db)) {
-        db_path <- parseDirPath(roots = volumes, input$norm_customized_db)
-        output$ms_db_folder_selected <- renderText(db_path)
-      }
-    })
-
-    # 工具函数 ----
-    check_ion_modes <- function(data_rv, prj) {
-      list(
-        has_pos = !is.null(data_rv$object_pos_norm) || !is.null(prj$object_positive.init),
-        has_neg = !is.null(data_rv$object_neg_norm) || !is.null(prj$object_negative.init)
-      )
-    }
-
-    # 添加MS2谱图函数 ----
-    perform_add_ms2 = function(object, para, polarity, ms2_path) {
-      tryCatch({
-        # 根据极性确定子目录
-        subdir <- if (polarity == "positive") "POS" else "NEG"
-        full_path <- file.path(ms2_path, subdir)
-
-        # 验证路径是否存在
-        if (!dir.exists(full_path)) {
-          shinyalert("Path Error", paste("MS2 directory not found:", full_path), type = "error")
-          return(NULL)
-        }
-
-        # 添加MS2数据
-        res <- object %>%
-          mutate_ms2(
-            polarity = polarity,
-            column = para$column,
-            ms1.ms2.match.rt.tol = para$ms1.ms2.match.rt.tol,
-            ms1.ms2.match.mz.tol = para$ms1.ms2.match.mz.tol,
-            path = full_path
-          )
-        return(res)
-      }, error = function(e) {
-        shinyalert("Add MS2 Error", paste("Error details:", e$message), type = "error")
-        return(NULL)
-      })
-    }
-
-    # MS2参数
-    para_ms2 =  reactive({
-      list(
-        column = as.character(input$column),
-        ms1.ms2.match.rt.tol = as.numeric(input$ms1.ms2.match.rt.tol),
-        ms1.ms2.match.mz.tol = as.numeric(input$ms1.ms2.match.mz.tol)
-      )
-    })
-
-    # 添加MS2谱图事件 ----
-    observeEvent(input$add_ms2, {
-      tryCatch({
-        # 获取离子模式状态
-        modes <- check_ion_modes(data_clean_rv, prj_init)
-
-        # 检查是否有数据
-        if (!modes$has_pos && !modes$has_neg) {
-          shinyalert("Data Not Loaded", "No positive/negative ion mode data found. Upload data first.", type = "error")
-          return()
-        }
-
-        # 检查MS2路径是否设置
-        if (is.null(ms2_path())) {
-          shinyalert("MS2 Path Not Set", "Please process MS2 files first", type = "error")
-          return()
-        }
-
-        # 获取参数
-        para <- para_ms2()
-
-        # 进度条设置
-        steps <- character()
-        if (modes$has_pos) steps <- c(steps, "Processing positive mode")
-        if (modes$has_neg) steps <- c(steps, "Processing negative mode")
-        steps <- c(steps, "Saving results")
-        total_steps <- length(steps)
-
-        withProgress(message = "Adding MS2 Spectra...", value = 0, {
-          # 处理正离子模式
-          if (modes$has_pos) {
-            incProgress(1/total_steps, detail = steps[1])
-            data_anno$object_pos <- perform_add_ms2(
-              data_anno$object_pos,
-              para,
-              "positive",
-              ms2_path = ms2_path()
-            )
-
-            # 保存结果
-            if (!is.null(data_anno$object_pos)) {
-              object_pos_ms2 <- data_anno$object_pos
-              save(
-                object_pos_ms2,
-                file = file.path(prj_init$mass_dataset_dir, "06.object_pos_ms2.rda")
-              )
-            }
-          }
-
-          # 处理负离子模式
-          if (modes$has_neg) {
-            incProgress(1/total_steps, detail = steps[2])
-            data_anno$object_neg <- perform_add_ms2(
-              data_anno$object_neg,
-              para,
-              "negative",
-              ms2_path = ms2_path()
-            )
-
-            # 保存结果
-            if (!is.null(data_anno$object_neg)) {
-              object_neg_ms2 <- data_anno$object_neg
-              save(
-                object_neg_ms2,
-                file = file.path(prj_init$mass_dataset_dir, "06.object_neg_ms2.rda")
-              )
-            }
-          }
-
-          # 更新状态
-          incProgress(1/total_steps, detail = steps[3])
-          data_anno$ms2_status <- TRUE
-          shinyalert(
-            title = "Success",
-            text = "MS2 spectra have been successfully added to the dataset",
-            type = "success"
-          )
+        }, error = function(e) {
+          shinyalert("Error", paste("Failed to process MS2 files:", e$message), type = "error")
+          ms2_processing_status("error")
         })
-
-      }, error = function(e) {
-        shinyalert("Add MS2 Failed", paste("Error details:", e$message), type = "error")
       })
-    })
 
-    # 注释参数 ----
-    run_annotation <- function(object, para, polarity, database) {
-      tryCatch({
+      # 2. Custom Database Handling ----------------------------------------------
+      # Store custom DB path and status
+      cuz_db_path <- reactiveVal(NULL)
+      cuz_db_processing_status <- reactiveVal("idle")
+
+      # UI for custom DB status
+      output$cuz_db_status <- renderUI({
+        status <- cuz_db_processing_status()
+        path <- cuz_db_path()
+
+        if (status == "idle") {
+          tags$div(
+            class = "alert alert-info",
+            bsicons::bs_icon("info-circle"),
+            " Please upload custom database ZIP"
+          )
+        } else if (status == "processing") {
+          tags$div(
+            class = "alert alert-warning",
+            bsicons::bs_icon("hourglass-split"),
+            " Processing database files..."
+          )
+        } else if (status == "success" && !is.null(path)) {
+          tags$div(
+            class = "alert alert-success",
+            bsicons::bs_icon("check-circle-fill"),
+            " Custom database processed successfully"
+          )
+        } else if (status == "error") {
+          tags$div(
+            class = "alert alert-danger",
+            bsicons::bs_icon("exclamation-triangle-fill"),
+            " Error processing database files"
+          )
+        }
+      })
+
+      # Process custom database ZIP
+      observeEvent(input$cuz_db_zip, {
+        tryCatch({
+          # Validate project initialization
+          if (is.null(prj_init$wd) || !dir.exists(prj_init$wd)) {
+            shinyalert("Error", "Project not initialized", type = "error")
+            return()
+          }
+
+          # Set processing status
+          cuz_db_processing_status("processing")
+
+          # Target directory
+          target_dir <- file.path(prj_init$wd, "cuz_db")
+
+          # Clean existing directory
+          if (dir.exists(target_dir)) unlink(target_dir, recursive = TRUE)
+          dir.create(target_dir, showWarnings = FALSE, recursive = TRUE)
+
+          # Create temp directory
+          temp_dir <- file.path(prj_init$wd, "temp_cuz_db")
+          if (dir.exists(temp_dir)) unlink(temp_dir, recursive = TRUE)
+          dir.create(temp_dir, showWarnings = FALSE, recursive = TRUE)
+
+          # Get uploaded file
+          req(input$cuz_db_zip)
+          zip_file <- input$cuz_db_zip$datapath
+
+          # Validate file type
+          if (!grepl("\\.zip$", input$cuz_db_zip$name, ignore.case = TRUE)) {
+            shinyalert("Error", "Please upload a ZIP file", type = "error")
+            cuz_db_processing_status("error")
+            return()
+          }
+
+          # Extract files
+          withProgress(
+            message = 'Extracting database files',
+            detail = 'This may take a while...',
+            value = 0.5,
+            {
+              unzip(zip_file, exdir = temp_dir)
+            }
+          )
+
+          # Remove macOS artifacts
+          macosx_dirs <- list.dirs(temp_dir, recursive = TRUE)[
+            grepl("__MACOSX|_MACOSX", list.dirs(temp_dir, recursive = TRUE))
+          ]
+          if (length(macosx_dirs)) unlink(macosx_dirs, recursive = TRUE)
+
+          # Remove hidden files (starting with .)
+          hidden_files <- list.files(temp_dir, all.files = TRUE, full.names = TRUE, recursive = TRUE)
+          hidden_files <- hidden_files[grepl("/\\.", hidden_files)]
+          if (length(hidden_files)) file.remove(hidden_files)
+
+          # Move all .rda files to target directory
+          rda_files <- list.files(temp_dir, pattern = "\\.rda$", full.names = TRUE, recursive = TRUE)
+          if (length(rda_files)) {
+            file.copy(rda_files, target_dir)
+          } else {
+            shinyalert("Warning", "No .rda database files found in ZIP", type = "warning")
+          }
+
+          # Clean temp directory
+          unlink(temp_dir, recursive = TRUE)
+
+          # Update status
+          cuz_db_path(target_dir)
+          cuz_db_processing_status("success")
+          shinyalert("Success", "Custom database processed successfully", type = "success")
+
+        }, error = function(e) {
+          shinyalert("Error", paste("Failed to process database files:", e$message), type = "error")
+          cuz_db_processing_status("error")
+        })
+      })
+
+
+      # 3. Utility Functions ----------------------------------------------------
+      check_ion_modes <- function(data_rv, prj) {
+        list(
+          has_pos = !is.null(data_rv$object_pos_norm) || !is.null(prj$object_positive.init),
+          has_neg = !is.null(data_rv$object_neg_norm) || !is.null(prj$object_negative.init)
+        )
+      }
+
+      common_path <- function(paths) {
+        path_split <- strsplit(paths, "/")
+        common_elements <- Reduce(intersect, path_split)
+        paste(common_elements, collapse = "/")
+      }
+
+      # 4. Add MS2 Spectra ------------------------------------------------------
+      perform_add_ms2 = function(object, para, polarity, ms2_path) {
+        tryCatch({
+          subdir <- if (polarity == "positive") "POS" else "NEG"
+          full_path <- file.path(ms2_path, subdir)
+
+          if (!dir.exists(full_path)) {
+            shinyalert("Path Error", paste("MS2 directory not found:", full_path), type = "error")
+            return(NULL)
+          }
+
+          res <- object %>%
+            mutate_ms2(
+              polarity = polarity,
+              column = para$column,
+              ms1.ms2.match.rt.tol = para$ms1.ms2.match.rt.tol,
+              ms1.ms2.match.mz.tol = para$ms1.ms2.match.mz.tol,
+              path = full_path
+            )
+          return(res)
+        }, error = function(e) {
+          shinyalert("Add MS2 Error", paste("Error details:", e$message), type = "error")
+          return(NULL)
+        })
+      }
+
+      # MS2 parameters
+      para_ms2 =  reactive({
+        list(
+          column = as.character(input$column),
+          ms1.ms2.match.rt.tol = as.numeric(input$ms1.ms2.match.rt.tol),
+          ms1.ms2.match.mz.tol = as.numeric(input$ms1.ms2.match.mz.tol)
+        )
+      })
+
+      # Add MS2 spectra event
+      observeEvent(input$add_ms2, {
+        tryCatch({
+          # Check ion modes
+          modes <- check_ion_modes(data_clean_rv, prj_init)
+
+          # Validate data existence
+          if (!modes$has_pos && !modes$has_neg) {
+            shinyalert("Data Not Loaded", "No ion mode data found. Process data first.", type = "error")
+            return()
+          }
+
+          # Validate MS2 path
+          if (is.null(ms2_path())) {
+            shinyalert("MS2 Path Not Set", "Please process MS2 files first", type = "error")
+            return()
+          }
+
+          # Get parameters
+          para <- para_ms2()
+
+          # Determine data source based on workflow step
+          if (prj_init$steps == "Annotation") {
+            # Use initialized objects from project
+            if (modes$has_pos) data_anno$object_pos <- prj_init$object_positive.init
+            if (modes$has_neg) data_anno$object_neg <- prj_init$object_negative.init
+          } else {
+            # Use objects from previous processing steps
+            if (modes$has_pos) data_anno$object_pos <- data_clean_rv$object_pos_norm
+            if (modes$has_neg) data_anno$object_neg <- data_clean_rv$object_neg_norm
+          }
+
+          # Validate objects exist
+          if ((modes$has_pos && is.null(data_anno$object_pos)) ||
+              (modes$has_neg && is.null(data_anno$object_neg))) {
+            shinyalert("Data Error", "Required data objects not found", type = "error")
+            return()
+          }
+
+          # Process steps
+          steps <- character()
+          if (modes$has_pos) steps <- c(steps, "Processing positive mode")
+          if (modes$has_neg) steps <- c(steps, "Processing negative mode")
+          steps <- c(steps, "Saving results")
+          total_steps <- length(steps)
+
+          withProgress(message = "Adding MS2 Spectra...", value = 0, {
+            # Positive mode processing
+            if (modes$has_pos) {
+              incProgress(1/total_steps, detail = steps[1])
+              data_anno$object_pos <- perform_add_ms2(
+                object = data_anno$object_pos,
+                para = para,
+                polarity = "positive",
+                ms2_path = ms2_path()
+              )
+
+              # Save results
+              if (!is.null(data_anno$object_pos)) {
+                object_pos_ms2 <- data_anno$object_pos
+                save(
+                  object_pos_ms2,
+                  file = file.path(prj_init$mass_dataset_dir, "06.object_pos_ms2.rda")
+                )
+              }
+            }
+
+            # Negative mode processing
+            if (modes$has_neg) {
+              incProgress(1/total_steps, detail = steps[2])
+              data_anno$object_neg <- perform_add_ms2(
+                object = data_anno$object_neg,
+                para = para,
+                polarity = "negative",
+                ms2_path = ms2_path()
+              )
+
+              # Save results
+              if (!is.null(data_anno$object_neg)) {
+                object_neg_ms2 <- data_anno$object_neg
+                save(
+                  object_neg_ms2,
+                  file = file.path(prj_init$mass_dataset_dir, "06.object_neg_ms2.rda")
+                )
+              }
+            }
+
+            # Update status
+            incProgress(1/total_steps, detail = steps[3])
+            data_anno$ms2_status <- TRUE
+            shinyalert("Success", "MS2 spectra added to dataset", type = "success")
+          })
+
+        }, error = function(e) {
+          shinyalert("Add MS2 Failed", paste("Error details:", e$message), type = "error")
+        })
+      })
+
+
+      run_annotation <- function(object, para, polarity, database) {
         annotate_metabolites_mass_dataset(
           object = object,
           polarity = polarity,
@@ -647,266 +757,276 @@ feature_annotation_server <- function(id, volumes, prj_init, data_import_rv, dat
           ms2.match.weight = para$ms2.match.weight,
           total.score.tol = para$total.score.tol
         )
-      }, error = function(e) {
-        shinyalert("Annotation Error", paste("Error in", polarity, "mode:", e$message), type = "error")
-        return(NULL)
+      }
+      check_ms2 = function(object){
+        if(length(object@ms2_data) == 0) {
+          return(FALSE)
+        } else {
+          return(TRUE)
+        }
+      }
+
+      para_anno = reactive({
+        list(
+          ms1.match.ppm = as.numeric(input$anno_ms1.match.ppm),
+          ms2.match.ppm = as.numeric(input$anno_ms2.match.ppm),
+          rt.match.tol = as.numeric(input$anno_rt.match.tol),
+          candidate.num = as.numeric(input$anno_candidate.num),
+          column = as.character(input$anno_column),
+          threads= as.numeric(input$anno_threads),
+          norm_db = as.character(input$norm_db),
+          mz.ppm.thr = as.numeric(input$anno_mz.ppm.thr),
+          ms2.match.tol = as.numeric(input$anno_ms2.match.tol),
+          fraction.weight = as.numeric(input$anno_fraction.weight),
+          dp.forward.weight = as.numeric(input$anno_dp.forward.weight),
+          dp.reverse.weight = as.numeric(input$anno_dp.reverse.weight),
+          remove_fragment_intensity_cutoff = as.numeric(input$anno_remove_fragment_intensity_cutoff),
+          ce = as.character(input$anno_ce),
+          rt.match.weight = as.numeric(input$anno_rt.match.weight),
+          ms2.match.weight = as.numeric(input$anno_ms2.match.weight),
+          ms1.match.weight = as.numeric(input$anno_ms1.match.weight),
+          total.score.tol= as.numeric(input$anno_total.score.tol)
+        )
       })
-    }
 
-    # 检查MS2数据是否存在
-    check_ms2 = function(object){
-      if (is.null(object) || length(object@ms2_data) == 0) {
-        return(FALSE)
-      } else {
-        return(TRUE)
-      }
-    }
+      ##> run_anno
+      observeEvent(
+        input$anno_start,
+        {
+          shinyjs::disable("anno_start")
+          modes <- check_ion_modes(data_clean_rv, prj_init)
 
-    # 注释参数
-    para_anno = reactive({
-      list(
-        ms1.match.ppm = as.numeric(input$anno_ms1.match.ppm),
-        ms2.match.ppm = as.numeric(input$anno_ms2.match.ppm),
-        rt.match.tol = as.numeric(input$anno_rt.match.tol),
-        candidate.num = as.numeric(input$anno_candidate.num),
-        column = as.character(input$anno_column),
-        threads = as.numeric(input$anno_threads),
-        norm_db = as.character(input$norm_db),
-        mz.ppm.thr = as.numeric(input$anno_mz.ppm.thr),
-        ms2.match.tol = as.numeric(input$anno_ms2.match.tol),
-        fraction.weight = as.numeric(input$anno_fraction.weight),
-        dp.forward.weight = as.numeric(input$anno_dp.forward.weight),
-        dp.reverse.weight = as.numeric(input$anno_dp.reverse.weight),
-        remove_fragment_intensity_cutoff = as.numeric(input$anno_remove_fragment_intensity_cutoff),
-        ce = as.character(input$anno_ce),
-        rt.match.weight = as.numeric(input$anno_rt.match.weight),
-        ms2.match.weight = as.numeric(input$anno_ms2.match.weight),
-        ms1.match.weight = as.numeric(input$anno_ms1.match.weight),
-        total.score.tol = as.numeric(input$anno_total.score.tol)
-      )
-    })
+          if (!modes$has_pos && !modes$has_neg) {
+            # No data initialized at all
+            shinyalert(
+              "Data Not Loaded",
+              "No positive/negative ion mode data found. Upload data first.",
+              type = "error"
+            )
+            return()
+          }
+          if (!modes$has_pos && !modes$has_neg) {
+            # No data initialized at all
+            shinyalert(
+              "Data Not Loaded",
+              "No positive/negative ion mode data found. Upload data first.",
+              type = "error"
+            )
+            return()
+          }
 
-    # 执行注释事件 ----
-    observeEvent(input$anno_start, {
-      tryCatch({
-        shinyjs::disable("anno_start")  # 防止重复点击
+          # Check if data initialization exists
+          if(is.null(data_clean_rv$object_pos_norm) && is.null(data_clean_rv$object_neg_norm)){
+            if (!is.null(prj_init$object_negative.init) || !is.null(prj_init$object_positive.init)) {
+              # Data initialized but current step is invalid
+              if (prj_init$steps != "Annotation") {
+                shinyalert(
+                  "Step Error",
+                  "Invalid workflow sequence detected.\nPlease restart from the 'ANNOTATION' step.",
+                  type = "error"
+                )
+                return()
+              }
+            }
+          }
+          ## previous add ms2 has been finished
+          if(!isTRUE(data_anno$ms2_status)) {
+            if(prj_init$steps == "Annotation") {
+              if(modes$has_pos) data_anno$object_pos <- prj_init$object_positive.init
+              if(modes$has_neg) data_anno$object_neg <- prj_init$object_negative.init
+            } else {
+              if(modes$has_pos) data_anno$object_pos <- data_clean_rv$object_pos_norm
+              if(modes$has_neg) data_anno$object_neg <- data_clean_rv$object_neg_norm
+            }
+          }
 
-        # 获取离子模式状态
-        modes <- check_ion_modes(data_clean_rv, prj_init)
 
-        # 检查是否有数据
-        if (!modes$has_pos && !modes$has_neg) {
-          shinyalert("Data Not Loaded", "No positive/negative ion mode data found. Upload data first.", type = "error")
-          return()
-        }
+          # check ms2
+          if ((modes$has_pos && !isTRUE(check_ms2(data_anno$object_pos))) || (modes$has_neg && !isTRUE(check_ms2(data_anno$object_neg)))){
+            shinyalert(
+              "Warning!",
+              "MS2 data was not detected. Annotations will be based on MS1 data only.",
+              type = "warning"
+            )
+          }
 
-        # 检查MS2状态
-        if (modes$has_pos && !check_ms2(data_anno$object_pos)) {
-          showNotification("Warning: No MS2 data found in positive mode. Annotation will use MS1 only.",
-                           type = "warning", duration = 10)
-        }
-        if (modes$has_neg && !check_ms2(data_anno$object_neg)) {
-          showNotification("Warning: No MS2 data found in negative mode. Annotation will use MS1 only.",
-                           type = "warning", duration = 10)
-        }
+          para = para_anno()
 
-        # 获取参数
-        para <- para_anno()
+          ## buildin database
 
-        # 准备数据库
-        shinyalert(
-          title = "Preparing Databases",
-          text = "Loading and preparing databases for annotation...",
-          type = "info",
-          timer = 3000,
-          showConfirmButton = FALSE
-        )
+          ##! The integrated database needs to be loaded, then replace this code.
+          shinyalert(
+            title = "Preparing Annotation Database",
+            text = HTML("Processing will take <b>10-20 seconds</b>. <br><br>
+                  <span style='color:red;'>DO NOT click the 'Start annotation' button again</span>"),
+            type = "warning",
+            timer = 5000,    # close in 5 s
+            html = TRUE
+          )
 
-        # 内置数据库
-        data_anno$buildin_db <- list(
-          MoNA = mona_ms2,
-          Massbank = massbank_ms2,
-          HMDB = hmdb_ms2
-        )
+          data_anno$buildin_db <-
+            list(
+              MoNA = mona_ms2,
+              Massbank = massbank_ms2,
+              HMDB = hmdb_ms2
+            )
 
-        # 选择的数据库
-        selected_dbs <- para$norm_db
-        if ("NULL" %in% selected_dbs) {
-          selected_dbs <- selected_dbs[selected_dbs != "NULL"]
-        }
+          data_anno$buildin_name = para$norm_db %>% as.character()
 
-        if (length(selected_dbs) == 0) {
-          data_anno$buildin_db <- NULL
-        } else {
-          data_anno$buildin_db <- data_anno$buildin_db[selected_dbs]
-        }
+          if(length(data_anno$buildin_name) == 0) {
+            data_anno$buildin_db = NULL
+          } else {
+            temp_anno_idx = match(data_anno$buildin_name,names(data_anno$buildin_db))
+            data_anno$buildin_db = data_anno$buildin_db[temp_anno_idx]
+          }
 
-        # 自定义数据库
-        custom_db_path <- parseDirPath(volumes, input$norm_customized_db)
-        if (length(custom_db_path) > 0) {
-          custom_db_files <- list.files(custom_db_path, pattern = "\\.rda$", full.names = TRUE)
+          ## Customized ms database
+          # Custom databases
+          data_anno$cuz_db_path <- cuz_db_path()
 
-          if (length(custom_db_files) > 0) {
-            data_anno$cuz_db <- lapply(custom_db_files, function(file) {
-              load(file)
-              get(ls()[1])  # 获取加载的对象
+          temp_file_name = dir(data_anno$cuz_db_path,"*.rda")
+
+          if(length(temp_file_name) == 0) {
+            data_anno$db = data_anno$buildin_db
+          } else {
+            data_anno$cuz_db = list()
+            for (i in 1:length(temp_file_name)) {
+              xx = load(file = paste0(data_anno$cuz_db_path,"/",temp_file_name[[i]]))
+              data_anno$cuz_db[[i]] = get(xx)
+            }
+            data_anno$cuz_name = str_remove(string = temp_file_name,pattern = "\\.rda")
+
+            names(data_anno$cuz_db) = data_anno$cuz_name
+
+            if(is.null(data_anno$buildin_db)){
+              data_anno$db = data_anno$cuz_db
+            } else {
+              data_anno$db <- c(data_anno$buildin_db,data_anno$cuz_db)
+            }
+          }
+          dir.create(path = paste0(prj_init$wd,"/temp/Anno_Database/"),showWarnings = F,recursive = T)
+          temp_db <- data_anno$db
+          data_clean_rv$db <- data_anno$db
+          save(temp_db,file =  paste0(prj_init$wd,"/temp/Anno_Database/auto_saved.dblist"))
+          print("check point2")
+          #> annotation
+          if(length(data_anno$db) == 0) {
+            shinyalert(
+              "Error!",
+              "No metabolomics database detected. Please select an existing database or upload a METID-generated metabolite database",
+              type = "error"
+            )
+            return()
+          } else {
+            tags = names(data_anno$db)
+            ##> compound annotation
+            pro_steps_anno = c(paste0("Database ",tags," in progress..."),"Finish!")
+
+            anno_steps = length(pro_steps_anno)
+            withProgress(message = 'Compound annoation', value = 0,
+                         expr = {
+                           for (i in 1:(anno_steps)) {
+                             incProgress(1/anno_steps,detail = pro_steps_anno[i])
+                             if(i == 1) {
+                               if(modes$has_pos){
+                                 print("check point3")
+                                 para = para_anno()
+                                 data_anno$object_pos_anno <- run_annotation(
+                                   object = data_anno$object_pos,
+                                   para = para,
+                                   polarity = "positive",
+                                   database = data_anno$db[[i]]
+                                 )
+                               }
+                               if(modes$has_neg){
+                                 print("check point4")
+                                 para = para_anno()
+                                 data_anno$object_neg_anno <- run_annotation(
+                                   object = data_anno$object_neg,
+                                   para = para,
+                                   polarity = "negative",
+                                   database = data_anno$db[[i]]
+                                 )
+                               }
+
+                             } else if(i > 1 & i < anno_steps) {
+                               if(modes$has_pos){
+                                 para = para_anno()
+                                 data_anno$object_pos_anno <- run_annotation(
+                                   object = data_anno$object_pos_anno,
+                                   para = para,
+                                   polarity = "positive",
+                                   database = data_anno$db[[i]]
+                                 )
+                               }
+                               if(modes$has_neg){
+                                 para = para_anno()
+                                 data_anno$object_neg_anno <- run_annotation(
+                                   object = data_anno$object_neg_anno,
+                                   para = para,
+                                   polarity = "negative",
+                                   database = data_anno$db[[i]]
+                                 )
+                               }
+                             } else if(i == anno_steps) {
+                               if (modes$has_pos) {
+                                 data_clean_rv$object_pos_anno = data_anno$object_pos_anno
+                                 object_pos_anno <- data_anno$object_pos_anno
+                                 save(
+                                   object_pos_anno,
+                                   file = file.path(prj_init$mass_dataset_dir, "07.object_pos_anno.rda")
+                                 )
+                               }
+                               if (modes$has_neg) {
+                                 data_clean_rv$object_neg_anno = data_anno$object_neg_anno
+                                 object_neg_anno <- data_anno$object_neg_anno
+                                 save(
+                                   object_neg_anno,
+                                   file = file.path(prj_init$mass_dataset_dir, "07.object_neg_anno.rda")
+                                 )
+                               }
+                             }
+                           }
+                         }
+
+            )
+
+
+
+            # show process
+            output$obj_anno.pos  = check_massdata_info(
+              object = data_anno$object_pos_anno,
+              mode = "positive"
+            )
+
+            output$obj_anno.neg  = check_massdata_info(
+              object = data_anno$object_neg_anno,
+              mode = "negative"
+            )
+
+            #> data table
+            #>
+            output$Annotation_pos = renderDataTable_formated(
+              actions = input$anno_start,
+              condition1 = data_anno$object_pos_anno,filename.a = "3.6.6.annotation_pos",
+              tbl = data_anno$object_pos_anno %>% extract_annotation_table()
+            )
+
+            output$Annotation_neg = renderDataTable_formated(
+              actions = input$anno_start,
+              condition1 = data_anno$object_neg_anno,filename.a = "3.6.6.annotation_neg",
+              tbl = data_anno$object_neg_anno %>% extract_annotation_table()
+            )
+
+            #> Summary
+            temp_db_name = paste(tags,collapse = " | ")
+            output$anno_check1_pos = renderUI({
+              isolate(HTML(paste0(
+                '<font color = blue> <b>Selected database: </b> </font> <font color=red>',temp_db_name,'</font> ')))
             })
-            names(data_anno$cuz_db) <- tools::file_path_sans_ext(basename(custom_db_files))
-          } else {
-            data_anno$cuz_db <- NULL
-          }
-        } else {
-          data_anno$cuz_db <- NULL
-        }
 
-        # 合并数据库
-        if (!is.null(data_anno$buildin_db) && !is.null(data_anno$cuz_db)) {
-          data_anno$db <- c(data_anno$buildin_db, data_anno$cuz_db)
-        } else if (!is.null(data_anno$buildin_db)) {
-          data_anno$db <- data_anno$buildin_db
-        } else if (!is.null(data_anno$cuz_db)) {
-          data_anno$db <- data_anno$cuz_db
-        } else {
-          shinyalert("No Databases", "Please select at least one database", type = "error")
-          return()
-        }
-
-        # 保存数据库信息
-        db_names <- names(data_anno$db)
-        dir.create(file.path(prj_init$wd, "Annotation_Databases"), showWarnings = FALSE)
-        save(data_anno$db, file = file.path(prj_init$wd, "Annotation_Databases", "used_databases.rda"))
-
-        # 执行注释
-        total_dbs <- length(data_anno$db)
-        withProgress(message = "Annotating Metabolites...", value = 0, {
-          # 正离子模式注释
-          if (modes$has_pos) {
-            current_object <- data_anno$object_pos
-            for (i in seq_along(data_anno$db)) {
-              db_name <- names(data_anno$db)[i]
-              incProgress(1/(total_dbs * 2), detail = paste("POS:", db_name))
-
-              current_object <- run_annotation(
-                object = current_object,
-                para = para,
-                polarity = "positive",
-                database = data_anno$db[[i]]
-              )
-
-              if (is.null(current_object)) break  # 如果出错则停止
-            }
-            data_anno$object_pos_anno <- current_object
           }
 
-          # 负离子模式注释
-          if (modes$has_neg) {
-            current_object <- data_anno$object_neg
-            for (i in seq_along(data_anno$db)) {
-              db_name <- names(data_anno$db)[i]
-              incProgress(1/(total_dbs * 2), detail = paste("NEG:", db_name))
-
-              current_object <- run_annotation(
-                object = current_object,
-                para = para,
-                polarity = "negative",
-                database = data_anno$db[[i]]
-              )
-
-              if (is.null(current_object)) break  # 如果出错则停止
-            }
-            data_anno$object_neg_anno <- current_object
-          }
-
-          # 保存结果
-          incProgress(0.1, detail = "Saving results")
-          if (modes$has_pos && !is.null(data_anno$object_pos_anno)) {
-            object_pos_anno <- data_anno$object_pos_anno
-            save(
-              object_pos_anno,
-              file = file.path(prj_init$mass_dataset_dir, "07.object_pos_anno.rda")
-            )
-            data_clean_rv$object_pos_anno <- object_pos_anno
-          }
-
-          if (modes$has_neg && !is.null(data_anno$object_neg_anno)) {
-            object_neg_anno <- data_anno$object_neg_anno
-            save(
-              object_neg_anno,
-              file = file.path(prj_init$mass_dataset_dir, "07.object_neg_anno.rda")
-            )
-            data_clean_rv$object_neg_anno <- object_neg_anno
-          }
         })
-
-        # 更新UI
-        output$obj_anno.pos <- renderPrint({
-          if (modes$has_pos && !is.null(data_anno$object_pos_anno)) {
-            cat("Positive Mode Annotation Summary:\n")
-            cat("--------------------------------\n")
-            cat("Features:", nrow(data_anno$object_pos_anno), "\n")
-            cat("Annotated:", sum(!is.na(data_anno$object_pos_anno@annotation$annotation)), "\n")
-            cat("Databases:", paste(names(data_anno$db), collapse = ", "), "\n")
-          } else {
-            cat("No positive mode data available\n")
-          }
-        })
-
-        output$obj_anno.neg <- renderPrint({
-          if (modes$has_neg && !is.null(data_anno$object_neg_anno)) {
-            cat("Negative Mode Annotation Summary:\n")
-            cat("--------------------------------\n")
-            cat("Features:", nrow(data_anno$object_neg_anno), "\n")
-            cat("Annotated:", sum(!is.na(data_anno$object_neg_anno@annotation$annotation)), "\n")
-            cat("Databases:", paste(names(data_anno$db), collapse = ", "), "\n")
-          } else {
-            cat("No negative mode data available\n")
-          }
-        })
-
-        # 显示注释表格
-        output$Annotation_pos <- DT::renderDataTable({
-          if (modes$has_pos && !is.null(data_anno$object_pos_anno)) {
-            data_anno$object_pos_anno %>%
-              extract_annotation_table() %>%
-              DT::datatable(options = list(
-                pageLength = 10,
-                scrollX = TRUE,
-                autoWidth = TRUE
-              ))
-          }
-        })
-
-        output$Annotation_neg <- DT::renderDataTable({
-          if (modes$has_neg && !is.null(data_anno$object_neg_anno)) {
-            data_anno$object_neg_anno %>%
-              extract_annotation_table() %>%
-              DT::datatable(options = list(
-                pageLength = 10,
-                scrollX = TRUE,
-                autoWidth = TRUE
-              ))
-          }
-        })
-
-        # 显示数据库信息
-        output$anno_check1_pos <- renderUI({
-          db_list <- paste(names(data_anno$db), collapse = ", ")
-          HTML(paste0(
-            '<div class="alert alert-success">',
-            '<strong>Annotation Completed!</strong> ',
-            'Used databases: <span style="color:blue;">', db_list, '</span>',
-            '</div>'
-          ))
-        })
-
-        shinyalert("Success", "Metabolite annotation completed!", type = "success")
-
-      }, error = function(e) {
-        shinyalert("Annotation Failed", paste("Error details:", e$message), type = "error")
-      }) %finally% {
-        shinyjs::enable("anno_start")  # 重新启用按钮
-      }
-    })
   })
-}
-
+  }

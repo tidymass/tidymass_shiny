@@ -49,7 +49,6 @@ app_ui <- function(request) {
         kegg_pathway_ui("kegg_pathway_id"),
         id_convert_ui("id_convert_id")
       ),
-      nav_item(proxy_module_ui("proxy")),
       footer = flexible_download_widget_ui("download_widget")
       )
 

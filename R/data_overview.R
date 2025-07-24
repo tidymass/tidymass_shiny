@@ -22,7 +22,6 @@ data_overview_ui <- function(id) {
           sidebar = sidebar(
             title = "Actions",
             actionButton(inputId = ns('data_clean_start'),label = "Start",icon = icon("play")),
-            actionButton(inputId = ns('generate_report_raw'),label = "Export report",icon = icon("save")),
           ),
           ##> Main page ============
           page_fluid(

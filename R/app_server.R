@@ -7,9 +7,6 @@
 #' @noRd
 app_server <-
   function(input, output, session) {
-
-    # Your application server logic
-    bslib::bs_themer()
     # Call module server functions
     # Determine volumes based on system type
     if (Sys.info()["sysname"] == "Windows") {
@@ -145,7 +142,6 @@ app_server <-
     id_convert_server(
       id = "id_convert_id"
     )
-    proxy_status <- proxy_module_server("proxy")
     flexible_download_widget_server("download_widget", prj_init)
 
   }
