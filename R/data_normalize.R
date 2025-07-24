@@ -65,10 +65,12 @@ data_normalize_ui <- function(id) {
             label = "multiple",
             value = 1
           ),
-          textInput(
+          selectInput(
             inputId = ns('threads'),
             label = "threads",
-            value = 1
+            choices = c(1,2,3),
+            selected = 1,
+            multiple = F
           ),
         ),
         accordion_panel(

@@ -112,8 +112,8 @@ data_import_raw_ui <- function(id) {
             inputId = ns('mzdiff'),label = 'mzdiff',value = 0.01
           ),
 
-          textInput(
-            inputId = ns('threads'),label = 'threads',value = 6
+          selectInput(
+            inputId = ns('threads'),label = 'threads',choices = c(1,2,3),selected = 1,multiple = F
           ),
 
           textInput(
@@ -158,7 +158,7 @@ data_import_raw_ui <- function(id) {
                 textInput(inputId = ns("massSDrange.1"),label = "massSDrange",value = 2),
                 textInput(inputId = ns("smooth.1"),label = "smooth",value = 0),
                 textInput(inputId = ns("cutoff.1"),label = "cutoff",value = 0.95),
-                textInput(inputId = ns("thread.1"),label = "thread",value = 5),
+                selectInput(inputId = ns("thread.1"),label = "threads",choices = c(1,2,3),selected = 1,multiple = F),
                 textInput(inputId = ns("ppmCut.1"),label = "ppmCut",value = 7),
                 radioButtons(inputId = ns("filenum.1"),label = "filenum",choices = c(3,5,"all"),selected = 3),
               ),
@@ -167,7 +167,7 @@ data_import_raw_ui <- function(id) {
                 textInput(inputId = ns("massSDrange.2"),label = "massSDrange",value = 2),
                 textInput(inputId = ns("smooth.2"),label = "smooth",value = 0),
                 textInput(inputId = ns("cutoff.2"),label = "cutoff",value = 0.95),
-                textInput(inputId = ns("thread.2"),label = "thread",value = 5),
+                selectInput(inputId = ns("thread.2"),,label = "threads",choices = c(1,2,3),selected = 1,multiple = F),
                 textInput(inputId = ns("ppmCut.2"),label = "ppmCut",value = 7),
                 radioButtons(inputId = ns("filenum.2"),label = "filenum",choices = c(3,5,"all"),selected = 3),
                 radioButtons(inputId = ns("para_choise"),label = "use optimized parameters",choices = c("yes","no"),selected = "yes")

@@ -59,7 +59,7 @@ enrichment_ui <- function(id) {
             choices = p.adjust.methods,
             selected = "BH",multiple = FALSE
           ),
-          textInput(
+          selectInput(
             inputId = ns("threads"),
             label = tooltip(
               trigger = list(
@@ -67,17 +67,16 @@ enrichment_ui <- function(id) {
                 bsicons::bs_icon("info-circle")
               ),
               "Do not exceed the maximum number of cores of the machine."
-            ),
-            value = 1,
+            ),choices = c(1,2,3),selected = 1,multiple = F
           ),
           selectInput(
             inputId = ns("enrich_method"),
             label = tooltip(
               trigger = list(
-                "threads",
+                "enrich method",
                 bsicons::bs_icon("info-circle")
               ),
-              "Do not exceed the maximum number of cores of the machine."
+              "enrichment methods"
             ),choices = c("hypergeometric","fisher.test")
           ),
           sliderInput(

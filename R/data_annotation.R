@@ -120,12 +120,12 @@ feature_annotation_ui <- function(id) {
             selected = "rp",multiple = FALSE,
             title = "rp: reverse phase \nhilic: HILIC column"
           ),
-          textInput_div(
+          selectInput(
             inputId = ns('anno_threads'),
             label = "threads",
-            value = 3,
-            placeholder = "Only accept number, The number of threads",
-            title = "Number of threads"
+            choices = c(1,2,3),
+            selected = 1,
+            multiple = F
           )
         ),
         accordion_panel(
