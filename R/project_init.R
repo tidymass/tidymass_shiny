@@ -93,7 +93,6 @@ project_init_ui <- function(id) {
           actionButton(inputId = ns('action_init'),'Initialize project',icon = icon("play"), style = "width: 200px;"),
           tags$h4("Generated working directory:"),
           verbatimTextOutput(ns("generated_wd_path")),
-          tags$br(),
           uiOutput(ns("wd_status")),
           tags$br(),
           tags$h3("Summary of input file",style = 'color: black'),
@@ -159,6 +158,7 @@ project_init_server <- function(id, volumes, prj_init) {
     # 添加状态管理变量
     wd_generated <- reactiveVal(FALSE)  # 标记路径是否已生成
     generated_wd <- reactiveVal(NULL)   # 存储生成的路径
+    generated_job_id <- reactiveVal(NULL)
 
     # 生成随机目录的函数
     generate_random_dir <- function() {
@@ -177,18 +177,32 @@ project_init_server <- function(id, volumes, prj_init) {
 
         # 如果路径不存在，则使用该路径
         if (!dir.exists(new_path)) {
-          return(new_path)
+          return(list(
+            full_path = new_path,
+            job_id = rand_string
+          ))
         }
       }
     }
-
     # 显示工作目录状态
     output$wd_status <- renderUI({
       if (wd_generated()) {
         tags$div(
           style = "color: #4CAF50; font-weight: bold;",
           bsicons::bs_icon("check-circle-fill"),
-          " Working directory has been initialized. Re-initialization disabled."
+          paste0(" Project initialized successfully. Re-initialization disabled."),
+          tags$br(),
+          tags$div(
+            style = "color: #2196F3; font-weight: normal; margin-top: 8px;",
+            tags$strong("Job-ID: "), prj_init$job_id,
+            tags$br(),
+            tags$span(
+              style = "color: #FF9800;",
+              "Note: Your results will be automatically deleted after 24 hours.",
+              tags$br(),
+              "Please download your results using the 'Download mass_dataset' widget before the deadline."
+            )
+          )
         )
       } else {
         tags$div(
@@ -199,14 +213,15 @@ project_init_server <- function(id, volumes, prj_init) {
       }
     })
 
-    # 显示生成的路径（如果已生成）
-    output$generated_wd_path <- renderText({
+    # 显示生成的Job-ID（如果已生成）
+    output$generated_job_id <- renderText({
       if (wd_generated()) {
-        generated_wd()
+        generated_job_id()
       } else {
-        "Working directory will be generated after initialization"
+        "Job-ID will be generated after initialization"
       }
     })
+
 
     #> Import sample info from raw file
     sample_info_raw <- reactive({
@@ -249,14 +264,15 @@ project_init_server <- function(id, volumes, prj_init) {
       }
 
       tryCatch({
-        # 生成随机工作目录
-        new_wd <- generate_random_dir()
-        generated_wd(new_wd)  # 存储生成的路径
+        # 生成随机工作目录和Job-ID
+        dir_info <- generate_random_dir()
+        generated_job_id(dir_info$job_id)  # 存储生成的Job-ID
         wd_generated(TRUE)    # 标记路径已生成
 
         # 设置项目参数
-        prj_init$wd_path <- new_wd
-        prj_init$wd <- new_wd
+        prj_init$wd_path <- dir_info$full_path
+        prj_init$wd <- dir_info$full_path
+        prj_init$job_id <- dir_info$job_id  # 存储Job-ID到项目变量
 
         # 创建目录结构
         dir.create(prj_init$wd, showWarnings = FALSE, recursive = TRUE)
@@ -264,6 +280,7 @@ project_init_server <- function(id, volumes, prj_init) {
         dir.create(prj_init$mass_dataset_dir, showWarnings = FALSE, recursive = TRUE)
         prj_init$data_export_dir <- file.path(prj_init$wd, "data_export")
         dir.create(prj_init$data_export_dir, showWarnings = FALSE, recursive = TRUE)
+
 
         # Sample info file
         prj_init$sample_id_n = as.character(input$sample_id_raw)
@@ -397,12 +414,12 @@ project_init_server <- function(id, volumes, prj_init) {
           mode = "negative"
         )
 
-        # 成功提示（覆盖之前的提示）
+        # Success
         shinyalert::shinyalert(
           title = "Project Initialized!",
           text = paste(
-            "Working directory created:",
-            tags$code(new_wd),
+            "Job-ID created:",
+            tags$code(dir_info$job_id),
             tags$br(),
             "You can now proceed with the analysis."
           ),
@@ -414,6 +431,7 @@ project_init_server <- function(id, volumes, prj_init) {
         shinyalert::shinyalert("Initialization Failed",
                                paste("Error:", e$message),
                                type = "error")
+
       })
     })
   })

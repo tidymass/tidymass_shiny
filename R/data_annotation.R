@@ -884,7 +884,11 @@ feature_annotation_server <- function(id, volumes, prj_init, data_import_rv, dat
           # Custom databases
           data_anno$cuz_db_path <- cuz_db_path()
 
-          temp_file_name = dir(data_anno$cuz_db_path,"*.rda")
+          if (!is.null(data_anno$cuz_db_path) && dir.exists(data_anno$cuz_db_path)) {
+            temp_file_name = dir(data_anno$cuz_db_path, pattern = "*.rda", full.names = FALSE)
+          } else {
+            temp_file_name = character(0)
+          }
 
           if(length(temp_file_name) == 0) {
             data_anno$db = data_anno$buildin_db
@@ -904,6 +908,7 @@ feature_annotation_server <- function(id, volumes, prj_init, data_import_rv, dat
               data_anno$db <- c(data_anno$buildin_db,data_anno$cuz_db)
             }
           }
+
           dir.create(path = paste0(prj_init$wd,"/temp/Anno_Database/"),showWarnings = F,recursive = T)
           temp_db <- data_anno$db
           data_clean_rv$db <- data_anno$db

@@ -168,28 +168,6 @@ golem_add_external_resources <- function() {
         text-decoration: none;
       }
 
-      /* 代理模块样式 */
-      .proxy-control {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 5px 10px;
-      }
-      .proxy-status {
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-      }
-      .proxy-success {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-      }
-      .proxy-failure {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-      }
     "))
   )
 }

@@ -20,6 +20,21 @@ flexible_download_widget_ui <- function(id) {
       card_header(class = "bg-primary text-white", "Download mass_dataset"),
       card_body(
         padding = "10px",
+
+        # 添加Job-ID显示
+        fluidRow(
+          column(12,
+                 tags$div(
+                   class = "form-group",
+                   tags$label("Job-ID:"),
+                   textInput(ns("job_id_input"),
+                             label = NULL,
+                             value = "Not generated yet",
+                             width = "100%")
+                 )
+          )
+        ),
+
         # Progress indicator
         conditionalPanel(
           condition = paste0("output['", ns("is_processing"), "']"),
@@ -65,6 +80,15 @@ flexible_download_widget_server <- function(id, prj_init) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # 更新Job-ID输入框
+    observe({
+      if (!is.null(prj_init$job_id) && prj_init$job_id != "") {
+        updateTextInput(session, "job_id_input", value = prj_init$job_id)
+      } else {
+        updateTextInput(session, "job_id_input", value = "Not generated yet")
+      }
+    })
+
     # Reactive value to track processing state
     is_processing <- reactiveVal(FALSE)
     output$is_processing <- reactive(is_processing())
@@ -73,7 +97,10 @@ flexible_download_widget_server <- function(id, prj_init) {
     # Download mass_dataset folder
     output$download_mass_dataset <- downloadHandler(
       filename = function() {
-        paste0("mass_dataset_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".zip")
+        job_id <- ifelse(!is.null(prj_init$job_id) && prj_init$job_id != "",
+                         prj_init$job_id,
+                         "mass_dataset")
+        paste0(job_id, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".zip")
       },
       content = function(file) {
         tryCatch({
