@@ -134,10 +134,10 @@ app_server <-
       id = "Feature-based_Pathway_Analysis_id"
     )
     database_server(
-      id = "database_id",volumes = volumes
+      id = "database_id",prj_init = prj_init
     )
     kegg_pathway_server(
-      id = "kegg_pathway_id",volumes = volumes
+      id = "kegg_pathway_id",prj_init = prj_init
     )
     id_convert_server(
       id = "id_convert_id"

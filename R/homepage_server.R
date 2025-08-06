@@ -9,14 +9,6 @@
 homepage_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
-    observe({
-      query <- parseQueryString(session$clientData$url_search)
-      if (!is.null(query[['baseurl']])) {
-        options(shiny.baseurl = query[['baseurl']])
-      }
-    })
-
     # Handle button clicks
     observeEvent(input$start_btn, {
       # Navigate to project initialization

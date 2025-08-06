@@ -1,11 +1,9 @@
-
 #' KEGG Pathway Database UI
 #'
 #' @param id Module ID for Shiny.
 #' @import shiny
 #' @importFrom bsicons bs_icon
 #' @importFrom shinyjs useShinyjs
-#' @importFrom shinyFiles shinyDirButton
 #' @importFrom shinyalert useShinyalert
 #' @importFrom progress progress_bar
 #' @importFrom purrr map
@@ -19,17 +17,9 @@ kegg_pathway_ui <- function(id) {
     layout_sidebar(
       sidebar = accordion(
         accordion_panel(
-          title = "Data Input",
-          icon = bs_icon("folder"),
-          shinyDirButton(
-            id = ns("prj_wd"),
-            label = "Set working directory",
-            title = "Set working directory:",
-            buttonType = "default",
-            icon = bsicons::bs_icon("folder"),
-            multiple = FALSE
-          ),
-          tags$span(textOutput(outputId = ns("raw_wd_path")), class = "text-wrap")
+          title = "Project Status",
+          icon = bs_icon("info-circle"),
+          uiOutput(ns("project_status"))  # 显示项目状态
         ),
         accordion_panel(
           title = "Parameters",
@@ -74,7 +64,8 @@ kegg_pathway_ui <- function(id) {
         nav_panel(
           title = "Summary of pathway database",
           icon = bs_icon("terminal"),
-          verbatimTextOutput(ns("status_log"))
+          verbatimTextOutput(ns("status_log")),
+          uiOutput(ns("download_ui"))  # 动态显示下载按钮
         )
       )
     )
@@ -84,40 +75,107 @@ kegg_pathway_ui <- function(id) {
 #' KEGG Pathway Database Server
 #'
 #' @param id Module ID for Shiny.
-#' @param volumes ShinyFiles volumes.
+#' @param prj_init Project initialization object containing:
+#' \itemize{
+#'   \item wd - Working directory path
+#' }
 #' @import shiny
 #' @importFrom shinyjs useShinyjs
-#' @importFrom shinyFiles parseDirPath
 #' @importFrom shinyalert shinyalert
 #' @importFrom progress progress_bar
 #' @importFrom purrr map
 #' @importFrom KEGGREST keggGet
 #' @importFrom massdatabase request_kegg_pathway_info convert_kegg2metpath read_kegg_pathway
 #' @noRd
-kegg_pathway_server <- function(id, volumes) {
+kegg_pathway_server <- function(id, prj_init) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    values <- reactiveValues(wd = NULL, log = character())
+    values <- reactiveValues(
+      log = character(),
+      final_db_path = NULL  # 存储最终生成的数据库路径
+    )
 
-    # Set working directory
-    observe({
-      shinyDirChoose(input, "prj_wd", roots = volumes, session = session)
-      if (!is.null(input$prj_wd)) {
-        wd_path <- parseDirPath(roots = volumes, input$prj_wd)
-        output$raw_wd_path <- renderText(wd_path)
-        values$wd <- wd_path
+    # 项目初始化状态检查
+    project_initialized <- reactive({
+      !is.null(prj_init$wd) && dir.exists(prj_init$wd)
+    })
+
+    # 显示项目状态
+    output$project_status <- renderUI({
+      if (!project_initialized()) {
+        tags$div(
+          class = "alert alert-danger",
+          bsicons::bs_icon("exclamation-triangle"),
+          " Project not initialized. Please initialize project first."
+        )
+      } else {
+        # 显示相对路径（去除项目根目录）
+        relative_path <- gsub(paste0(prj_init$wd, "/?"), "", file.path(prj_init$wd, "kegg_pathway_database"))
+
+        tags$div(
+          class = "alert alert-success",
+          bsicons::bs_icon("folder"),
+          tags$strong("Project directory: "),
+          tags$br(),
+          tags$code(relative_path),
+          tags$br(),
+          tags$strong("Database path: "),
+          tags$br(),
+          tags$code(file.path(relative_path, "kegg_pathway_database"))
+        )
       }
     })
 
-    # Handle download and processing
+    # 显示下载按钮
+    output$download_ui <- renderUI({
+      req(values$final_db_path)
+
+      # 获取相对路径用于显示
+      relative_path <- gsub(paste0(prj_init$wd, "/?"), "", values$final_db_path)
+
+      tagList(
+        tags$div(
+          class = "alert alert-info",
+          bsicons::bs_icon("info-circle"),
+          " Pathway database created: ",
+          tags$code(relative_path)
+        ),
+        downloadButton(
+          outputId = ns("download_db"),
+          label = "Download Pathway Database",
+          icon = icon("download"),
+          class = "btn-primary",
+          style = "width: 100%;"
+        )
+      )
+    })
+
+    # 处理下载按钮
+    output$download_db <- downloadHandler(
+      filename = function() {
+        basename(values$final_db_path)
+      },
+      content = function(file) {
+        req(values$final_db_path)
+        file.copy(values$final_db_path, file)
+      }
+    )
+
+    # 处理下载和转换
     observeEvent(input$download_pathway, {
-      req(values$wd)
+      # 检查项目是否初始化
+      if (!project_initialized()) {
+        shinyalert("Error", "Project not initialized. Please initialize project first.", type = "error")
+        return()
+      }
+
       organism <- input$organism
       sleep <- input$sleep
-      db_path <- file.path(values$wd, "kegg_pathway_database")
+      db_dir <- file.path(prj_init$wd, "kegg_pathway_database")
+      db_file <- file.path(db_dir, "kegg_pathway_database")
 
-      # Check if database exists
-      if (file.exists(db_path)) {
+      # 检查数据库是否存在
+      if (file.exists(db_file)) {
         shinyalert(
           title = "Database Exists",
           text = "KEGG pathway database already exists. Re-download?",
@@ -127,66 +185,105 @@ kegg_pathway_server <- function(id, volumes) {
           cancelButtonText = "No",
           callbackR = function(value) {
             if (value) {
-              download_kegg_pathway_with_progress(values$wd, sleep, organism)
+              download_kegg_pathway_with_progress(db_dir, db_file, sleep, organism)
             } else {
-              process_existing_database(values$wd, organism)
+              process_existing_database(db_dir, organism)
             }
           }
         )
       } else {
-        download_kegg_pathway_with_progress(values$wd, sleep, organism)
+        download_kegg_pathway_with_progress(db_dir, db_file, sleep, organism)
       }
     })
 
-    # Download function with progress bar
-    download_kegg_pathway_with_progress <- function(path, sleep, organism) {
+    # 带进度条的下载函数
+    download_kegg_pathway_with_progress <- function(db_dir, db_file, sleep, organism) {
       withProgress(message = "Downloading KEGG Pathway Database", value = 0, {
-        dir.create(path, recursive = TRUE, showWarnings = FALSE)
-        kegg_id <- massdatabase::request_kegg_pathway_info(organism = organism)
-        pb <- progress::progress_bar$new(total = nrow(kegg_id))
+        # 创建目录
+        dir.create(db_dir, recursive = TRUE, showWarnings = FALSE)
 
-        kegg_pathway_database <- seq_along(kegg_id$KEGG.ID) %>%
-          purrr::map(function(i) {
+        # 获取KEGG通路ID
+        tryCatch({
+          kegg_id <- massdatabase::request_kegg_pathway_info(organism = organism)
+          values$log <- c(values$log, paste("Found", nrow(kegg_id), "pathways for", organism))
+
+          # 设置进度条
+          total_pathways <- nrow(kegg_id)
+          pb <- progress::progress_bar$new(
+            format = "[:bar] :percent | :eta remaining",
+            total = total_pathways
+          )
+
+          # 下载通路数据
+          kegg_pathway_database <- vector("list", total_pathways)
+          for (i in seq_along(kegg_id$KEGG.ID)) {
+            tryCatch({
+              kegg_pathway_database[[i]] <- KEGGREST::keggGet(dbentries = kegg_id$KEGG.ID[i])[[1]]
+              values$log <- c(values$log, paste("Downloaded:", kegg_id$KEGG.ID[i]))
+            }, error = function(e) {
+              values$log <- c(values$log, paste("Error downloading", kegg_id$KEGG.ID[i], ":", e$message))
+            })
+
+            # 更新进度
             pb$tick()
-            incProgress(1/nrow(kegg_id))
+            incProgress(1/total_pathways, detail = paste("Pathway", i, "of", total_pathways))
             Sys.sleep(time = sleep)
-            KEGGREST::keggGet(dbentries = kegg_id$KEGG.ID[i])[[1]]
-          })
+          }
 
-        save(kegg_pathway_database, file = db_path <- file.path(path, "kegg_pathway_database"))
-        values$log <- c(values$log, "Download completed.")
-        process_existing_database(path, organism)
+          # 保存数据库
+          save(kegg_pathway_database, file = db_file)
+          values$log <- c(values$log, paste("Database saved to:", db_file))
+
+          # 处理数据库
+          process_existing_database(db_dir, organism)
+        }, error = function(e) {
+          shinyalert("Download Error", paste("Failed to download pathway database:", e$message), type = "error")
+          values$log <- c(values$log, paste("Error:", e$message))
+        })
       })
     }
 
-    # Read and convert existing database
-    process_existing_database <- function(path, organism) {
+    # 读取和转换现有数据库
+    process_existing_database <- function(db_dir, organism) {
       withProgress(message = "Processing Pathway Database", value = 0, {
-        # Read KEGG pathway database
-        kegg_pathway_database <- massdatabase::read_kegg_pathway(path = path)
-        values$log <- c(values$log, "Database loaded.")
-        incProgress(0.5)
+        tryCatch({
+          # 读取KEGG通路数据库
+          kegg_pathway_database <- massdatabase::read_kegg_pathway(path = db_dir)
+          values$log <- c(values$log, "Database loaded successfully.")
+          incProgress(0.3)
 
-        # Convert to metpath format
-        kegg_org_pathway <- massdatabase::convert_kegg2metpath(
-          data = kegg_pathway_database,
-          path = path,
-          threads = 5
-        )
-        values$log <- c(values$log, "Conversion to metpath format completed.")
-        incProgress(0.9)
+          # 转换为metpath格式
+          kegg_org_pathway <- massdatabase::convert_kegg2metpath(
+            data = kegg_pathway_database,
+            path = db_dir,
+            threads = 5
+          )
+          values$log <- c(values$log, "Conversion to metpath format completed.")
+          incProgress(0.6)
 
-        # Save with organism-specific name
-        save_name <- paste0("kegg_", organism, "_pathway.rda")
-        save(kegg_org_pathway, file = file.path(path, save_name))
-        values$log <- c(values$log, paste("Saved as", file.path(path, save_name)))
+          # 保存为特定生物名称
+          save_name <- paste0("kegg_", organism, "_pathway.rda")
+          save_path <- file.path(db_dir, save_name)
+          save(kegg_org_pathway, file = save_path)
+          values$log <- c(values$log, paste("Saved as", save_path))
 
+          # 存储最终路径用于下载
+          values$final_db_path <- save_path
+          incProgress(0.9)
+
+          # 最终状态
+          values$log <- c(values$log, "Processing completed successfully!")
+          shinyalert("Success", "Pathway database processed successfully!", type = "success", timer = 5000)
+        }, error = function(e) {
+          shinyalert("Processing Error", paste("Failed to process pathway database:", e$message), type = "error")
+          values$log <- c(values$log, paste("Error:", e$message))
+        })
       })
     }
 
-    # Display log
+    # 显示日志
     output$status_log <- renderText({
-      print(paste(values$log, collapse = "\n"))
+      paste(values$log, collapse = "\n")
     })
   })
 }
