@@ -21,6 +21,8 @@ app_server <-
     } else {
       volumes = shinyFiles::getVolumes()()
     }
+
+    homepage_server(id = "homepage_id")
     #> project init
     prj_init <- reactiveValues(data = NULL) # project init
     project_init_server(id = "project_init_id", volumes = volumes, prj_init)
