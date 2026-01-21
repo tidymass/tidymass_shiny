@@ -163,6 +163,11 @@ app_server <-
     id_convert_server(
       id = "id_convert_id"
     )
+    fmsea_server(
+      id = "fmsea_id",
+      volumes = volumes
+    )
+
     proxy_status <- proxy_module_server("proxy")
 
   }

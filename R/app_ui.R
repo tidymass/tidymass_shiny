@@ -44,6 +44,7 @@ app_ui <- function(request) {
       ),
       nav_menu(
         title = 'Tidymass shiny toolkits', icon = bs_icon('person-vcard'),
+        fmsea_ui("fmsea_id"),
         fpa_ui("Feature-based_Pathway_Analysis_id"),
         database_ui("database_id"),
         kegg_pathway_ui("kegg_pathway_id"),
