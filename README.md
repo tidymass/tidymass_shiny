@@ -67,7 +67,11 @@ You can also initiate a question a or bug report in the `issue page`.
 
 # **Citation**
 
-If you use `tidymass shiny` in your publications, please cite this paper:
+If you use `tidymass shiny` in your publications, please cite:
+
+Wang, X., Liu, Y., Jiang, C. et al. TidyMass2: advancing LC-MS untargeted metabolomics through metabolite origin inference and metabolic feature-based functional module analysis. Nat Commun 17, 68464 (2026).
+
+[Weblink](https://www.nature.com/articles/s41467-026-68464-7)
 
 Shen, X., Yan, H., Wang, C. et al. TidyMass an object-oriented reproducible analysis framework for LC–MS data. Nat Commun 13, 4365 (2022). 
 
