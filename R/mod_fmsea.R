@@ -5,6 +5,7 @@
 #' @importFrom bsicons bs_icon
 #' @importFrom shinyFiles shinyFilesButton
 #' @import featuremsea
+#' @importFrom DT dataTableOutput
 #' @noRd
 fmsea_ui <- function(id) {
   ns <- NS(id)
@@ -51,7 +52,7 @@ fmsea_ui <- function(id) {
         accordion_panel(
           title = "Step 2: fMSEA Analysis",
           icon = bsicons::bs_icon("2-circle"),
-          numericInput(ns("threads"), "Threads", value = 3, min = 1), # Default 3
+          numericInput(ns("threads"), "Threads", value = 3, min = 1),
           numericInput(ns("min_compounds"), "Min Compounds", value = 15),
           numericInput(ns("max_compounds"), "Max Compounds", value = 300),
           numericInput(ns("perm_num"), "Permutations", value = 1000),
@@ -65,10 +66,23 @@ fmsea_ui <- function(id) {
       card(
         card_header("Analysis Results"),
         card_body(
+          # 1. Step 1 Status (Brief)
           h5("Step 1 Status:"),
           textOutput(ns("status_step1_text")),
           hr(),
-          h5("Step 2 Result Summary:"),
+
+          # 2. Interactive Table
+          h5("Significant Modules (Click a row to visualize):"),
+          DT::dataTableOutput(ns("sig_modules_table")),
+          hr(),
+
+          # 3. Visualization Plot
+          h5("Visualization:"),
+          plotOutput(ns("fmsea_plot"), height = "500px"),
+          hr(),
+
+          # 4. Detailed Text Summary (Moved to bottom)
+          h5("Step 2 Result Summary (Text):"),
           verbatimTextOutput(ns("result_summary"))
         )
       )
@@ -83,6 +97,7 @@ fmsea_ui <- function(id) {
 #' @param volumes shinyFiles volumes
 #' @import shiny
 #' @import featuremsea
+#' @importFrom DT renderDataTable datatable
 #' @noRd
 fmsea_server <- function(id, volumes) {
   moduleServer(id, function(input, output, session) {
@@ -99,7 +114,6 @@ fmsea_server <- function(id, volumes) {
     )
 
     # Helper function to load RDA safely
-    # This prevents overwriting existing variables and returns the loaded object directly
     load_rda_data <- function(file_path) {
       env <- new.env()
       name <- load(file_path, envir = env)
@@ -148,7 +162,7 @@ fmsea_server <- function(id, volumes) {
       req(vals$feature_table, vals$ms1_db)
       output$step1_log <- renderText("Running Step 1... Please wait.")
 
-      # Snapshot inputs to avoid reactive dependency issues during calculation
+      # Snapshot inputs
       local_column <- input$column
       local_db_type <- input$database_type
       local_ppm <- as.numeric(input$ms1_match_ppm)
@@ -193,9 +207,7 @@ fmsea_server <- function(id, volumes) {
     observeEvent(input$run_step2, {
       req(vals$pathway_db, vals$ranking_table, vals$annotation_table)
 
-      # *** CRITICAL FIX FOR PARALLEL PROCESSING ***
-      # Snapshot all reactive inputs and reactive values to local variables.
-      # This prevents the "Reactive context was created in one process and accessed from another" error.
+      # Snapshot inputs for parallel processing safety
       local_pathway_db <- vals$pathway_db
       local_annotation_table <- vals$annotation_table
       local_ranking_table <- vals$ranking_table
@@ -211,12 +223,10 @@ fmsea_server <- function(id, volumes) {
         tryCatch({
           incProgress(0.1, detail = "Preparing data...")
 
-          # Determine ID column based on DB type
           current_id_col <- if(local_db_type == "KEGG") "KEGG_ID" else "HMDB_ID"
 
           incProgress(0.3, detail = "Calculating (this may take a while)...")
 
-          # Pass LOCAL variables to the function, not input$xxx
           results <- featuremsea::perform_fmsea_analysis(
             pathway_database = local_pathway_db,
             annotation_table = local_annotation_table,
@@ -236,16 +246,53 @@ fmsea_server <- function(id, volumes) {
           incProgress(1, detail = "Finished!")
 
         }, error = function(e) {
-          vals$final_result <- paste("Error in Step 2:", e$message)
+          vals$final_result <- NULL
+          showNotification(paste("Error in Step 2:", e$message), type = "error")
         })
       })
     })
 
-    # --- 4. Result Display ---
+    # --- 4. Results Display & Interaction ---
+
+    # A. Render the Interactive Table (Significant Modules)
+    output$sig_modules_table <- DT::renderDataTable({
+      req(vals$final_result)
+
+      validate(
+        need(isS4(vals$final_result), "Result is not a valid object."),
+        need("significant_modules" %in% slotNames(vals$final_result), "Result object missing 'significant_modules' slot.")
+      )
+
+      df <- vals$final_result@significant_modules
+
+      DT::datatable(df,
+                    selection = 'single',
+                    options = list(pageLength = 5, scrollX = TRUE, autoWidth = TRUE),
+                    rownames = FALSE)
+    })
+
+    # B. Render the Plot based on Selection
+    output$fmsea_plot <- renderPlot({
+      req(vals$final_result)
+
+      selected_idx <- input$sig_modules_table_rows_selected
+      validate(need(selected_idx, "Please click a row in the table above to visualize the pathway."))
+
+      df <- vals$final_result@significant_modules
+      target_id <- df$pathway_id[selected_idx]
+
+      featuremsea::plot_fmsea_plot(
+        fmsea_obj = vals$final_result,
+        pathway_id = target_id,
+        title = paste("Pathway:", target_id)
+      )
+    })
+
+    # C. Render the Text Summary (Moved to bottom)
     output$result_summary <- renderPrint({
       req(vals$final_result)
       print(vals$final_result)
     })
+
   })
 }
-
