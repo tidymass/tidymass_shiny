@@ -1,16 +1,12 @@
-#' Feature-based Metabolite Set Enrichment Analysis (fMSEA) UI
-#'
-#' @param id module id
+#' Feature-based Metabolite Set Enrichment Analysis (fMSEA)
 #' @import shiny
-#' @importFrom bsicons bs_icon
-#' @importFrom shinyFiles shinyFilesButton
-#' @import featuremsea
-#' @importFrom DT dataTableOutput
+#' @importFrom DT dataTableOutput renderDataTable datatable
+#' @importFrom shinyFiles shinyFilesButton parseFilePaths
 #' @noRd
 fmsea_ui <- function(id) {
   ns <- NS(id)
   nav_panel(
-    title = 'Feature-based Metabolite Set Enrichment Analysis (fMSEA)',
+    title = 'fMSEA Analysis',
     icon = bsicons::bs_icon("diagram-3"),
     layout_sidebar(
       sidebar = accordion(
@@ -20,279 +16,221 @@ fmsea_ui <- function(id) {
         accordion_panel(
           title = "Data Upload",
           icon = bsicons::bs_icon("upload"),
+          shinyFiles::shinyFilesButton(id = ns('feature_table_file'), label = 'Feature Table', title = "Select", multiple = FALSE, buttonType = "default"),
+          div(textOutput(ns("feature_table_path")), style = "font-size: 0.75em; color: grey; margin-bottom: 5px;"),
 
-          # Feature Table Upload
-          shinyFiles::shinyFilesButton(id = ns('feature_table_file'), label = 'Load Feature Table (.rda)', title = "Select Feature Table", multiple = FALSE, buttonType = "default", icon = icon("table")),
-          div(textOutput(ns("feature_table_path"), inline = TRUE), style = "font-size: 0.8em; color: grey; margin-bottom: 10px;"),
+          shinyFiles::shinyFilesButton(id = ns('ms1_db_file'), label = 'MS1 DB', title = "Select", multiple = FALSE, buttonType = "default"),
+          div(textOutput(ns("ms1_db_path")), style = "font-size: 0.75em; color: grey; margin-bottom: 5px;"),
 
-          # MS1 Database Upload
-          shinyFiles::shinyFilesButton(id = ns('ms1_db_file'), label = 'Load MS1 Database (.rda)', title = "Select MS1 Database", multiple = FALSE, buttonType = "default", icon = icon("database")),
-          div(textOutput(ns("ms1_db_path"), inline = TRUE), style = "font-size: 0.8em; color: grey; margin-bottom: 10px;"),
+          shinyFiles::shinyFilesButton(id = ns('pathway_db_file'), label = 'Pathway DB', title = "Select", multiple = FALSE, buttonType = "default"),
+          div(textOutput(ns("pathway_db_path")), style = "font-size: 0.75em; color: grey;"),
 
-          # Pathway Database Upload
-          shinyFiles::shinyFilesButton(id = ns('pathway_db_file'), label = 'Load Pathway Database (.rda)', title = "Select Pathway Database", multiple = FALSE, buttonType = "default", icon = icon("bezier-curve")),
-          div(textOutput(ns("pathway_db_path"), inline = TRUE), style = "font-size: 0.8em; color: grey;")
+          hr(),
+          p("Existing Results:", style = "font-size: 0.85em; font-weight: bold; margin-bottom: 5px;"),
+          shinyFiles::shinyFilesButton(id = ns('results_rda_file'), label = 'Load results.rda', title = "Select RDA", multiple = FALSE, buttonType = "info"),
+          div(textOutput(ns("results_rda_path")), style = "font-size: 0.75em; color: grey;")
         ),
 
         # --- 2. Step 1 Parameters ---
         accordion_panel(
-          title = "Step 1: Annotation & Processing",
+          title = "Step 1: Annotation",
           icon = bsicons::bs_icon("1-circle"),
           selectInput(ns("column"), "Column", choices = c("rp", "hilic"), selected = "rp"),
-          selectInput(ns("database_type"), "Database Type", choices = c("KEGG", "HMDB"), selected = "KEGG"),
-          numericInput(ns("ms1_match_ppm"), "MS1 Match PPM", value = 15),
-          numericInput(ns("mfc_rt_tol"), "RT Tolerance (s)", value = 10),
-          numericInput(ns("isotope_number"), "Isotope Number", value = 3),
-
-          actionButton(ns("run_step1"), "Run Step 1 (Annotate)", class = "btn-primary", width = "100%"),
-          verbatimTextOutput(ns("step1_log"), placeholder = TRUE)
+          selectInput(ns("database_type"), "DB Type", choices = c("KEGG", "HMDB"), selected = "KEGG"),
+          numericInput(ns("ms1_match_ppm"), "MS1 PPM", value = 15),
+          numericInput(ns("mfc_rt_tol"), "RT Tol (s)", value = 10),
+          numericInput(ns("isotope_number"), "Isotope No.", value = 3),
+          actionButton(ns("run_step1"), "Run Step 1", class = "btn-primary", width = "100%"),
+          verbatimTextOutput(ns("step1_log"))
         ),
 
         # --- 3. Step 2 Parameters ---
         accordion_panel(
-          title = "Step 2: fMSEA Analysis",
+          title = "Step 2: fMSEA",
           icon = bsicons::bs_icon("2-circle"),
           numericInput(ns("threads"), "Threads", value = 3, min = 1),
           numericInput(ns("min_compounds"), "Min Compounds", value = 15),
           numericInput(ns("max_compounds"), "Max Compounds", value = 300),
           numericInput(ns("perm_num"), "Permutations", value = 1000),
-          numericInput(ns("fdr_thr"), "FDR Threshold", value = 0.05),
-
-          actionButton(ns("run_step2"), "Run Step 2 (fMSEA)", class = "btn-success", width = "100%")
+          numericInput(ns("fdr_thr"), "FDR Thr", value = 0.05),
+          actionButton(ns("run_step2"), "Run Step 2", class = "btn-success", width = "100%")
         )
       ),
 
-      # --- Main Panel Output ---
       card(
-        card_header("Analysis Results"),
+        full_screen = TRUE,
+        card_header(
+          div(class = "d-flex justify-content-between align-items-center",
+              "Analysis Results",
+              downloadButton(ns("download_table"), "Download Table (CSV)", class = "btn-sm"))
+        ),
         card_body(
-          # 1. Step 1 Status (Brief)
-          h5("Step 1 Status:"),
-          textOutput(ns("status_step1_text")),
-          hr(),
+          padding = 0, # Remove padding to reduce white space
+          # Table Section
+          div(
+            style = "padding: 10px; border-bottom: 1px solid #eee;",
+            h6("Significant Modules (Select to visualize)"),
+            DT::dataTableOutput(ns("sig_modules_table"))
+          ),
 
-          # 2. Interactive Table
-          h5("Significant Modules (Click a row to visualize):"),
-          DT::dataTableOutput(ns("sig_modules_table")),
-          hr(),
+          # Visualization & Download Section
+          div(
+            style = "padding: 10px;",
+            h6("Enrichment Plot"),
+            plotOutput(ns("fmsea_plot"), height = "400px"),
+            div(
+              style = "display: flex; gap: 10px; margin-top: 5px;",
+              downloadButton(ns("download_png"), "PNG", class = "btn-sm"),
+              downloadButton(ns("download_pdf"), "PDF", class = "btn-sm")
+            )
+          ),
 
-          # 3. Visualization Plot
-          h5("Visualization:"),
-          plotOutput(ns("fmsea_plot"), height = "500px"),
-          hr(),
-
-          # 4. Detailed Text Summary (Moved to bottom)
-          h5("Step 2 Result Summary (Text):"),
-          verbatimTextOutput(ns("result_summary"))
+          accordion(
+            open = FALSE,
+            accordion_panel("Detailed Summary", verbatimTextOutput(ns("result_summary")))
+          )
         )
       )
     )
   )
 }
 
-
-#' Feature-based Metabolite Set Enrichment Analysis (fMSEA) Server
-#'
-#' @param id module id
-#' @param volumes shinyFiles volumes
-#' @import shiny
-#' @import featuremsea
-#' @importFrom DT renderDataTable datatable
+#' fMSEA Server
 #' @noRd
 fmsea_server <- function(id, volumes) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    vals <- reactiveValues(feature_table = NULL, ms1_db = NULL, pathway_db = NULL, final_result = NULL)
 
-    # Store loaded data and intermediate results
-    vals <- reactiveValues(
-      feature_table = NULL,
-      ms1_db = NULL,
-      pathway_db = NULL,
-      ranking_table = NULL,
-      annotation_table = NULL,
-      final_result = NULL
-    )
-
-    # Helper function to load RDA safely
-    load_rda_data <- function(file_path) {
+    load_rda_data <- function(path) {
+      if (is.null(path) || length(path) == 0 || path == "") return(NULL)
       env <- new.env()
-      name <- load(file_path, envir = env)
+      name <- load(path, envir = env)
       return(get(name, envir = env))
     }
 
-    # --- 1. File Upload Logic ---
+    # --- Secure File Handlers ---
     observe({
       shinyFiles::shinyFileChoose(input, "feature_table_file", roots = volumes, session = session)
-      if (!is.null(input$feature_table_file)) {
-        file_selected <- shinyFiles::parseFilePaths(roots = volumes, input$feature_table_file)
-        if (nrow(file_selected) > 0) {
-          path <- as.character(file_selected$datapath)
-          output$feature_table_path <- renderText(path)
-          vals$feature_table <- load_rda_data(path)
-        }
+      req(input$feature_table_file)
+      file_info <- shinyFiles::parseFilePaths(volumes, input$feature_table_file)
+      if (nrow(file_info) > 0) {
+        path <- as.character(file_info$datapath)
+        vals$feature_table <- load_rda_data(path)
+        output$feature_table_path <- renderText(path)
       }
     })
 
     observe({
       shinyFiles::shinyFileChoose(input, "ms1_db_file", roots = volumes, session = session)
-      if (!is.null(input$ms1_db_file)) {
-        file_selected <- shinyFiles::parseFilePaths(roots = volumes, input$ms1_db_file)
-        if (nrow(file_selected) > 0) {
-          path <- as.character(file_selected$datapath)
-          output$ms1_db_path <- renderText(path)
-          vals$ms1_db <- load_rda_data(path)
-        }
+      req(input$ms1_db_file)
+      file_info <- shinyFiles::parseFilePaths(volumes, input$ms1_db_file)
+      if (nrow(file_info) > 0) {
+        path <- as.character(file_info$datapath)
+        vals$ms1_db <- load_rda_data(path)
+        output$ms1_db_path <- renderText(path)
       }
     })
 
     observe({
       shinyFiles::shinyFileChoose(input, "pathway_db_file", roots = volumes, session = session)
-      if (!is.null(input$pathway_db_file)) {
-        file_selected <- shinyFiles::parseFilePaths(roots = volumes, input$pathway_db_file)
-        if (nrow(file_selected) > 0) {
-          path <- as.character(file_selected$datapath)
-          output$pathway_db_path <- renderText(path)
-          vals$pathway_db <- load_rda_data(path)
-        }
+      req(input$pathway_db_file)
+      file_info <- shinyFiles::parseFilePaths(volumes, input$pathway_db_file)
+      if (nrow(file_info) > 0) {
+        path <- as.character(file_info$datapath)
+        vals$pathway_db <- load_rda_data(path)
+        output$pathway_db_path <- renderText(path)
       }
     })
 
-    # --- 2. Step 1 Logic: Annotation ---
+    observe({
+      shinyFiles::shinyFileChoose(input, "results_rda_file", roots = volumes, session = session)
+      req(input$results_rda_file)
+      file_info <- shinyFiles::parseFilePaths(volumes, input$results_rda_file)
+      if (nrow(file_info) > 0) {
+        path <- as.character(file_info$datapath)
+        vals$final_result <- load_rda_data(path)
+        output$results_rda_path <- renderText(path)
+      }
+    })
+
+    # --- Analysis Logics ---
     observeEvent(input$run_step1, {
       req(vals$feature_table, vals$ms1_db)
-      output$step1_log <- renderText("Running Step 1... Please wait.")
-
-      # Snapshot inputs
-      local_column <- input$column
-      local_db_type <- input$database_type
-      local_ppm <- as.numeric(input$ms1_match_ppm)
-      local_rt_tol <- as.numeric(input$mfc_rt_tol)
-      local_isotope <- as.numeric(input$isotope_number)
-
       tryCatch({
-        # 1. Annotation
-        annotation_table_final <- featuremsea::annotate_feature_table(
-          feature_table = vals$feature_table,
-          column = local_column,
-          metabolite_database = vals$ms1_db,
-          database_type = local_db_type,
-          ms1_match_ppm = local_ppm,
-          mfc_rt_tol = local_rt_tol,
-          isotope_number = local_isotope
-        )
-
-        # 2. Remove Redundancy
-        annotation_table_final2 <- featuremsea::remove_redundancy(
-          annotation_table = annotation_table_final
-        )
-
-        # 3. Process Annotation Table
-        results_step1 <- featuremsea::process_annotation_table(
-          annotation_table_final2 = annotation_table_final2,
-          database_type = local_db_type
-        )
-
-        vals$ranking_table <- results_step1$ranking_table
-        vals$annotation_table <- results_step1$original_score_annotation
-
-        output$step1_log <- renderText("Step 1 Complete! Ready for fMSEA Analysis.")
-        output$status_step1_text <- renderText(paste("Step 1 Done. Ranking Table Rows:", nrow(vals$ranking_table)))
-
-      }, error = function(e) {
-        output$step1_log <- renderText(paste("Error:", e$message))
-      })
+        res1 <- featuremsea::annotate_feature_table(vals$feature_table, input$column, vals$ms1_db, input$database_type, input$ms1_match_ppm, input$mfc_rt_tol, input$isotope_number)
+        res2 <- featuremsea::process_annotation_table(featuremsea::remove_redundancy(res1), input$database_type)
+        vals$ranking_table <- res2$ranking_table
+        vals$annotation_table <- res2$original_score_annotation
+        output$step1_log <- renderText("Step 1 Done!")
+      }, error = function(e) output$step1_log <- renderText(e$message))
     })
 
-    # --- 3. Step 2 Logic: fMSEA Analysis ---
     observeEvent(input$run_step2, {
       req(vals$pathway_db, vals$ranking_table, vals$annotation_table)
+      l_db <- vals$pathway_db; l_anno <- vals$annotation_table; l_rank <- vals$ranking_table
+      l_threads <- as.numeric(input$threads); l_db_type <- input$database_type
 
-      # Snapshot inputs for parallel processing safety
-      local_pathway_db <- vals$pathway_db
-      local_annotation_table <- vals$annotation_table
-      local_ranking_table <- vals$ranking_table
-
-      local_threads <- as.numeric(input$threads)
-      local_min_comp <- as.numeric(input$min_compounds)
-      local_max_comp <- as.numeric(input$max_compounds)
-      local_perm_num <- as.numeric(input$perm_num)
-      local_fdr_thr <- as.numeric(input$fdr_thr)
-      local_db_type <- input$database_type
-
-      withProgress(message = 'Running fMSEA Analysis...', value = 0, {
-        tryCatch({
-          incProgress(0.1, detail = "Preparing data...")
-
-          current_id_col <- if(local_db_type == "KEGG") "KEGG_ID" else "HMDB_ID"
-
-          incProgress(0.3, detail = "Calculating (this may take a while)...")
-
-          results <- featuremsea::perform_fmsea_analysis(
-            pathway_database = local_pathway_db,
-            annotation_table = local_annotation_table,
-            ranking_table = local_ranking_table,
-            threads = local_threads,
-            min.compounds.num = local_min_comp,
-            max.compounds.num = local_max_comp,
-            id.col = current_id_col,
-            perm.num = local_perm_num,
-            seed = 123,
-            fdr.thr = local_fdr_thr,
-            max.iter.num = 1,
-            verbose = TRUE
-          )
-
-          vals$final_result <- results
-          incProgress(1, detail = "Finished!")
-
-        }, error = function(e) {
-          vals$final_result <- NULL
-          showNotification(paste("Error in Step 2:", e$message), type = "error")
-        })
+      withProgress(message = 'Running fMSEA...', {
+        vals$final_result <- featuremsea::perform_fmsea_analysis(
+          pathway_database = l_db, annotation_table = l_anno, ranking_table = l_rank,
+          threads = l_threads, min.compounds.num = input$min_compounds,
+          max.compounds.num = input$max_compounds, id.col = ifelse(l_db_type=="KEGG", "KEGG_ID", "HMDB_ID"),
+          perm.num = input$perm_num, fdr.thr = input$fdr_thr
+        )
       })
     })
 
-    # --- 4. Results Display & Interaction ---
-
-    # A. Render the Interactive Table (Significant Modules)
+    # --- Table Rendering (with Content Control) ---
     output$sig_modules_table <- DT::renderDataTable({
       req(vals$final_result)
-
-      validate(
-        need(isS4(vals$final_result), "Result is not a valid object."),
-        need("significant_modules" %in% slotNames(vals$final_result), "Result object missing 'significant_modules' slot.")
-      )
-
       df <- vals$final_result@significant_modules
 
-      DT::datatable(df,
-                    selection = 'single',
-                    options = list(pageLength = 5, scrollX = TRUE, autoWidth = TRUE),
-                    rownames = FALSE)
-    })
-
-    # B. Render the Plot based on Selection
-    output$fmsea_plot <- renderPlot({
-      req(vals$final_result)
-
-      selected_idx <- input$sig_modules_table_rows_selected
-      validate(need(selected_idx, "Please click a row in the table above to visualize the pathway."))
-
-      df <- vals$final_result@significant_modules
-      target_id <- df$pathway_id[selected_idx]
-
-      featuremsea::plot_fmsea_plot(
-        fmsea_obj = vals$final_result,
-        pathway_id = target_id,
-        title = paste("Pathway:", target_id)
+      DT::datatable(df, selection = 'single', rownames = FALSE,
+                    options = list(
+                      scrollX = TRUE,
+                      scrollY = "200px",
+                      pageLength = 5,
+                      dom = 'tp', # Simplified DOM to save space
+                      columnDefs = list(list(
+                        targets = "_all",
+                        render = DT::JS(
+                          "function(data, type, row, meta) {",
+                          "  return type === 'display' && data !== null && data.length > 20 ?",
+                          "  '<span title=\"' + data + '\">' + data.substr(0, 20) + '...</span>' : data;",
+                          "}"
+                        )
+                      ))
+                    ),
+                    escape = FALSE # Crucial for rendering the JS/HTML
       )
     })
 
-    # C. Render the Text Summary (Moved to bottom)
-    output$result_summary <- renderPrint({
-      req(vals$final_result)
-      print(vals$final_result)
+    # --- Plot Rendering ---
+    current_plot <- reactive({
+      req(vals$final_result, input$sig_modules_table_rows_selected)
+      idx <- input$sig_modules_table_rows_selected
+      target_id <- vals$final_result@significant_modules$pathway_id[idx]
+      featuremsea::plot_fmsea_plot(vals$final_result, target_id)
     })
 
+    output$fmsea_plot <- renderPlot({ current_plot() })
+
+    # --- Download Handlers ---
+    output$download_table <- downloadHandler(
+      filename = function() { paste0("fMSEA_Results_", Sys.Date(), ".csv") },
+      content = function(file) { write.csv(vals$final_result@significant_modules, file, row.names = FALSE) }
+    )
+
+    output$download_png <- downloadHandler(
+      filename = function() { paste0("fMSEA_Plot_", Sys.Date(), ".png") },
+      content = function(file) { ggplot2::ggsave(file, plot = current_plot(), device = "png", width = 8, height = 6) }
+    )
+    output$download_pdf <- downloadHandler(
+      filename = function() { paste0("fMSEA_Plot_", Sys.Date(), ".pdf") },
+      content = function(file) { ggplot2::ggsave(file, plot = current_plot(), device = "pdf", width = 8, height = 6) }
+    )
+
+    output$result_summary <- renderPrint({ req(vals$final_result); print(vals$final_result) })
   })
 }
