@@ -88,6 +88,7 @@ fmsea_ui <- function(id) {
           numericInput(ns("min_compounds"), "Min Compounds", value = 15),
           numericInput(ns("max_compounds"), "Max Compounds", value = 300),
           numericInput(ns("perm_num"), "Permutations", value = 1000),
+          numericInput(ns("max_iter_num"), "Max Iterations", value = 1, min = 1, max = 20),
           numericInput(ns("fdr_thr"), "FDR Thr", value = 0.05),
 
           actionButton(ns("run_step2"), "Run Step 2",
@@ -367,6 +368,7 @@ fmsea_server <- function(id, volumes) {
       l_min_compounds <- as.numeric(input$min_compounds)
       l_max_compounds <- as.numeric(input$max_compounds)
       l_perm_num <- as.numeric(input$perm_num)
+      l_max_iter_num <- as.numeric(input$max_iter_num)
       l_fdr_thr <- as.numeric(input$fdr_thr)
 
       withProgress(message = 'Running Step 2: fMSEA Analysis', value = 0, {
@@ -382,6 +384,7 @@ fmsea_server <- function(id, volumes) {
             max.compounds.num = l_max_compounds,
             id.col = ifelse(l_db_type == "KEGG", "KEGG_ID", "HMDB_ID"),
             perm.num = l_perm_num,
+            max.iter.num = l_max_iter_num,
             fdr.thr = l_fdr_thr
           )
 
